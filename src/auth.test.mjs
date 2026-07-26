@@ -33,9 +33,6 @@ assert.equal(await _test.verifyAccessJwt(token.slice(0,-2)+'xx', {
   CF_ACCESS_TEAM_DOMAIN:'https://verre.cloudflareaccess.com',
   CF_ACCESS_AUD:'admin-audience'
 }),null,'a tampered signature is rejected');
-assert.equal(_test.allowed('kyle@example.com',{ADMIN_EMAILS:'kyle@example.com'}),true);
-assert.equal(_test.allowed('other@example.com',{ADMIN_EMAILS:'kyle@example.com'}),false);
-assert.equal(_test.allowed('kyle@example.com',{}),false,'Cloudflare Access requires an explicit allowlist');
 globalThis.fetch = originalFetch;
 
 const env={ASSETS:{fetch:async()=>new Response('asset')}};
@@ -43,9 +40,9 @@ assert.equal((await worker.fetch(new Request('https://verre.test/api/admin/me'),
 assert.equal((await worker.fetch(new Request('https://verre.test/api/pos/products'),env)).status,401);
 const forged=new Request('https://verre.test/api/admin/me',{headers:{'oai-authenticated-user-email':'attacker@example.com'}});
 assert.equal((await worker.fetch(forged,env)).status,401,'a client-supplied Sites identity is not trusted by default');
-const local={...env,LOCAL_AUTH_BYPASS:'true',LOCAL_AUTH_EMAIL:'local@verre.test'};
+const local={...env,LOCAL_AUTH_BYPASS:'true',LOCAL_AUTH_EMAIL:'local@verre.test',SUPER_ADMIN_EMAILS:'local@verre.test'};
 const me=await worker.fetch(new Request('http://localhost/api/admin/me'),local);
 assert.equal(me.status,200);
 assert.equal((await me.json()).user.email,'local@verre.test');
 
-console.log('ok — Access signature, allowlist, protected routes, and localhost bypass');
+console.log('ok — Access signature, protected routes, and localhost bypass');

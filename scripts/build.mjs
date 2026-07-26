@@ -23,8 +23,12 @@ await cp(
 await cp(resolve(root, "admin"), resolve(client, "admin"), { recursive: true });
 await cp(resolve(root, "pos"), resolve(client, "pos"), { recursive: true });
 
-// The Worker lives in src/ now. Copy it plus its imports; wrangler bundles them.
+// The Worker lives in src/. Copy the whole tree rather than naming each module —
+// a per-file list silently drops every new import until the deploy fails.
+// Tests stay behind; worker.js becomes index.js because that is the entrypoint
+// both wrangler.toml and .openai/hosting.json expect.
+await cp(resolve(root, "src"), server, {
+  recursive: true,
+  filter: (path) => !path.endsWith(".test.mjs") && !path.endsWith("worker.js")
+});
 await cp(resolve(root, "src", "worker.js"), resolve(server, "index.js"));
-await cp(resolve(root, "src", "auth.js"), resolve(server, "auth.js"));
-await cp(resolve(root, "src", "api"), resolve(server, "api"), { recursive: true });
-await cp(resolve(root, "src", "db"), resolve(server, "db"), { recursive: true });

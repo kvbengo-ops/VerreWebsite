@@ -4,6 +4,7 @@ import { adminApi } from './api/admin.js';
 import { posApi } from './api/pos.js';
 import { listPublicProducts } from './db/products.js';
 import { createInquiry } from './db/orders.js';
+import { can, resolveUser } from './roles.js';
 
 const MAX_BODY = 16 * 1024;
 const RESEND_TIMEOUT_MS = 8000;
@@ -24,12 +25,14 @@ export default {
     if (url.pathname === '/api/inquiry') return handleInquiry(request, env);
     if (url.pathname === '/api/products' && request.method === 'GET') return publicProducts(request, env);
     if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/admin') {
-      const user = await authenticate(request, env);
-      return user ? adminApi(request, env, user) : authError();
+      const access = await requestUser(request, env);
+      if (access.response) return access.response;
+      return can(access.user, 'admin') ? adminApi(request, env, access.user) : forbidden();
     }
     if (url.pathname.startsWith('/api/pos/') || url.pathname === '/api/pos') {
-      const user = await authenticate(request, env);
-      return user ? posApi(request, env, user) : authError();
+      const access = await requestUser(request, env);
+      if (access.response) return access.response;
+      return can(access.user, 'pos') ? posApi(request, env, access.user) : forbidden();
     }
     if (/^\/r\/VR-[A-Z2-9]{4}$/.test(url.pathname)) return receiptPage(env, url.pathname.slice(3));
 
@@ -41,8 +44,10 @@ export default {
     // leaves /admin/app.js and /pos/sw.js served straight off ASSETS, so the
     // whole console is readable by anyone who guesses the path.
     if (isProtected(url.pathname)) {
-      const user = await authenticate(request, env);
-      if (!user) return authError();
+      const access = await requestUser(request, env);
+      if (access.response) return access.response;
+      const capability = url.pathname === '/admin' || url.pathname.startsWith('/admin/') ? 'admin' : 'pos';
+      if (!can(access.user, capability)) return forbidden();
       if (url.pathname === '/admin' || url.pathname === '/admin/') url.pathname = '/admin/index.html';
       if (url.pathname === '/pos' || url.pathname === '/pos/') url.pathname = '/pos/index.html';
       return env.ASSETS.fetch(new Request(url, request));
@@ -50,6 +55,28 @@ export default {
     return env.ASSETS.fetch(request);
   }
 };
+
+async function requestUser(request, env) {
+  const identity = await authenticate(request, env);
+  if (!identity) return { response: authError() };
+  const resolved = await resolveUser(env, identity);
+  if (resolved.error) {
+    return {
+      response: json(503, {
+        ok:false,
+        error:'Account permissions are temporarily unavailable',
+        code:'AUTHORIZATION_UNAVAILABLE'
+      })
+    };
+  }
+  return resolved.data ? { user: resolved.data } : { response: forbidden() };
+}
+
+const forbidden = () => json(403, {
+  ok:false,
+  error:'Your account does not have permission for this area',
+  code:'FORBIDDEN'
+});
 
 /* ------------------------------------------------------------------ */
 /* rate limit                                                          */
@@ -139,16 +166,23 @@ async function handleInquiry(request, env) {
   const saved = await createInquiry(env, ref, parsed);
   if (saved.error) console.error('inquiry ' + ref + ': database write failed — ' + saved.error.code);
 
+  // Once the row exists, Kyle has the order — it shows up in /admin whatever the
+  // mailer does. Telling the customer it failed just makes them submit again,
+  // and now there are two rows for one order.
+  const recorded = !saved.error;
+
   const owner = env.OWNER_EMAIL;
   const from = env.FROM_EMAIL;
   if (!env.RESEND_API_KEY || !owner || !from) {
     console.error('inquiry ' + ref + ': email is not configured'); // never log the key itself
+    if (recorded) return json(200, { ok: true, ref });
     return json(502, { ok: false, error: 'Email is not set up yet. Please message Verre on Instagram.' });
   }
 
   const mail = compose(parsed, ref);
 
-  // Kyle's copy is the one that matters — if it fails, the request failed.
+  // Kyle's copy is the one that matters — unless the row already saved it, in
+  // which case the order is safe and only the notification is missing.
   const sentToOwner = await sendEmail(env, {
     from,
     to: owner,
@@ -159,7 +193,9 @@ async function handleInquiry(request, env) {
   });
   if (!sentToOwner.ok) {
     console.error('inquiry ' + ref + ': owner email failed — ' + sentToOwner.error);
-    return json(502, { ok: false, error: "That didn't go through. Please try again in a moment." });
+    if (!recorded) {
+      return json(502, { ok: false, error: "That didn't go through. Please try again in a moment." });
+    }
   }
 
   // The customer confirmation is a nicety. Losing it must not lose the order.

@@ -41,6 +41,11 @@ function uuid(){return crypto.randomUUID()}
 async function init(){
   try{
     if('serviceWorker'in navigator)await navigator.serviceWorker.register('/pos/sw.js',{scope:'/pos/'});
+    api('me').then(({user})=>{
+      const role={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'}[user.role]||user.role;
+      $('#operator').textContent=(user.display_name||user.email)+' · '+role;
+      $('#operator').title=user.email;
+    }).catch(()=>{$('#operator').textContent='Offline operator'});
     state.queue=await all('queue');state.review=await all('review');
     state.session=await get('kv','session')||null;
     state.products=await get('kv','catalog')||[];

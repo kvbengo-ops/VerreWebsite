@@ -107,13 +107,28 @@ globalThis.fetch = async () => {
 hits.clear();
 assert.equal((await worker.fetch(request(order(), { ip: 'confirmation-fail-test' }), env)).status, 200, 'confirmation failure does not lose an order');
 
+// With no database configured AND no mailer, nothing survives the request, so
+// failing honestly is correct. (The inverse — row saved, mailer down, expect 200
+// — needs a real database; it is covered by the local Supabase e2e run.)
+hits.clear();
+globalThis.fetch = async () => new Response('{}', { status: 500 });
+const unconfigured = await worker.fetch(
+  request(order(), { ip: 'unconfigured' }),
+  { ...env, RESEND_API_KEY: '', OWNER_EMAIL: '', FROM_EMAIL: '' }
+);
+assert.equal(unconfigured.status, 502, 'nothing recorded and nothing emailed must not report success');
+
+hits.clear();
+const mailerDown = await worker.fetch(request(order(), { ip: 'mailer-down' }), env);
+assert.equal(mailerDown.status, 502, 'no database either, so a dead mailer still fails honestly');
+
 globalThis.fetch = originalFetch;
 
 // The admin and POS shells are static files. Guarding only /api/admin/* would
 // leave the whole console readable to anyone who guesses the path — which is
 // exactly what happens on a workers.dev host, where Cloudflare Access cannot
 // be attached at all.
-const shellEnv = { ...env, LOCAL_AUTH_BYPASS: 'true', LOCAL_AUTH_EMAIL: 'local@verre.test' };
+const shellEnv = { ...env, LOCAL_AUTH_BYPASS: 'true', LOCAL_AUTH_EMAIL: 'local@verre.test', SUPER_ADMIN_EMAILS: 'local@verre.test' };
 const shell = (path, host) => worker.fetch(new Request('https://' + host + path), shellEnv);
 
 for (const path of ['/admin', '/admin/', '/admin/app.js', '/pos', '/pos/sw.js', '/pos/manifest.json']) {

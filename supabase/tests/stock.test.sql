@@ -53,7 +53,11 @@ select is(
   (select ref from orders where client_uuid = 'aaaaaaaa-0000-0000-0000-000000000001'),
   'a replayed sale returns the original order');
 
-select is((select count(*) from orders), 1::bigint, 'the replay created no second order');
+-- Scoped to this fixture's client_uuid, not the whole table: the suite has to
+-- pass against a database that already holds real orders, not just a fresh reset.
+select is(
+  (select count(*) from orders where client_uuid = 'aaaaaaaa-0000-0000-0000-000000000001'),
+  1::bigint, 'the replay created no second order');
 select is(
   (select stock_on_hand from products where slug = 'test-stickers'), 7,
   'the replay moved no stock');

@@ -9,11 +9,6 @@ const decodeBytes = (part) => {
   return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
 };
 
-function allowed(email, env) {
-  const allowlist = String(env.ADMIN_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);
-  return allowlist.length > 0 && allowlist.includes(String(email || '').toLowerCase());
-}
-
 async function verifyAccessJwt(token, env) {
   if (!token || !env.CF_ACCESS_TEAM_DOMAIN || !env.CF_ACCESS_AUD) return null;
   const parts = token.split('.');
@@ -44,22 +39,34 @@ async function verifyAccessJwt(token, env) {
 export async function authenticate(request, env) {
   const url = new URL(request.url);
   if (env.LOCAL_AUTH_BYPASS === 'true' && ['localhost','127.0.0.1'].includes(url.hostname)) {
-    return { email: env.LOCAL_AUTH_EMAIL || 'local@verre.test', source: 'local' };
+    return {
+      email: env.LOCAL_AUTH_EMAIL || 'local@verre.test',
+      name: env.LOCAL_AUTH_NAME || 'Local Super Admin',
+      source: 'local'
+    };
   }
 
   const accessToken = request.headers.get('cf-access-jwt-assertion');
   if (accessToken) {
     try {
       const payload = await verifyAccessJwt(accessToken, env);
-      if (payload?.email && allowed(payload.email, env)) return { email: payload.email, source: 'cloudflare-access' };
+      if (payload?.email) {
+        return { email: payload.email, name: payload.name || payload.email, source: 'cloudflare-access' };
+      }
     } catch {}
     return null;
   }
 
   // Sites' owner-only dispatcher authenticates before forwarding this header.
   const sitesEmail = request.headers.get('oai-authenticated-user-email');
-  if (env.TRUST_SITES_AUTH === 'true' && sitesEmail && (!env.ADMIN_EMAILS || allowed(sitesEmail, env))) {
-    return { email: sitesEmail, source: 'sites' };
+  if (env.TRUST_SITES_AUTH === 'true' && sitesEmail) {
+    const encodedName = request.headers.get('oai-authenticated-user-full-name');
+    const encoding = request.headers.get('oai-authenticated-user-full-name-encoding');
+    let name = sitesEmail;
+    if (encodedName && encoding === 'percent-encoded-utf-8') {
+      try { name = decodeURIComponent(encodedName); } catch {}
+    }
+    return { email: sitesEmail, name, source: 'sites' };
   }
   return null;
 }
@@ -68,4 +75,4 @@ export const authError = () => new Response(JSON.stringify({
   ok:false, error:'Authentication required', code:'AUTH_REQUIRED'
 }), { status:401, headers:{'content-type':'application/json; charset=utf-8'} });
 
-export const _test = { decodePart, allowed, verifyAccessJwt };
+export const _test = { decodePart, verifyAccessJwt };

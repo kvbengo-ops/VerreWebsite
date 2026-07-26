@@ -7,6 +7,7 @@ export async function posApi(request, env, user) {
   const url=new URL(request.url);
   const path=url.pathname.replace(/^\/api\/pos\/?/,'');
   const parts=path.split('/').filter(Boolean);
+  if(path==='me'&&request.method==='GET')return json(200,{ok:true,user});
   if(path==='products'&&request.method==='GET') {
     const value=await listPublicProducts(env);
     return json(200,{ok:true,data:value.data,stale:Boolean(value.stale)});

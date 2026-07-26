@@ -62,7 +62,7 @@ npx supabase db push      # apply pending migrations to the linked project
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key. Bypasses RLS — **Worker only, never the browser.** |
 | `CF_ACCESS_TEAM_DOMAIN` | Access issuer, such as `https://team.cloudflareaccess.com`. |
 | `CF_ACCESS_AUD` | Access application audience tag checked on every admin/POS API request. |
-| `ADMIN_EMAILS` | Comma-separated email allowlist. Required with Cloudflare Access. |
+| `SUPER_ADMIN_EMAILS` | Comma-separated bootstrap Super Admin emails. `ADMIN_EMAILS` remains a legacy alias. |
 
 Set both the same way as the Resend values: `.dev.vars` locally,
 `npx wrangler secret put NAME` in production. The **anon key is deliberately not
@@ -109,7 +109,21 @@ Product images live in the private `product-images` bucket at
 - `/r/{ref}` is the public, read-only digital receipt.
 
 Cloudflare Access should have separate applications for `/admin/*` (24-hour
-session) and `/pos/*` (30-day session), both restricted to the owner email.
+session) and `/pos/*` (30-day session), restricted to the staff emails that
+should be able to sign in. Access authenticates the email; Verre then applies
+the role stored under **Admin → Accounts**:
+
+| Role | Access |
+| --- | --- |
+| Super Admin | Every feature, including products and account management |
+| General Admin | Dashboard, sales/orders, inventory, sessions, and POS |
+| Cashier | POS only |
+
+Set `SUPER_ADMIN_EMAILS` first so the initial Super Admin can open Accounts.
+Adding an account in Verre does not create a password or update the Cloudflare
+Access policy, so the same email must also be allowed in Access. Deactivate an
+account in Verre to remove its feature access immediately.
+
 For local `wrangler dev`, set `LOCAL_AUTH_BYPASS=true`; the Worker only honors
 that flag on `localhost` or `127.0.0.1`.
 `TRUST_SITES_AUTH` is off by default and should only be enabled for a verified

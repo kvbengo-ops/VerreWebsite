@@ -10,10 +10,13 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 
 # Cloudflare Access. The team domain includes https://, for example
-# https://verre.cloudflareaccess.com. ADMIN_EMAILS is a comma-separated allowlist.
+# https://verre.cloudflareaccess.com. Access authenticates every staff email;
+# Verre's Accounts page assigns permissions.
 CF_ACCESS_TEAM_DOMAIN=
 CF_ACCESS_AUD=
-ADMIN_EMAILS=
+# Emergency/bootstrap Super Admin email(s), comma-separated. Keep at least one
+# configured until a database-managed Super Admin has been tested.
+SUPER_ADMIN_EMAILS=
 
 # Localhost only. authenticate() also checks the request hostname, so this flag
 # cannot bypass Access on a deployed host.

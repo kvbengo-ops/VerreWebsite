@@ -4,7 +4,16 @@ const main=$('#main'), modal=$('#modal'), modalBody=$('#modal-body');
 const money=(c=0)=>'₱'+(Number(c)/100).toLocaleString('en-PH',{minimumFractionDigits:2});
 const date=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(v));
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state={products:[],orders:[],movements:[],sessions:[],dirty:false};
+let state={products:[],orders:[],movements:[],sessions:[],accounts:[],me:null,dirty:false};
+const roleLabels={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'};
+const routeRoles={
+  dashboard:['super_admin','general_admin'],
+  products:['super_admin'],
+  inventory:['super_admin','general_admin'],
+  orders:['super_admin','general_admin'],
+  sessions:['super_admin','general_admin'],
+  accounts:['super_admin']
+};
 
 async function api(path,options={}){
   const response=await fetch('/api/admin/'+path,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
@@ -24,7 +33,13 @@ window.addEventListener('beforeunload',e=>{if(state.dirty){e.preventDefault();e.
 
 function route(){return location.hash.slice(1)||'dashboard'}
 async function render(){
-  const current=route();$$('[data-route]').forEach(a=>a.classList.toggle('active',a.dataset.route===current));
+  const current=route();
+  if(!state.me)return;
+  if(!routeRoles[current]?.includes(state.me.role)){
+    location.hash='dashboard';
+    return;
+  }
+  $$('[data-route]').forEach(a=>a.classList.toggle('active',a.dataset.route===current));
   main.innerHTML='<div class="loading">Loading…</div>';
   try{
     if(current==='dashboard')await dashboard();
@@ -32,11 +47,21 @@ async function render(){
     else if(current==='inventory')await inventory();
     else if(current==='orders')await orders();
     else if(current==='sessions')await sessions();
+    else if(current==='accounts')await accounts();
     else location.hash='dashboard';
     main.focus();
   }catch(error){main.innerHTML=setupError(error)}
 }
 function setupError(error){return `${heading('Needs setup','The studio could not load')}<div class="card attention"><h2>${esc(error.message)}</h2><p>Check the Worker’s private Supabase and authentication configuration. Your storefront remains available while admin is offline.</p><button onclick="location.reload()">Try again</button></div>`}
+
+function configureAccount(){
+  $$('[data-roles]').forEach(node=>{
+    node.hidden=!node.dataset.roles.split(/\s+/).includes(state.me.role);
+  });
+  $('#account-email').textContent=state.me.display_name||state.me.email;
+  $('#account-email').title=state.me.email;
+  $('#account-role').textContent=roleLabels[state.me.role]||state.me.role;
+}
 
 async function dashboard(refresh=false){
   const data=await api('dashboard'+(refresh?'?refresh=1':''));
@@ -190,9 +215,64 @@ async function sessions(){
   `<div class="toolbar"><button id="open-session" class="primary">Start session</button></div><div class="table-wrap"><table><thead><tr><th>Label</th><th>Device</th><th>Opened</th><th>Opening float</th><th>Status</th><th></th></tr></thead><tbody>${state.sessions.map(s=>`<tr><td>${esc(s.label)}</td><td>${esc(s.device_label||'')}</td><td>${date(s.opened_at)}</td><td>${money(s.opening_float_cents)}</td><td><span class="status ${s.closed_at?'fulfilled':'inquiry'}">${s.closed_at?'closed':'open'}</span></td><td>${s.closed_at?'':`<button data-close-session="${s.id}">Close</button>`}</td></tr>`).join('')}</tbody></table></div>`;
   $('#open-session').onclick=()=>sessionForm();$$('[data-close-session]').forEach(b=>b.onclick=()=>closeSessionForm(b.dataset.closeSession));
 }
+
+async function accounts(){
+  state.accounts=await api('accounts');
+  main.innerHTML=heading('People and permissions','Accounts','Cloudflare Access verifies each email. This page controls what that signed-in person may do inside Verre.')+
+    `${state.me.bootstrap?`<div class="card attention" style="margin:22px 0"><strong>${esc(state.me.email)}</strong> is the environment bootstrap Super Admin. Keep that setting until another Super Admin account has been tested.</div>`:''}
+    <section class="role-grid" aria-label="Role permissions">
+      <div class="card"><h2>Super Admin</h2><p>All features, including products and account management.</p></div>
+      <div class="card"><h2>General Admin</h2><p>Dashboard, orders and sales, inventory, sessions, and POS.</p></div>
+      <div class="card"><h2>Cashier</h2><p>POS only. No admin dashboard, orders, inventory, or accounts.</p></div>
+    </section>
+    <div class="toolbar"><button id="new-account" class="primary">Add account</button></div>
+    <div id="accounts-table"></div>`;
+  $('#new-account').onclick=()=>accountForm();
+  drawAccounts();
+}
+function drawAccounts(){
+  $('#accounts-table').innerHTML=state.accounts.length?`<div class="table-wrap"><table><thead><tr><th>Person</th><th>Email</th><th>Role</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${state.accounts.map(account=>`<tr class="${account.active?'':'out'}"><td><strong>${esc(account.display_name)}</strong></td><td>${esc(account.email)}</td><td><span class="role-badge">${esc(roleLabels[account.role]||account.role)}</span></td><td><span class="status ${account.active?'active':'archived'}">${account.active?'active':'inactive'}</span></td><td>${date(account.updated_at)}</td><td><button data-edit-account="${account.id}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No database-managed accounts yet. Add the first staff account here.</div>';
+  $$('[data-edit-account]').forEach(button=>button.onclick=()=>accountForm(state.accounts.find(account=>account.id===button.dataset.editAccount)));
+}
+function accountForm(account={role:'cashier',active:true}){
+  openModal(`<p class="eyebrow">${account.id?'Edit account':'New staff account'}</p><h2>${esc(account.display_name||'Invite by email')}</h2>
+    <p>The person must also be allowed by your Cloudflare Access policy. Verre does not create or store a password.</p>
+    <form id="account-form" class="form-grid" novalidate>
+      ${field('display_name','Display name',account.display_name||'',true)}
+      ${field('email','Sign-in email',account.email||'',true,false,'email')}
+      <label>Role<select name="role"><option value="super_admin">Super Admin — everything</option><option value="general_admin">General Admin — sales, inventory, POS</option><option value="cashier">Cashier — POS only</option></select></label>
+      <label><span>Account active</span><input name="active" type="checkbox" ${account.active!==false?'checked':''}></label>
+      <p class="error span-2" id="account-error" role="status"></p>
+      <div class="span-2 form-actions"><button type="button" class="secondary" id="cancel-account">Cancel</button><button class="primary">Save account</button></div>
+    </form>`);
+  const form=$('#account-form');form.role.value=account.role||'cashier';
+  form.addEventListener('input',()=>state.dirty=true);
+  $('#cancel-account').onclick=()=>{if(!state.dirty||confirm('Discard unsaved changes?'))closeModal()};
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    const data=Object.fromEntries(new FormData(form));
+    data.display_name=data.display_name.trim();data.email=data.email.trim().toLowerCase();data.active=form.elements.active.checked;
+    if(!data.display_name)return $('#account-error').textContent='Display name is required.';
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))return $('#account-error').textContent='Enter a valid email address.';
+    if(account.active&& !data.active && !confirm(`Deactivate ${account.display_name}? They will lose access on their next request.`))return;
+    try{
+      await api('accounts'+(account.id?'/'+account.id:''),{method:account.id?'PATCH':'POST',body:JSON.stringify(data)});
+      state.dirty=false;closeModal();toast('Account permissions saved');accounts();
+    }catch(error){$('#account-error').textContent=error.message}
+  };
+}
 function sessionForm(){openModal(`<h2>Start a market session</h2><form id="session-form" class="form-grid">${field('label','Label','',true)}${field('device_label','Device',navigator.platform)}${field('opening','Opening cash','0.00',true)}<div class="span-2 form-actions"><button class="primary">Start</button></div></form>`);$('#session-form').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target)),opening=parsePeso(d.opening);if(opening==null)return toast('Enter a valid opening amount',true);await api('sessions',{method:'POST',body:JSON.stringify({label:d.label,device_label:d.device_label,opening_float_cents:opening})});closeModal();toast('Session started');sessions()}}
 function closeSessionForm(id){openModal(`<h2>Close session</h2><form id="close-session-form">${field('cash','Counted cash','0.00',true)}<div class="form-actions"><button class="primary">Close session</button></div></form>`);$('#close-session-form').onsubmit=async e=>{e.preventDefault();const cash=parsePeso(new FormData(e.target).get('cash'));if(cash==null)return;await api(`sessions/${id}/close`,{method:'POST',body:JSON.stringify({closing_cash_cents:cash})});closeModal();toast('Session closed');sessions()}}
 
 window.addEventListener('hashchange',render);
-api('me').then(x=>$('#account-email').textContent=x.email).catch(()=>$('#account-email').textContent='Sign-in required');
-render();
+async function boot(){
+  try{
+    state.me=await api('me');
+    configureAccount();
+    await render();
+  }catch(error){
+    $('#account-email').textContent='Sign-in required';
+    main.innerHTML=setupError(error);
+  }
+}
+boot();

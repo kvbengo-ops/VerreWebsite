@@ -16,14 +16,15 @@
     <aside>
       <a class="brand" href="/admin/dashboard"><span>V</span> Verre studio</a>
       <nav aria-label="Admin">
-        <a href="#dashboard" data-route="dashboard">Dashboard</a>
-        <a href="#products" data-route="products">Products</a>
-        <a href="#inventory" data-route="inventory">Inventory</a>
-        <a href="#orders" data-route="orders">Orders</a>
-        <a href="/pos">Open POS ↗</a>
-        <a href="#sessions" data-route="sessions">Sessions</a>
+        <a href="#dashboard" data-route="dashboard" data-roles="super_admin general_admin">Dashboard</a>
+        <a href="#products" data-route="products" data-roles="super_admin">Products</a>
+        <a href="#inventory" data-route="inventory" data-roles="super_admin general_admin">Inventory</a>
+        <a href="#orders" data-route="orders" data-roles="super_admin general_admin">Orders</a>
+        <a href="/pos" data-roles="super_admin general_admin">Open POS ↗</a>
+        <a href="#sessions" data-route="sessions" data-roles="super_admin general_admin">Sessions</a>
+        <a href="#accounts" data-route="accounts" data-roles="super_admin">Accounts</a>
       </nav>
-      <div class="account"><small>Signed in as</small><strong id="account-email">Checking…</strong><a href="/signout-with-chatgpt?return_to=/">Sign out</a></div>
+      <div class="account"><small>Signed in as</small><strong id="account-email">Checking…</strong><span id="account-role" class="role-badge">Checking role…</span><a href="/signout-with-chatgpt?return_to=/">Sign out</a></div>
     </aside>
     <main id="main" tabindex="-1"><div class="loading">Loading the studio…</div></main>
   </div>

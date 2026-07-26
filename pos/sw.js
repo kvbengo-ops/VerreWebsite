@@ -1,4 +1,4 @@
-const VERSION = 'verre-pos-v1';
+const VERSION = 'verre-pos-v2';
 const SHELL = ['/pos/', '/pos/index.html', '/pos/style.css', '/pos/app.js', '/pos/manifest.json', '/pos/icon.svg', '/assets/verre-photo-atlas.png'];
 
 self.addEventListener('install', (event) => {

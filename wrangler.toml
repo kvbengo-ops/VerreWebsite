@@ -6,3 +6,8 @@ compatibility_date = "2025-05-01"
 [assets]
 directory = "dist/client"
 binding = "ASSETS"
+# Without this, Cloudflare serves any matching static file BEFORE the Worker
+# runs, so the auth check in src/worker.js never sees a request for
+# /admin/app.js or /pos/sw.js and the whole console is downloadable.
+# The storefront is deliberately not listed — it must stay fast and public.
+run_worker_first = ["/admin/*", "/pos/*"]
