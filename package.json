@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/check-catalog.mjs && node src/worker.test.mjs && node src/auth.test.mjs && node scripts/check-admin.mjs"
   }
 }

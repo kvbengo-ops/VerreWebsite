@@ -2,3 +2,24 @@
 RESEND_API_KEY=
 OWNER_EMAIL=
 FROM_EMAIL=Verre <hello@your-verified-domain.example>
+
+# Supabase — used from task-admin.md Phase 1 onward.
+# `npx supabase start` prints local values for these.
+# The service role key bypasses RLS: Worker only, never browser code.
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Cloudflare Access. The team domain includes https://, for example
+# https://verre.cloudflareaccess.com. ADMIN_EMAILS is a comma-separated allowlist.
+CF_ACCESS_TEAM_DOMAIN=
+CF_ACCESS_AUD=
+ADMIN_EMAILS=
+
+# Localhost only. authenticate() also checks the request hostname, so this flag
+# cannot bypass Access on a deployed host.
+LOCAL_AUTH_BYPASS=true
+LOCAL_AUTH_EMAIL=local@verre.test
+
+# Only enable when the hosting dispatcher strips the client-supplied header and
+# injects its own verified owner identity. Cloudflare Access does not need this.
+TRUST_SITES_AUTH=false

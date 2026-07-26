@@ -139,6 +139,7 @@
       <div>
         <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Fresh batch</p>
         <h2 style="margin:8px 0 0;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,44px);color:#3A2430;">Made this week</h2>
+        {{ catalogNote }}
       </div>
       <p style="margin:0;font-size:12.5px;color:#7A5C6B;max-width:300px;line-height:1.6;">Each piece is hand-painted or hand-strung, so no two are ever exactly alike.</p>
     </div>
@@ -328,74 +329,22 @@ const atlasBg = (index) => {
   const stops = ['0%', '33.333%', '66.667%', '100%'];
   return "url('./assets/verre-photo-atlas.png') " + stops[index % 4] + ' ' + stops[Math.floor(index / 4)] + ' / 400% 400% no-repeat';
 };
-
-// Product ids are permanent public slugs used by cart storage, links, and the Worker catalog.
-const PRODUCTS = [
-  {
-    id: 'peach-sky-glass-panel', name: 'Peach Sky Glass Panel', tag: 'Glass painting', category: 'glass',
-    price: 850, stock: 1, atlas: 0, gallery: [0, 8], bg: '#FFD9EC', tape: '#FFD166', m: -1.4,
-    blurb: 'A pocket-size sunset painted one soft layer at a time.',
-    description: 'A dreamy peach-and-blue sky painted in reverse on a clear glass panel, so every brushstroke glows through the front. The tiny clouds and hand-finished edges make this one-off piece especially sweet on a sunny shelf.',
-    dimensions: '12 × 12 cm · 4 mm glass', materials: 'Reverse-painted acrylic on tempered glass, sealed matte',
-    care: 'Wipe with a dry cloth. Do not submerge. Keep out of direct sun.', leadTime: 'Ships in 2–3 days'
-  },
-  {
-    id: 'star-cookie-charm', name: 'Star Cookie Charm', tag: 'Keychain', category: 'charms',
-    price: 280, stock: 4, atlas: 1, gallery: [1, 9], bg: '#DFF4FE', tape: '#7ED3F2', m: 1,
-    blurb: 'A sprinkle-bright star for keys, bags, and little adventures.',
-    description: 'A hand-assembled star charm inspired by iced sugar cookies, finished with a cheerful mix of glass and acrylic beads. Bead placement varies slightly, so each charm has its own tiny personality.',
-    dimensions: 'Approx. 11 cm long · 3.5 cm charm', materials: 'Resin charm, glass and acrylic beads, zinc-alloy clasp',
-    care: 'Keep dry and avoid perfume or alcohol. Wipe hardware gently after use.', leadTime: 'Ships in 2–3 days'
-  },
-  {
-    id: 'cloud-bead-bracelet', name: 'Cloud Bead Bracelet', tag: 'Accessory', category: 'charms',
-    price: 320, stock: 3, atlas: 2, gallery: [2, 9], bg: '#FFE1EF', tape: '#FFB6D9', m: -0.6,
-    blurb: 'Pastel beads and a tiny cloud for soft-sky days.',
-    description: 'This stretch bracelet pairs milky glass beads with pastel accents and a miniature cloud centerpiece. Each strand is balanced and knotted by hand for an easy everyday stack.',
-    dimensions: 'Fits wrists 15–17 cm · 8 mm beads', materials: 'Glass and acrylic beads, elastic cord',
-    care: 'Roll on and off instead of stretching. Keep dry and store away from direct sun.', leadTime: 'Ships in 2–3 days'
-  },
-  {
-    id: 'sweetheart-sticker-pack', name: 'Sweetheart Sticker Pack', tag: '6 die-cuts', category: 'stickers',
-    price: 180, stock: 8, atlas: 3, gallery: [3, 10], bg: '#FFF0C7', tape: '#FFD166', m: 1.6,
-    blurb: 'Six glossy little love notes for journals and gadgets.',
-    description: 'A set of six hand-drawn hearts, ribbons, and candy-bright doodles, printed in saturated color and cut individually. The glossy finish makes them perfect for notebooks, phone cases, and happy-mail envelopes.',
-    dimensions: '6 die-cuts · 4–6 cm each', materials: 'Gloss-laminated waterproof vinyl',
-    care: 'Apply to a clean, dry surface. Hand-wash decorated bottles; do not soak.', leadTime: 'Ships in 1–2 days'
-  },
-  {
-    id: 'little-daisy-glass-cup', name: 'Little Daisy Glass Cup', tag: 'Glass painting', category: 'glass',
-    price: 620, stock: 1, atlas: 4, gallery: [4, 8], bg: '#F3FBE7', tape: '#FFB6D9', m: -1,
-    blurb: 'A garden of tiny daisies wrapped around your favorite drink.',
-    description: 'A clear tumbler dotted with individually painted white daisies and sunny yellow centers. The flowers are sealed by hand, leaving the rim and inside completely paint-free.',
-    dimensions: '350 ml · 10.5 × 7.5 cm', materials: 'Soda-lime glass, cured glass paint, food-safe exterior seal',
-    care: 'Hand-wash gently with a soft sponge. Do not soak, microwave, or dishwash.', leadTime: 'Ships in 3–4 days'
-  },
-  {
-    id: 'sparkle-phone-charm', name: 'Sparkle Phone Charm', tag: 'Accessory', category: 'charms',
-    price: 260, stock: 5, atlas: 5, gallery: [5, 9], bg: '#EDE3FF', tape: '#7ED3F2', m: 0.8,
-    blurb: 'A candy-colored wrist loop with just enough sparkle.',
-    description: 'A lightweight phone charm strung with translucent stars, pearly beads, and playful pastel accents. Every loop is arranged by hand and finished with reinforced cord at the phone tab.',
-    dimensions: 'Approx. 18 cm loop · 6 mm cord end', materials: 'Acrylic and glass beads, nylon cord',
-    care: 'Use as a wrist loop, not a drop-proof strap. Keep dry and avoid sharp pulls.', leadTime: 'Ships in 2–3 days'
-  },
-  {
-    id: 'cloud-nine-vinyl-sheet', name: 'Cloud Nine Vinyl Sheet', tag: 'Sticker sheet', category: 'stickers',
-    price: 150, stock: 0, atlas: 6, gallery: [6, 10], bg: '#E7F7FF', tape: '#EF4056', m: -1.8,
-    blurb: 'Tiny clouds, stars, and daydreams on one cheerful sheet.',
-    description: 'A kiss-cut sheet filled with soft blue clouds, pink stars, and miniature sky-day doodles. The compact stickers are sized for planners, pen-pal letters, and all the awkward little notebook gaps.',
-    dimensions: '10 × 15 cm sheet · 18 stickers', materials: 'Gloss-laminated waterproof vinyl',
-    care: 'Peel slowly from the edge and apply to a clean, dry surface.', leadTime: 'Ships in 1–2 days'
-  },
-  {
-    id: 'cherry-red-mini-frame', name: 'Cherry Red Mini Frame', tag: 'Glass painting', category: 'glass',
-    price: 540, stock: 1, atlas: 7, gallery: [7, 8], bg: '#FFDCD9', tape: '#FFD166', m: 1.2,
-    blurb: 'A bright pair of cherries framed for the smallest happy corner.',
-    description: 'Two glossy red cherries are reverse-painted onto glass and set into a hand-finished mini frame. The bold color and tiny scale make it a playful desk piece or an easy handmade gift.',
-    dimensions: '9 × 11 cm framed · 3 mm glass', materials: 'Reverse-painted glass, acrylic paint, sealed wood-composite frame',
-    care: 'Dust with a soft dry cloth. Keep away from moisture and direct sun.', leadTime: 'Ships in 2–3 days'
+const productPhoto = (product, galleryIndex, thumbnail) => {
+  const image = product.images && product.images[galleryIndex];
+  if (!image || !image.url) {
+    const atlasIndex = product.gallery[galleryIndex] ?? product.gallery[0];
+    return atlasPhoto(atlasIndex, product.name + (thumbnail ? ' thumbnail' : ' photo'));
   }
-];
+  return h('img', {
+    src: image.url,
+    alt: image.alt || product.name,
+    loading: thumbnail ? 'lazy' : 'eager',
+    width: thumbnail ? 128 : 960,
+    height: thumbnail ? 128 : 960,
+    style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' }
+  });
+};
+
 const peso = (n) => '₱' + n.toLocaleString('en-PH');
 
 async function postInquiry(payload) {
@@ -449,6 +398,8 @@ const hiddenFieldStyle = {
 
 class Component extends DCLogic {
   state = {
+    products: [],
+    catalogStale: false,
     cart: [],
     overlay: null,
     activeProductId: null,
@@ -473,10 +424,9 @@ class Component extends DCLogic {
   };
 
   componentDidMount() {
-    this.restoreCart();
     this._onPopState = () => this.syncProductFromUrl();
     window.addEventListener('popstate', this._onPopState);
-    this.syncProductFromUrl(true);
+    this.loadCatalog();
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       const els = Array.from(document.querySelectorAll('[data-reveal]'));
@@ -505,7 +455,50 @@ class Component extends DCLogic {
   }
 
   product(id) {
-    return PRODUCTS.find((product) => product.id === id);
+    return this.state.products.find((product) => product.id === id);
+  }
+
+  async loadCatalog() {
+    const requested = new URL(location.href).searchParams.get('p');
+    try {
+      const response = await fetch('/api/products' + (requested ? '?slug=' + encodeURIComponent(requested) : ''));
+      if (!response.ok) throw new Error('Catalog request failed');
+      const body = await response.json();
+      const products = (body.products || []).map((product) => ({
+        id: product.slug,
+        dbId: product.id,
+        name: product.name,
+        tag: product.tag,
+        category: product.category,
+        price: product.price_cents / 100,
+        stock: product.stock_on_hand,
+        atlas: Number(product.atlas ?? product.sort_order ?? 0),
+        gallery: product.gallery || [Number(product.sort_order || 0)],
+        images: product.images || [],
+        bg: product.bg_color || '#FFE1EF',
+        tape: product.tape_color || '#FFD166',
+        m: Number(product.sort_order || 0) % 2 ? 1 : -1,
+        blurb: product.blurb || '',
+        description: product.description || '',
+        dimensions: product.dimensions || '',
+        materials: product.materials || '',
+        care: product.care || '',
+        leadTime: product.lead_time || '',
+        status: product.status
+      }));
+      try { localStorage.setItem('verre.catalog.v1', JSON.stringify(products)); } catch {}
+      this.setState({ products, catalogStale: Boolean(body.stale) }, () => {
+        this.restoreCart();
+        this.syncProductFromUrl(true);
+      });
+    } catch {
+      let products = [];
+      try { products = JSON.parse(localStorage.getItem('verre.catalog.v1') || '[]'); } catch {}
+      this.setState({ products: Array.isArray(products) ? products : [], catalogStale: true }, () => {
+        this.restoreCart();
+        this.syncProductFromUrl(true);
+      });
+    }
   }
 
   restoreCart() {
@@ -869,7 +862,7 @@ class Component extends DCLogic {
   renderCartLines(lines) {
     return h('div', { style: { display: 'grid', gap: 14 } }, lines.map((line) =>
       h('div', { key: line.id, style: { display: 'grid', gridTemplateColumns: '68px 1fr auto', gap: 12, alignItems: 'center', paddingBottom: 14, borderBottom: '2px solid #FFE0EE' } }, [
-        h('div', { key: 'art', style: { width: 68, height: 68, borderRadius: 12, overflow: 'hidden', background: line.bg } }, atlasPhoto(line.atlas, line.name)),
+        h('div', { key: 'art', style: { width: 68, height: 68, borderRadius: 12, overflow: 'hidden', background: line.bg } }, productPhoto(line, 0, true)),
         h('div', { key: 'info', style: { minWidth: 0 } }, [
           h('p', { key: 'name', style: { margin: '0 0 3px', fontSize: 13, fontWeight: 600 } }, line.name),
           h('p', { key: 'price', style: { margin: '0 0 8px', fontSize: 12, color: '#7A5C6B' } }, line.priceLabel + ' each'),
@@ -969,8 +962,9 @@ class Component extends DCLogic {
   }
 
   renderProductPanel(product) {
-    const atlasIndex = product.gallery[this.state.galleryIndex] ?? product.gallery[0];
-    const stockText = product.stock === 0 ? 'Sold out' : product.stock === 1 ? 'One of a kind' : 'Only ' + product.stock + ' left';
+    const gallery = product.images && product.images.length ? product.images : product.gallery;
+    const available = product.status === 'active' && product.stock > 0;
+    const stockText = product.status !== 'active' ? 'No longer available' : product.stock === 0 ? 'Sold out' : product.stock === 1 ? 'One of a kind' : 'Only ' + product.stock + ' left';
     const detailRows = [
       ['Dimensions', product.dimensions],
       ['Materials', product.materials],
@@ -989,17 +983,17 @@ class Component extends DCLogic {
       h('div', { key: 'close', style: { position: 'sticky', top: 0, zIndex: 2, height: 0, display: 'flex', justifyContent: 'flex-end' } }, this.closeButton('Close product details')),
       h('div', { key: 'grid', 'data-product-modal': true, style: { display: 'grid', gap: 'clamp(22px,4vw,38px)', alignItems: 'start' } }, [
         h('div', { key: 'gallery' }, [
-          h('div', { key: 'main', style: { aspectRatio: '1', borderRadius: 20, overflow: 'hidden', background: product.bg, border: '4px solid #fff', boxShadow: '0 10px 24px rgba(160,40,90,.14)' } }, atlasPhoto(atlasIndex, product.name + ' photo ' + (this.state.galleryIndex + 1))),
-          h('div', { key: 'thumbs', style: { display: 'flex', gap: 10, marginTop: 12 } }, product.gallery.map((index, galleryIndex) =>
+          h('div', { key: 'main', style: { aspectRatio: '1', borderRadius: 20, overflow: 'hidden', background: product.bg, border: '4px solid #fff', boxShadow: '0 10px 24px rgba(160,40,90,.14)' } }, productPhoto(product, this.state.galleryIndex, false)),
+          h('div', { key: 'thumbs', style: { display: 'flex', gap: 10, marginTop: 12 } }, gallery.map((entry, galleryIndex) =>
             h('button', {
-              key: index, onClick: () => this.setState({ galleryIndex }), 'aria-label': 'Show photo ' + (galleryIndex + 1),
+              key: entry.id || entry.url || entry, onClick: () => this.setState({ galleryIndex }), 'aria-label': 'Show photo ' + (galleryIndex + 1),
               'aria-pressed': this.state.galleryIndex === galleryIndex,
               style: {
                 width: 64, height: 64, padding: 0, overflow: 'hidden', borderRadius: 12,
                 border: this.state.galleryIndex === galleryIndex ? '3px solid #EF4056' : '3px solid #fff',
                 background: product.bg, cursor: 'pointer'
               }
-            }, atlasPhoto(index, product.name + ' thumbnail ' + (galleryIndex + 1)))
+            }, productPhoto(product, galleryIndex, true))
           ))
         ]),
         h('div', { key: 'details', style: { paddingTop: 8 } }, [
@@ -1016,10 +1010,10 @@ class Component extends DCLogic {
               h('dd', { key: 'description', style: { margin: 0, color: '#3A2430', lineHeight: 1.55, fontSize: 13 } }, description)
             ])
           )),
-          product.stock
+          available
             ? h('button', { key: 'add', onClick: (event) => this.addToCart(product.id, event.currentTarget), style: { ...primaryButtonStyle, width: '100%', marginTop: 22 } }, 'Add to cart · ' + peso(product.price))
             : h('div', { key: 'sold', style: { marginTop: 22, textAlign: 'center' } }, [
-                h('button', { key: 'button', disabled: true, style: { ...primaryButtonStyle, width: '100%', opacity: .5, cursor: 'not-allowed' } }, 'Sold out'),
+                h('button', { key: 'button', disabled: true, style: { ...primaryButtonStyle, width: '100%', opacity: .5, cursor: 'not-allowed' } }, product.status !== 'active' ? 'No longer available' : 'Sold out'),
                 h('a', { key: 'link', href: '#custom', onClick: () => this.closeOverlay(false), style: { display: 'inline-block', marginTop: 12, fontSize: 13, fontWeight: 700 } }, 'Request something similar')
               ])
         ])
@@ -1050,6 +1044,7 @@ class Component extends DCLogic {
     const cartCount = this.state.cart.reduce((sum, entry) => sum + entry.qty, 0);
     const cartLines = this.state.cart.map((entry) => {
       const product = this.product(entry.id);
+      if (!product) return null;
       return {
         ...product,
         qty: entry.qty,
@@ -1057,12 +1052,12 @@ class Component extends DCLogic {
         lineTotal: product.price * entry.qty,
         lineTotalLabel: peso(product.price * entry.qty)
       };
-    });
+    }).filter(Boolean);
     const subtotal = cartLines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const products = PRODUCTS.map((p) => ({
+    const products = this.state.products.filter((p) => p.status === 'active').map((p) => ({
       ...p,
       rot: rot(p.m),
-      art: atlasPhoto(p.atlas, p.name),
+      art: productPhoto(p, 0, false),
       price: peso(p.price),
       priceLabel: peso(p.price),
       open: (event) => this.openProduct(p.id, event.currentTarget),
@@ -1092,6 +1087,10 @@ class Component extends DCLogic {
       cartAria: cartCount ? 'Cart, ' + cartCount + ' item' + (cartCount > 1 ? 's' : '') : 'Cart, empty',
       openCart: (event) => this.openCart(event),
       cartMessage: this.state.cartMessage,
+      catalogNote: this.state.catalogStale ? h('p', {
+        role: 'status',
+        style: { margin: '8px 0 0', color: '#9C536E', fontSize: 12 }
+      }, 'Stock may be a little out of date while the studio reconnects.') : null,
       customForm: this.renderCustomForm(),
       contactForm: this.renderContactForm(),
       overlay: this.renderOverlay(cartLines, subtotal),

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import worker, { _test } from './worker.js';
 
-const { validate, makeRef, compose, rateLimited, hits } = _test;
+const { validate, resolveOrder, makeRef, compose, rateLimited, hits } = _test;
 
 const order = (over = {}) => ({
   type: 'order',
@@ -16,7 +16,10 @@ const order = (over = {}) => ({
 // prices come from the catalog, never the client
 const ok = validate(order({ items: [{ id: 'peach-sky-glass-panel', qty: 2, price: 1 }] }));
 assert.equal(ok.error, undefined);
-assert.equal(ok.subtotal, 1700);
+assert.equal(ok.subtotal, 0);
+const priced = await resolveOrder({}, ok.items);
+assert.equal(priced.error, undefined);
+assert.equal(priced.subtotal, 1700);
 
 // rejections, each with the field the form should focus
 const rejects = [
@@ -29,7 +32,6 @@ const rejects = [
   [order({ fulfillment: 'teleport' }), 'fulfillment'],
   [order({ items: [] }), 'items'],
   [order({ items: Array(60).fill({ id: 'star-cookie-charm', qty: 1 }) }), 'items'],
-  [order({ items: [{ id: 'no-such-thing', qty: 1 }] }), 'items'],
   [order({ items: [{ id: 'star-cookie-charm', qty: 0 }] }), 'items'],
   [order({ items: [{ id: 'star-cookie-charm', qty: 999 }] }), 'items'],
   [order({ items: [{ id: 'star-cookie-charm', qty: 1.5 }] }), 'items'],
@@ -48,7 +50,9 @@ assert.equal(validate({ type: 'contact', name: 'Ana', email: 'ana@example.com', 
 assert.match(makeRef(), /^VR-[A-Z2-9]{4}$/);
 
 // user input never lands raw in the HTML email
-const mail = compose(validate(order({ name: '<script>x</script>' })), 'VR-TEST');
+const unsafe = validate(order({ name: '<script>x</script>' }));
+const unsafePriced = await resolveOrder({}, unsafe.items);
+const mail = compose({ ...unsafe, ...unsafePriced }, 'VR-TEST');
 assert.ok(!mail.ownerHtml.includes('<script>'));
 assert.ok(mail.ownerHtml.includes('&lt;script&gt;'));
 assert.ok(mail.customerText.includes('VR-TEST'));

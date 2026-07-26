@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#3A2430">
+  <title>Verre Market POS</title>
+  <link rel="manifest" href="/pos/manifest.json">
+  <link rel="stylesheet" href="/pos/style.css">
+</head>
+<body>
+  <header>
+    <a class="brand" href="/admin"><span>V</span><strong>Verre market</strong></a>
+    <button id="session-button" class="session">No open session</button>
+    <div class="signals">
+      <span id="network" class="signal" role="status">Checking…</span>
+      <button id="queue-button" class="queue">Pending <b id="pending-count">0</b></button>
+    </div>
+  </header>
+  <main>
+    <section class="catalog" aria-label="Products">
+      <div class="catalog-tools">
+        <input id="search" type="search" placeholder="Search pieces" autocomplete="off">
+        <div id="categories" class="categories" role="tablist"></div>
+      </div>
+      <div id="products" class="products" aria-live="polite"></div>
+    </section>
+    <aside class="cart" aria-label="Current sale">
+      <div><p class="eyebrow">Current sale</p><h1>Cart</h1></div>
+      <div id="session-warning" class="warning" hidden>Selling without an open session. The sale will still be safe.</div>
+      <div id="cart-lines" class="cart-lines"></div>
+      <div class="discount">
+        <label>Discount
+          <div class="discount-row"><input id="discount" inputmode="decimal" placeholder="0"><select id="discount-type"><option value="amount">₱</option><option value="percent">%</option></select></div>
+        </label>
+        <label>Reason <input id="discount-reason" placeholder="Optional reason"></label>
+      </div>
+      <div class="totals">
+        <p><span>Subtotal</span><strong id="subtotal">₱0.00</strong></p>
+        <p><span>Discount</span><strong id="discount-total">−₱0.00</strong></p>
+        <p class="grand"><span>Total</span><strong id="total">₱0.00</strong></p>
+      </div>
+      <div class="payment">
+        <div class="pay-tabs"><button data-payment="cash" class="active">Cash</button><button data-payment="gcash">GCash</button></div>
+        <div id="cash-fields">
+          <label>Tendered <input id="tendered" inputmode="decimal" placeholder="0.00"></label>
+          <div class="quick"><button data-tender="exact">Exact</button><button data-tender="500">₱500</button><button data-tender="1000">₱1,000</button></div>
+          <div class="change"><span>Change</span><strong id="change">₱0.00</strong></div>
+        </div>
+        <label id="gcash-fields" hidden>GCash reference <input id="gcash-reference" autocomplete="off" placeholder="Optional"></label>
+      </div>
+      <button id="complete" class="complete" disabled>Complete sale</button>
+    </aside>
+  </main>
+
+  <dialog id="success">
+    <div class="success-card">
+      <p class="eyebrow">Sale saved</p><h2 id="success-ref">Pending sync</h2>
+      <div id="qr" class="qr"></div>
+      <a id="receipt-link" class="receipt" href="#">Open digital receipt</a>
+      <p id="sync-note"></p>
+      <div class="actions"><button id="undo">Undo sale</button><button id="next-sale" class="primary">Next sale</button></div>
+    </div>
+  </dialog>
+  <dialog id="queue-dialog"><div class="dialog-card"><button class="close" data-close>×</button><h2>Sync queue</h2><p id="queue-message"></p><div id="queue-list"></div><button id="sync-now" class="primary">Sync now</button></div></dialog>
+  <dialog id="session-dialog"><div class="dialog-card"><button class="close" data-close>×</button><h2>Market session</h2><div id="session-body"></div></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/pos/app.js"></script>
+</body>
+</html>

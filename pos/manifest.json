@@ -1,0 +1,19 @@
+{
+  "name": "Verre Market POS",
+  "short_name": "Verre POS",
+  "start_url": "/pos/",
+  "scope": "/pos/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FFF6F0",
+  "theme_color": "#3A2430",
+  "description": "Offline-first checkout for Verre market stalls",
+  "icons": [
+    {
+      "src": "/pos/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

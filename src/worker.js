@@ -1,4 +1,9 @@
-import { CATALOG, peso } from './catalog.js';
+import { authenticate, authError } from './auth.js';
+import { publicProducts, receiptPage } from './api/public.js';
+import { adminApi } from './api/admin.js';
+import { posApi } from './api/pos.js';
+import { listPublicProducts } from './db/products.js';
+import { createInquiry } from './db/orders.js';
 
 const MAX_BODY = 16 * 1024;
 const RESEND_TIMEOUT_MS = 8000;
@@ -14,9 +19,27 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/inquiry') return handleInquiry(request, env);
+    if (url.pathname === '/api/products' && request.method === 'GET') return publicProducts(request, env);
+    if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/admin') {
+      const user = await authenticate(request, env);
+      return user ? adminApi(request, env, user) : authError();
+    }
+    if (url.pathname.startsWith('/api/pos/') || url.pathname === '/api/pos') {
+      const user = await authenticate(request, env);
+      return user ? posApi(request, env, user) : authError();
+    }
+    if (/^\/r\/VR-[A-Z2-9]{4}$/.test(url.pathname)) return receiptPage(env, url.pathname.slice(3));
 
     if (url.pathname === '/') {
       url.pathname = '/index.html';
+      return env.ASSETS.fetch(new Request(url, request));
+    }
+    if (url.pathname === '/admin' || url.pathname === '/admin/') {
+      url.pathname = '/admin/index.html';
+      return env.ASSETS.fetch(new Request(url, request));
+    }
+    if (url.pathname === '/pos' || url.pathname === '/pos/') {
+      url.pathname = '/pos/index.html';
       return env.ASSETS.fetch(new Request(url, request));
     }
     return env.ASSETS.fetch(request);
@@ -95,12 +118,22 @@ async function handleInquiry(request, env) {
   const parsed = validate(body);
   if (parsed.error) return bad(parsed.error, parsed.field);
 
+  if (parsed.type === 'order') {
+    const resolved = await resolveOrder(env, parsed.items);
+    if (resolved.error) return bad(resolved.error, 'items');
+    parsed.items = resolved.items;
+    parsed.subtotal = resolved.subtotal;
+  }
+
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   if (rateLimited(ip)) {
     return json(429, { ok: false, error: 'Too many requests' }, { 'retry-after': '600' });
   }
 
   const ref = makeRef();
+  const saved = await createInquiry(env, ref, parsed);
+  if (saved.error) console.error('inquiry ' + ref + ': database write failed — ' + saved.error.code);
+
   const owner = env.OWNER_EMAIL;
   const from = env.FROM_EMAIL;
   if (!env.RESEND_API_KEY || !owner || !from) {
@@ -183,18 +216,31 @@ function validate(body) {
   const items = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') return { error: 'Something in the cart is unreadable', field: 'items' };
-    const product = CATALOG[str(entry.id)];
-    if (!product) return { error: 'One of those pieces is no longer available', field: 'items' };
+    const id = str(entry.id);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return { error: 'One of those pieces is unreadable', field: 'items' };
     const qty = entry.qty;
     if (!Number.isInteger(qty) || qty < 1 || qty > 20) {
       return { error: 'Quantities must be between 1 and 20', field: 'items' };
     }
-    items.push({ id: str(entry.id), name: product.name, qty, price: product.price, total: product.price * qty });
+    items.push({ id, qty });
   }
 
-  // Prices come from CATALOG, never from the request.
-  const subtotal = items.reduce((sum, i) => sum + i.total, 0);
-  return { type, name, email, phone, message, fulfillment, items, subtotal };
+  return { type, name, email, phone, message, fulfillment, items, subtotal: 0 };
+}
+
+async function resolveOrder(env, items) {
+  const catalog = await listPublicProducts(env);
+  const bySlug = new Map((catalog.data || []).map((product) => [product.slug, product]));
+  const resolved = [];
+  let subtotal = 0;
+  for (const item of items) {
+    const product = bySlug.get(item.id);
+    if (!product || product.status !== 'active') return { error: 'One of those pieces is no longer available' };
+    const price = product.price_cents / 100;
+    resolved.push({ ...item, name: product.name, price, total: price * item.qty });
+    subtotal += price * item.qty;
+  }
+  return { items: resolved, subtotal };
 }
 
 // No I, O, 0, 1 — these get read aloud over the phone.
@@ -214,6 +260,7 @@ const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const LABEL = { order: 'Order request', custom: 'Custom order', contact: 'Message' };
+const peso = (n) => '₱' + Number(n).toLocaleString('en-PH');
 
 function compose(d, ref) {
   const lines = d.items.map((i) => '  ' + i.qty + ' × ' + i.name + ' — ' + peso(i.total));
@@ -350,4 +397,4 @@ async function sendEmail(env, payload) {
   }
 }
 
-export const _test = { validate, makeRef, compose, rateLimited, hits };
+export const _test = { validate, resolveOrder, makeRef, compose, rateLimited, hits };

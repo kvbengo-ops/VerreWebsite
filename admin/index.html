@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verre Studio Admin</title>
+  <meta name="theme-color" content="#F157A8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside>
+      <a class="brand" href="/admin/dashboard"><span>V</span> Verre studio</a>
+      <nav aria-label="Admin">
+        <a href="#dashboard" data-route="dashboard">Dashboard</a>
+        <a href="#products" data-route="products">Products</a>
+        <a href="#inventory" data-route="inventory">Inventory</a>
+        <a href="#orders" data-route="orders">Orders</a>
+        <a href="/pos">Open POS ↗</a>
+        <a href="#sessions" data-route="sessions">Sessions</a>
+      </nav>
+      <div class="account"><small>Signed in as</small><strong id="account-email">Checking…</strong><a href="/signout-with-chatgpt?return_to=/">Sign out</a></div>
+    </aside>
+    <main id="main" tabindex="-1"><div class="loading">Loading the studio…</div></main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="modal"><button class="modal-close" aria-label="Close dialog">×</button><div id="modal-body"></div></dialog>
+  <script type="module" src="/admin/app.js"></script>
+</body>
+</html>
