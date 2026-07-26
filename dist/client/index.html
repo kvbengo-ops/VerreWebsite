@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verre — Handmade Glass Paintings, Charms &amp; Stickers | Cebu City</title>
+<meta name="description" content="Verre is a small-batch arts &amp; crafts studio in Cebu City — hand-painted glass, beaded charms and die-cut stickers, made by hand since 2022.">
+<meta name="theme-color" content="#F157A8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin:0; font-family:'Poppins',system-ui,sans-serif; background:#FFF6F0; color:#3A2430; -webkit-font-smoothing:antialiased; }
+  * { box-sizing:border-box; }
+  a { color:#EF4056; text-decoration:none; }
+  a:hover { color:#F157A8; }
+  input, textarea, button { font-family:'Poppins',sans-serif; }
+  @keyframes vFloat { 0%,100%{transform:translateY(0) rotate(var(--r,0deg));} 50%{transform:translateY(-14px) rotate(var(--r,0deg));} }
+  @keyframes vMarquee { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+  @keyframes vSpin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  @keyframes vTwinkle { 0%,100%{opacity:.35;transform:scale(.85);} 50%{opacity:1;transform:scale(1.1);} }
+  .atlas { background-image:url('./assets/verre-photo-atlas.png'); background-size:400% 400%; background-repeat:no-repeat; background-color:#FFE1EF; }
+
+  :focus-visible { outline:3px solid #EF4056; outline-offset:3px; }
+
+  /* nav links: scrolling strip on mobile, inline row from 900px */
+  [data-desknav] { flex:1 0 100%; order:3; overflow-x:auto; gap:16px; padding:4px 0; font-size:11.5px; scrollbar-width:none; }
+  [data-desknav]::-webkit-scrollbar { display:none; }
+  [data-desknav] a { white-space:nowrap; }
+  @media (min-width:900px) { [data-desknav] { flex:0 1 auto; order:0; overflow:visible; gap:26px; padding:0; font-size:12.5px; } }
+
+  [data-gramgrid] { grid-template-columns:repeat(2,1fr); }
+  @media (min-width:600px) { [data-gramgrid] { grid-template-columns:repeat(3,1fr); } }
+  @media (min-width:900px) { [data-gramgrid] { grid-template-columns:repeat(6,1fr); } }
+
+  @media (prefers-reduced-motion:reduce) {
+    html { scroll-behavior:auto; }
+    *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+  }
+</style>
+</helmet>
+
+<!-- clip, not hidden: overflow-x:hidden creates a scroll container and kills the sticky nav -->
+<div style="position:relative;overflow-x:clip;">
+<div style="position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.35;mix-blend-mode:multiply;background-image:radial-gradient(rgba(120,70,90,.10) 1px, transparent 1px);background-size:3px 3px;"></div>
+
+<!-- NAV -->
+<nav style="position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;padding:12px 18px;background:rgba(255,246,240,.92);backdrop-filter:blur(10px);border-bottom:2px solid #FFE0EE;">
+  <a href="#top" style="display:flex;align-items:center;gap:10px;">
+    <span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:linear-gradient(150deg,#FFB6D9,#F157A8);border:3px solid #fff;box-shadow:0 4px 0 rgba(239,64,86,.22);font-family:'Shrikhand',cursive;color:#fff;font-size:19px;padding-bottom:3px;">V</span>
+    <span style="font-family:'Shrikhand',cursive;font-size:20px;color:#EF4056;letter-spacing:.5px;">Verre</span>
+  </a>
+  <div style="display:flex;align-items:center;font-weight:600;letter-spacing:.14em;text-transform:uppercase;" data-desknav>
+    <a href="#shop" style="color:#3A2430;" style-hover="color:#F157A8;">Shop</a>
+    <a href="#about" style="color:#3A2430;" style-hover="color:#F157A8;">About</a>
+    <a href="#stockists" style="color:#3A2430;" style-hover="color:#F157A8;">Stockists &amp; Markets</a>
+    <a href="#custom" style="color:#3A2430;" style-hover="color:#F157A8;">Custom Orders</a>
+    <a href="#contact" style="color:#3A2430;" style-hover="color:#F157A8;">Contact</a>
+  </div>
+  <button onClick="{{ openCart }}" aria-label="{{ cartAria }}" style="border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:10px 18px;border-radius:999px;box-shadow:0 5px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .18s;" style-hover="transform:translateY(-2px) rotate(-2deg);box-shadow:0 7px 0 rgba(239,64,86,.28);" style-active="transform:translateY(3px) scale(.97);box-shadow:0 2px 0 rgba(239,64,86,.28);">Cart {{ cartLabel }}</button>
+</nav>
+
+<!-- HERO -->
+<header id="top" style="position:relative;overflow:hidden;background:linear-gradient(165deg,#FFB6D9 0%,#F98AC4 45%,#F157A8 100%);padding:64px 20px 90px;text-align:center;">
+  <div aria-hidden="true" style="position:absolute;top:8%;left:6%;--r:-12deg;animation:vFloat 6s ease-in-out infinite;opacity:.95;">
+    <svg width="86" height="60" viewBox="0 0 86 60" fill="none"><path d="M22 52c-11 0-18-7-18-15S11 22 20 22c2-11 11-18 21-18 11 0 20 8 21 19 10 0 20 5 20 15S72 52 62 52z" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/><path d="M22 52c-11 0-18-7-18-15S11 22 20 22c2-11 11-18 21-18 11 0 20 8 21 19 10 0 20 5 20 15S72 52 62 52z" fill="#EAF7FF"/></svg>
+  </div>
+  <div aria-hidden="true" style="position:absolute;top:22%;right:7%;--r:14deg;animation:vFloat 7.5s ease-in-out .6s infinite;">
+    <svg width="64" height="64" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="#FFD166" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
+  </div>
+  <div aria-hidden="true" style="position:absolute;bottom:14%;left:11%;--r:-8deg;animation:vFloat 8s ease-in-out 1.2s infinite;">
+    <svg width="58" height="54" viewBox="0 0 58 54"><path d="M29 50C13 38 4 30 4 20 4 11 11 4 20 4c5 0 9 3 9 3s4-3 9-3c9 0 16 7 16 16 0 10-9 18-25 30z" fill="#EF4056" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
+  </div>
+  <div aria-hidden="true" style="position:absolute;bottom:26%;right:14%;--r:6deg;animation:vFloat 6.8s ease-in-out .3s infinite;">
+    <svg width="46" height="46" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="#7ED3F2" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div style="position:relative;max-width:1060px;margin:0 auto;">
+    <p style="margin:0 0 14px;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#fff;opacity:.95;">Cebu City, Philippines ✦ est. 2022</p>
+    <h1 style="margin:0;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(64px,16vw,150px);line-height:.92;color:#fff;text-shadow:0 6px 0 rgba(239,64,86,.35),0 0 0 #fff;letter-spacing:-.01em;">Verre</h1>
+    <p style="margin:16px auto 0;max-width:520px;font-size:clamp(14px,3.6vw,18px);font-weight:500;color:#fff;line-height:1.6;">Arts &amp; Crafts — Made by Hand.<br><span style="opacity:.85;font-weight:400;font-size:.92em;">Glass paintings, beaded charms &amp; stickers, made in small batches.</span></p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:30px;">
+      <a href="#shop" style="border:3px solid #fff;background:#fff;color:#F157A8;font-weight:700;font-size:14px;letter-spacing:.05em;padding:14px 28px;border-radius:999px;box-shadow:0 6px 0 rgba(239,64,86,.3);transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .18s;" style-hover="transform:translateY(-3px) rotate(-1.5deg);box-shadow:0 9px 0 rgba(239,64,86,.3);" style-active="transform:translateY(3px) scale(.97);box-shadow:0 2px 0 rgba(239,64,86,.3);">Shop the pretties</a>
+      <a href="#stockists" style="border:3px solid #fff;background:transparent;color:#fff;font-weight:700;font-size:14px;letter-spacing:.05em;padding:14px 28px;border-radius:999px;box-shadow:0 6px 0 rgba(239,64,86,.22);transition:transform .18s cubic-bezier(.2,.9,.3,1.4),background .2s;" style-hover="transform:translateY(-3px) rotate(1.5deg);background:rgba(255,255,255,.16);" style-active="transform:translateY(3px) scale(.97);">Find us at markets</a>
+    </div>
+
+    <!-- polaroid collage -->
+    <div style="display:flex;justify-content:center;align-items:flex-start;gap:clamp(4px,1.5vw,14px);margin-top:52px;flex-wrap:nowrap;">
+      <div style="transform:rotate(-9deg);background:#fff;padding:10px 10px 34px;border-radius:8px;box-shadow:0 12px 26px rgba(160,40,90,.25);width:clamp(110px,28vw,200px);transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-4deg) translateY(-8px) scale(1.03);">
+        <div class="atlas" role="img" aria-label="Peach sky glass painting" style="aspect-ratio:1;border-radius:4px;background-position:0% 0%;"></div>
+        <p style="margin:10px 2px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;text-align:center;">glass no. 04</p>
+      </div>
+      <div style="transform:rotate(3deg) translateY(-16px);background:#fff;padding:10px 10px 34px;border-radius:8px;box-shadow:0 16px 30px rgba(160,40,90,.28);width:clamp(120px,30vw,220px);z-index:2;transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(0deg) translateY(-26px) scale(1.04);">
+        <div class="atlas" role="img" aria-label="Beaded star keychain" style="aspect-ratio:1;border-radius:4px;background-position:33.333% 0%;"></div>
+        <p style="margin:10px 2px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;text-align:center;">star charm set</p>
+      </div>
+      <div style="transform:rotate(10deg);background:#fff;padding:10px 10px 34px;border-radius:8px;box-shadow:0 12px 26px rgba(160,40,90,.25);width:clamp(110px,28vw,200px);transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(5deg) translateY(-8px) scale(1.03);">
+        <div class="atlas" role="img" aria-label="Colorful heart sticker pack" style="aspect-ratio:1;border-radius:4px;background-position:100% 0%;"></div>
+        <p style="margin:10px 2px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;text-align:center;">sticker pack</p>
+      </div>
+    </div>
+  </div>
+  <svg aria-hidden="true" viewBox="0 0 1440 60" preserveAspectRatio="none" style="position:absolute;bottom:-1px;left:0;width:100%;height:46px;display:block;"><path d="M0 60V22c120 20 240 20 360 4s240-30 360-14 240 34 360 22 240-26 360-24v50z" fill="#FFF6F0"/></svg>
+</header>
+
+<!-- CATEGORIES -->
+<section id="shop" style="padding:56px 20px 20px;background:#FFF6F0;">
+  <div style="max-width:1100px;margin:0 auto;text-align:center;">
+    <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">What we make</p>
+    <h2 style="margin:10px 0 34px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,44px);color:#3A2430;">Three little worlds</h2>
+    <div style="display:grid;gap:26px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
+      <sc-for list="{{ categories }}" as="c" hint-placeholder-count="3">
+        <a href="#featured" data-reveal style="display:block;background:#fff;border:5px solid #fff;border-radius:28px;padding:0 0 22px;overflow:hidden;box-shadow:0 10px 0 rgba(58,36,48,.10),0 18px 30px rgba(160,40,90,.12);transform:rotate({{ c.rot }});transition:transform .35s cubic-bezier(.2,.9,.3,1.4);text-align:center;" style-hover="transform:rotate(0deg) translateY(-6px);">
+          <div style="aspect-ratio:4/3;display:grid;place-items:center;background:{{ c.bg }};overflow:hidden;">{{ c.art }}</div>
+          <h3 style="margin:18px 16px 6px;font-family:'Shrikhand',cursive;font-weight:400;font-size:22px;color:#3A2430;">{{ c.title }}</h3>
+          <p style="margin:0 22px;font-size:13.5px;line-height:1.6;color:#7A5C6B;">{{ c.copy }}</p>
+          <span style="display:inline-block;margin-top:14px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#EF4056;">Browse ✦</span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURED -->
+<section id="featured" style="padding:56px 20px 70px;background:#FFF6F0;">
+  <div style="max-width:1180px;margin:0 auto;">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:30px;">
+      <div>
+        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Fresh batch</p>
+        <h2 style="margin:8px 0 0;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,44px);color:#3A2430;">Made this week</h2>
+      </div>
+      <p style="margin:0;font-size:12.5px;color:#7A5C6B;max-width:300px;line-height:1.6;">Each piece is hand-painted or hand-strung, so no two are ever exactly alike.</p>
+    </div>
+
+    <div style="display:grid;gap:26px;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));">
+      <sc-for list="{{ products }}" as="p" hint-placeholder-count="8">
+        <article data-reveal style="position:relative;background:#fff;padding:12px 12px 18px;border-radius:14px;box-shadow:0 8px 22px rgba(160,40,90,.14);transform:rotate({{ p.rot }});transition:transform .3s cubic-bezier(.2,.9,.3,1.4),box-shadow .3s;" style-hover="transform:rotate(0deg) translateY(-6px);box-shadow:0 16px 32px rgba(160,40,90,.2);">
+          <span style="position:absolute;top:-10px;left:14px;width:64px;height:22px;background:{{ p.tape }};opacity:.75;transform:rotate(-8deg);box-shadow:0 1px 3px rgba(0,0,0,.06);"></span>
+          <div style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};overflow:hidden;">{{ p.art }}</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:14px;">
+            <div>
+              <h3 style="margin:0;font-size:14px;font-weight:600;color:#3A2430;line-height:1.3;">{{ p.name }}</h3>
+              <p style="margin:3px 0 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;">{{ p.tag }}</p>
+            </div>
+            <span style="flex:none;transform:rotate(6deg);background:#FFF6F0;border:2px dashed #FFB6D9;border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:#EF4056;">{{ p.price }}</span>
+          </div>
+          <button onClick="{{ p.add }}" aria-label="Add {{ p.name }} to cart" style="width:100%;margin-top:14px;border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:12.5px;letter-spacing:.06em;padding:10px 12px;border-radius:999px;box-shadow:0 4px 0 rgba(239,64,86,.26);cursor:pointer;transition:transform .16s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:translateY(-2px);" style-active="transform:translateY(3px) scale(.97);">Add to cart</button>
+        </article>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about" style="padding:70px 20px;background:#7ED3F2;background:linear-gradient(180deg,#EAF7FF,#D6F0FC);">
+  <div style="max-width:1000px;margin:0 auto;display:grid;gap:44px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-items:center;">
+    <div style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="grid-column:1/2;transform:rotate(-6deg);background:#fff;padding:9px 9px 30px;border-radius:6px;box-shadow:0 10px 24px rgba(40,90,120,.2);">
+        <div class="atlas" role="img" aria-label="Verre maker working at her colorful craft desk" style="aspect-ratio:3/4;background-size:533.333% 400%;background-position:0% 100%;border-radius:3px;"></div>
+      </div>
+      <div style="grid-column:2/3;transform:rotate(5deg) translateY(26px);background:#fff;padding:9px 9px 30px;border-radius:6px;box-shadow:0 10px 24px rgba(40,90,120,.2);">
+        <div class="atlas" role="img" aria-label="Hands painting a small glass panel" style="aspect-ratio:3/4;background-size:533.333% 400%;background-position:92.308% 66.667%;border-radius:3px;"></div>
+      </div>
+      <span style="position:absolute;top:-14px;left:32%;width:86px;height:26px;background:#FFD166;opacity:.8;transform:rotate(-6deg);"></span>
+      <svg width="90" height="70" viewBox="0 0 90 70" style="position:absolute;right:-6px;bottom:-26px;"><path d="M6 8c26 34 52 44 76 40" stroke="#EF4056" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M68 38l14 10-16 6" stroke="#EF4056" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div>
+      <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#2E93BD;">The maker</p>
+      <h2 style="margin:10px 0 18px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,42px);color:#20475C;line-height:1.15;">Hi, I'm the hands<br>behind Verre</h2>
+      <p style="margin:0 0 14px;font-size:15px;line-height:1.75;color:#2B5568;">Verre started on a tiny desk in Cebu City with one glass jar, a set of secondhand brushes, and far too many beads. <span style="background:linear-gradient(180deg,transparent 58%,#FFD166 58%);padding:0 2px;">“Verre” is French for glass</span> — the little surface where every piece begins.</p>
+      <p style="margin:0 0 22px;font-size:15px;line-height:1.75;color:#2B5568;">Today it's still just me: painting, stringing charms, and cutting stickers by hand between weekend markets and artist alleys around the city.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <span style="background:#fff;border:3px solid #fff;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;color:#20475C;box-shadow:0 4px 0 rgba(40,90,120,.14);">Small batch</span>
+        <span style="background:#fff;border:3px solid #fff;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;color:#20475C;box-shadow:0 4px 0 rgba(40,90,120,.14);">Hand-painted</span>
+        <span style="background:#fff;border:3px solid #fff;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;color:#20475C;box-shadow:0 4px 0 rgba(40,90,120,.14);">Cebu made</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STOCKISTS -->
+<section id="stockists" style="padding:70px 20px;background:#FFF6F0;">
+  <div style="max-width:1100px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:36px;">
+      <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Come say hi</p>
+      <h2 style="margin:10px 0 0;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,44px);color:#3A2430;">Stockists &amp; markets</h2>
+    </div>
+    <div style="display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin-bottom:44px;">
+      <sc-for list="{{ stockists }}" as="s" hint-placeholder-count="2">
+        <div data-reveal style="position:relative;background:#fff;border:5px solid #fff;border-radius:26px;padding:26px 24px;box-shadow:0 10px 0 rgba(58,36,48,.09),0 18px 28px rgba(160,40,90,.1);transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:translateY(-6px) rotate(-1deg);">
+          <span style="position:absolute;top:-16px;right:20px;display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:{{ s.dot }};border:4px solid #fff;color:#fff;font-size:20px;">✦</span>
+          <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#F157A8;">Stocked at</p>
+          <h3 style="margin:8px 0 6px;font-family:'Shrikhand',cursive;font-weight:400;font-size:24px;color:#3A2430;">{{ s.name }}</h3>
+          <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#7A5C6B;">{{ s.address }}</p>
+          <p style="margin:0;font-size:12px;color:#B98AA0;">{{ s.hours }}</p>
+        </div>
+      </sc-for>
+    </div>
+
+    <p style="margin:0 0 18px;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#EF4056;text-align:center;">Upcoming markets</p>
+    <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));">
+      <sc-for list="{{ markets }}" as="m" hint-placeholder-count="4">
+        <div data-reveal style="display:flex;align-items:center;gap:14px;background:#fff;border-radius:16px;padding:14px 16px;border:2px dashed #FFB6D9;box-shadow:0 6px 16px rgba(160,40,90,.08);transition:transform .25s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-1.5deg) translateY(-3px);">
+          <div style="flex:none;display:grid;place-items:center;width:54px;height:54px;border-radius:12px;background:{{ m.bg }};color:#fff;line-height:1;text-align:center;">
+            <span style="font-size:18px;font-weight:700;">{{ m.day }}</span>
+            <span style="font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;">{{ m.month }}</span>
+          </div>
+          <div style="min-width:0;">
+            <h4 style="margin:0;font-size:14px;font-weight:600;color:#3A2430;">{{ m.name }}</h4>
+            <p style="margin:3px 0 0;font-size:12px;color:#7A5C6B;">{{ m.place }}</p>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<!-- CUSTOM ORDERS -->
+<section id="custom" style="padding:70px 20px;background:linear-gradient(180deg,#FFF0F7,#FFE2F0);">
+  <div style="max-width:900px;margin:0 auto;background:#fff;border:6px solid #fff;border-radius:34px;padding:clamp(24px,5vw,44px);box-shadow:0 14px 0 rgba(239,64,86,.12),0 26px 44px rgba(160,40,90,.14);position:relative;">
+    <span style="position:absolute;top:-22px;left:50%;transform:translateX(-50%) rotate(-3deg);background:#FFD166;border:4px solid #fff;border-radius:999px;padding:6px 20px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#7A4A00;">Commissions open</span>
+    <div style="text-align:center;margin-bottom:26px;">
+      <h2 style="margin:10px 0 10px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6.5vw,40px);color:#3A2430;">Want something painted just for you?</h2>
+      <p style="margin:0 auto;max-width:480px;font-size:14.5px;line-height:1.7;color:#7A5C6B;">Pets, portraits, band logos, wedding gifts — tell me what you're picturing and I'll send a quote within 2–3 days.</p>
+    </div>
+    <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+      <div role="status" style="text-align:center;padding:34px 10px;">
+        <div aria-hidden="true" style="font-size:44px;">✦</div>
+        <h3 style="margin:8px 0 6px;font-family:'Shrikhand',cursive;font-weight:400;font-size:26px;color:#EF4056;">Yay — request sent!</h3>
+        <p style="margin:0;font-size:14px;color:#7A5C6B;">I'll get back to you at your email very soon. 💗</p>
+      </div>
+    </sc-if>
+    <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+      <form onSubmit="{{ submit }}" style="display:grid;gap:14px;">
+        <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+          <label style="display:grid;gap:6px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#B98AA0;">Your name
+            <input required name="name" autocomplete="name" placeholder="Maria" style="border:3px solid #FFE0EE;border-radius:16px;padding:13px 16px;font-size:14px;color:#3A2430;background:#FFFBFD;outline:none;" style-focus="border-color:#FFB6D9;">
+          </label>
+          <label style="display:grid;gap:6px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#B98AA0;">Email
+            <input required type="email" name="email" autocomplete="email" placeholder="hello@email.com" style="border:3px solid #FFE0EE;border-radius:16px;padding:13px 16px;font-size:14px;color:#3A2430;background:#FFFBFD;outline:none;" style-focus="border-color:#FFB6D9;">
+          </label>
+        </div>
+        <label style="display:grid;gap:6px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#B98AA0;">Your request
+          <textarea required name="request" rows="4" placeholder="A little glass painting of my cat, Biscuit ✦" style="border:3px solid #FFE0EE;border-radius:18px;padding:13px 16px;font-size:14px;color:#3A2430;background:#FFFBFD;outline:none;resize:vertical;font-family:'Poppins',sans-serif;" style-focus="border-color:#FFB6D9;"></textarea>
+        </label>
+        <button type="submit" style="justify-self:center;margin-top:6px;border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:14px;letter-spacing:.06em;padding:14px 34px;border-radius:999px;box-shadow:0 6px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:translateY(-3px) rotate(-1.5deg);" style-active="transform:translateY(3px) scale(.97);">Send my request</button>
+      </form>
+    </sc-if>
+  </div>
+</section>
+
+<!-- INSTAGRAM -->
+<section id="contact" style="padding:0 0 70px;background:#FFF6F0;">
+  <div aria-hidden="true" style="overflow:hidden;background:linear-gradient(90deg,#FFB6D9,#F157A8);padding:14px 0;margin-bottom:34px;">
+    <div style="display:flex;width:max-content;animation:vMarquee 26s linear infinite;">
+      <span style="font-family:'Shrikhand',cursive;font-size:26px;color:#fff;white-space:nowrap;">@verrecrafts ✦ made by hand ✦ Cebu City ✦ @verrecrafts ✦ made by hand ✦ Cebu City ✦ </span>
+      <span style="font-family:'Shrikhand',cursive;font-size:26px;color:#fff;white-space:nowrap;">@verrecrafts ✦ made by hand ✦ Cebu City ✦ @verrecrafts ✦ made by hand ✦ Cebu City ✦ </span>
+    </div>
+  </div>
+  <div style="max-width:1100px;margin:0 auto;padding:0 20px;">
+    <div data-gramgrid style="display:grid;gap:14px;">
+      <sc-for list="{{ gram }}" as="g" hint-placeholder-count="6">
+        <a href="#contact" aria-label="{{ g.label }}" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-3deg) scale(1.04);"></a>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer style="background:#3A2430;color:#FFE7F2;padding:48px 20px 34px;text-align:center;">
+  <span style="display:inline-grid;place-items:center;width:60px;height:60px;border-radius:50%;background:linear-gradient(150deg,#FFB6D9,#F157A8);border:4px solid #fff;font-family:'Shrikhand',cursive;color:#fff;font-size:24px;padding-bottom:4px;">V</span>
+  <p style="margin:16px 0 6px;font-family:'Shrikhand',cursive;font-size:22px;color:#fff;">Verre</p>
+  <p style="margin:0 0 20px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#C9A4B7;">Arts &amp; Crafts — Made by Hand</p>
+  <div style="display:flex;justify-content:center;gap:12px;margin-bottom:20px;">
+    <a href="#top" aria-label="Instagram" style="display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);transition:transform .25s cubic-bezier(.2,.9,.3,1.4),background .25s;" style-hover="transform:translateY(-3px) rotate(-6deg);background:#F157A8;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff" stroke="none"/></svg>
+    </a>
+    <a href="#top" aria-label="Facebook" style="display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);transition:transform .25s cubic-bezier(.2,.9,.3,1.4),background .25s;" style-hover="transform:translateY(-3px) rotate(6deg);background:#7ED3F2;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff"><path d="M13.5 21v-8h2.7l.4-3h-3.1V8.2c0-.9.3-1.5 1.5-1.5h1.7V4.1c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3V10H7v3h3v8z"/></svg>
+    </a>
+    <a href="mailto:hello@verrecrafts.ph" aria-label="Email" style="display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);transition:transform .25s cubic-bezier(.2,.9,.3,1.4),background .25s;" style-hover="transform:translateY(-3px) rotate(-6deg);background:#FFD166;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 7l8 6 8-6"/></svg>
+    </a>
+  </div>
+  <p style="margin:0 0 6px;font-size:13px;"><a href="mailto:hello@verrecrafts.ph" style="color:#FFB6D9;">hello@verrecrafts.ph</a></p>
+  <p style="margin:0;font-size:12px;color:#C9A4B7;">Made by hand in Cebu 💗</p>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#F157A8&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#F157A8&quot;,&quot;#EF4056&quot;,&quot;#7ED3F2&quot;,&quot;#FFD166&quot;],&quot;section&quot;:&quot;Look&quot;},&quot;tilt&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2.5,&quot;min&quot;:0,&quot;max&quot;:6,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Look&quot;}}">
+const h = React.createElement;
+const svg = (children, vb) => h('svg', { viewBox: vb || '0 0 64 64', style: { width: '100%', display: 'block', overflow: 'visible' } }, children);
+const star = (fill) => svg(h('path', { key: 's', d: 'M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z', fill, stroke: '#fff', strokeWidth: 5, strokeLinejoin: 'round' }));
+const heart = (fill) => svg(h('path', { key: 'h', d: 'M32 56C14 42 5 34 5 23 5 13 12 6 21 6c5 0 9 3 11 6 2-3 6-6 11-6 9 0 21 7 21 17 0 11-14 19-32 33z', fill, stroke: '#fff', strokeWidth: 5, strokeLinejoin: 'round' }));
+const bead = (fill) => svg([
+  h('circle', { key: 1, cx: 18, cy: 24, r: 10, fill, stroke: '#fff', strokeWidth: 4 }),
+  h('circle', { key: 2, cx: 40, cy: 16, r: 8, fill: '#fff', stroke: '#fff', strokeWidth: 4 }),
+  h('circle', { key: 3, cx: 44, cy: 40, r: 12, fill, stroke: '#fff', strokeWidth: 4 }),
+  h('circle', { key: 4, cx: 22, cy: 48, r: 7, fill: '#fff', stroke: '#fff', strokeWidth: 4 })
+]);
+const frame = (fill) => svg([
+  h('rect', { key: 1, x: 8, y: 8, width: 48, height: 48, rx: 6, fill, stroke: '#fff', strokeWidth: 5 }),
+  h('path', { key: 2, d: 'M14 44l12-14 9 11 6-6 9 9', stroke: '#fff', strokeWidth: 4, fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  h('circle', { key: 3, cx: 24, cy: 22, r: 4, fill: '#fff' })
+]);
+const cloud = (fill) => svg(h('path', { key: 'c', d: 'M20 48c-8 0-14-5-14-12s6-12 13-12c2-8 9-13 17-13s16 6 17 15c8 0 13 4 13 11s-6 11-14 11z', fill, stroke: '#fff', strokeWidth: 5, strokeLinejoin: 'round' }));
+const flower = (fill) => svg([
+  ...[0, 72, 144, 216, 288].map((a, i) => h('ellipse', { key: i, cx: 32, cy: 16, rx: 9, ry: 13, fill, stroke: '#fff', strokeWidth: 4, transform: 'rotate(' + a + ' 32 32)' })),
+  h('circle', { key: 'c', cx: 32, cy: 32, r: 7, fill: '#fff' })
+]);
+const atlasPhoto = (index, label, shape) => {
+  const stops = ['0%', '33.333%', '66.667%', '100%'];
+  const landscapeRows = ['0%', '30.769%', '61.538%', '92.308%'];
+  return h('div', {
+    className: 'atlas',
+    role: 'img',
+    'aria-label': label,
+    style: {
+      width: '100%',
+      height: '100%',
+      backgroundImage: "url('./assets/verre-photo-atlas.png')",
+      backgroundSize: shape === 'landscape' ? '400% auto' : '400% 400%',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: stops[index % 4] + ' ' + (shape === 'landscape' ? landscapeRows[Math.floor(index / 4)] : stops[Math.floor(index / 4)])
+    }
+  });
+};
+const atlasBg = (index) => {
+  const stops = ['0%', '33.333%', '66.667%', '100%'];
+  return "url('./assets/verre-photo-atlas.png') " + stops[index % 4] + ' ' + stops[Math.floor(index / 4)] + ' / 400% 400% no-repeat';
+};
+
+class Component extends DCLogic {
+  state = { cart: 0, sent: false };
+
+  componentDidMount() {
+    // nav + instagram grid breakpoints live in CSS media queries now
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const els = Array.from(document.querySelectorAll('[data-reveal]'));
+    els.forEach((el, i) => {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity .7s cubic-bezier(.2,.8,.2,1) ' + ((i % 4) * 70) + 'ms, transform .7s cubic-bezier(.2,.8,.2,1) ' + ((i % 4) * 70) + 'ms';
+      el.dataset.baseTransform = el.style.transform || '';
+      el.style.transform = (el.dataset.baseTransform || '') + ' translateY(24px)';
+    });
+    this._io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        e.target.style.opacity = '1';
+        e.target.style.transform = e.target.dataset.baseTransform || '';
+        this._io.unobserve(e.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px' });
+    els.forEach((el) => this._io.observe(el));
+  }
+
+  componentWillUnmount() {
+    if (this._io) this._io.disconnect();
+  }
+
+  renderVals() {
+    const accent = this.props.accent ?? '#F157A8';
+    const tilt = this.props.tilt ?? 2.5;
+    const rot = (m) => (tilt * m).toFixed(1) + 'deg';
+    const add = () => this.setState((s) => ({ cart: s.cart + 1 }));
+
+    const products = [
+      { name: 'Peach Sky Glass Panel', tag: 'Glass painting', price: '₱850', bg: '#FFD9EC', tape: '#FFD166', art: atlasPhoto(0, 'Peach Sky Glass Panel'), m: -1.4 },
+      { name: 'Star Cookie Charm', tag: 'Keychain', price: '₱280', bg: '#DFF4FE', tape: '#7ED3F2', art: atlasPhoto(1, 'Star Cookie Charm'), m: 1 },
+      { name: 'Cloud Bead Bracelet', tag: 'Accessory', price: '₱320', bg: '#FFE1EF', tape: '#FFB6D9', art: atlasPhoto(2, 'Cloud Bead Bracelet'), m: -0.6 },
+      { name: 'Sweetheart Sticker Pack', tag: '6 die-cuts', price: '₱180', bg: '#FFF0C7', tape: '#FFD166', art: atlasPhoto(3, 'Sweetheart Sticker Pack'), m: 1.6 },
+      { name: 'Little Daisy Glass Cup', tag: 'Glass painting', price: '₱620', bg: '#F3FBE7', tape: '#FFB6D9', art: atlasPhoto(4, 'Little Daisy Glass Cup'), m: -1 },
+      { name: 'Sparkle Phone Charm', tag: 'Accessory', price: '₱260', bg: '#EDE3FF', tape: '#7ED3F2', art: atlasPhoto(5, 'Sparkle Phone Charm'), m: 0.8 },
+      { name: 'Cloud Nine Vinyl Sheet', tag: 'Sticker sheet', price: '₱150', bg: '#E7F7FF', tape: '#EF4056', art: atlasPhoto(6, 'Cloud Nine Vinyl Sheet'), m: -1.8 },
+      { name: 'Cherry Red Mini Frame', tag: 'Glass painting', price: '₱540', bg: '#FFDCD9', tape: '#FFD166', art: atlasPhoto(7, 'Cherry Red Mini Frame'), m: 1.2 }
+    ].map((p) => ({ ...p, rot: rot(p.m), add }));
+
+    return {
+      accent,
+      cartLabel: this.state.cart ? '(' + this.state.cart + ')' : '✦',
+      cartAria: this.state.cart ? 'Cart, ' + this.state.cart + ' item' + (this.state.cart > 1 ? 's' : '') : 'Cart, empty',
+      // ponytail: no cart drawer in the prototype — jump to the shop. Build the drawer when checkout is real.
+      openCart: () => { const el = document.getElementById('shop'); if (el) el.scrollIntoView({ behavior: 'smooth' }); },
+      sent: this.state.sent,
+      notSent: !this.state.sent,
+      submit: (e) => { e.preventDefault(); this.setState({ sent: true }); },
+      categories: [
+        { title: 'Glass Paintings', copy: 'Hand-painted panels, cups and mini frames — colour laid on the back of the glass.', bg: '#FFE1EF', art: atlasPhoto(8, 'Assortment of hand-painted glass art', 'landscape'), rot: rot(-1) },
+        { title: 'Accessories & Charms', copy: 'Beaded bracelets, phone charms and keyrings strung one bead at a time.', bg: '#DFF4FE', art: atlasPhoto(9, 'Assortment of handmade bead charms', 'landscape'), rot: rot(0.6) },
+        { title: 'Stickers', copy: 'Glossy die-cuts and sheets of tiny sweet things for your laptop and journals.', bg: '#FFF0C7', art: atlasPhoto(10, 'Assortment of colorful die-cut stickers', 'landscape'), rot: rot(1.4) }
+      ],
+      stockists: [
+        { name: 'CR8 Cebu', address: '3F Ayala Central Bloc, Cebu Business Park', hours: 'Open daily · 11am – 9pm', dot: '#F157A8' },
+        { name: 'Art Treats PH', address: '2F Talamban Times Square, Talamban', hours: 'Tue – Sun · 10am – 8pm', dot: '#7ED3F2' }
+      ],
+      markets: [
+        { day: '09', month: 'Aug', name: 'Sugbo Artist Alley', place: 'Robinsons Galleria Cebu', bg: '#F157A8' },
+        { day: '23', month: 'Aug', name: 'Handmade Sunday', place: 'The Outpost, Lahug', bg: '#7ED3F2' },
+        { day: '06', month: 'Sep', name: 'Cebu Craft Fair', place: 'Ayala Central Bloc Atrium', bg: '#FFD166' },
+        { day: '27', month: 'Sep', name: 'Tiny Things Market', place: 'Talamban Times Square', bg: '#EF4056' }
+      ],
+      gram: [
+        { bg: atlasBg(11), label: 'Hands painting a glass panel' },
+        { bg: atlasBg(12), label: 'The Verre maker at her craft desk' },
+        { bg: atlasBg(13), label: 'Paint brushes and colorful beads' },
+        { bg: atlasBg(14), label: 'A handmade order ready to ship' },
+        { bg: atlasBg(15), label: 'Verre craft market display' },
+        { bg: atlasBg(8), label: 'A collection of hand-painted glass pieces' }
+      ],
+      products
+    };
+  }
+}
+</script>
+</body>
+</html>
