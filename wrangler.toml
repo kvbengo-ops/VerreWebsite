@@ -10,4 +10,7 @@ binding = "ASSETS"
 # runs, so the auth check in src/worker.js never sees a request for
 # /admin/app.js or /pos/sw.js and the whole console is downloadable.
 # The storefront is deliberately not listed — it must stay fast and public.
-run_worker_first = ["/admin/*", "/pos/*"]
+# The bare paths are listed separately — "/admin/*" does not match "/admin",
+# which otherwise gets a 307 directory redirect from the asset layer instead of
+# the 401 everything else under it returns.
+run_worker_first = ["/admin", "/admin/*", "/pos", "/pos/*"]

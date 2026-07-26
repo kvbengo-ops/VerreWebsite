@@ -22,6 +22,12 @@ assert.match(sql,/'oversell_correction'/,'oversells need a compensating movement
 
 const html=await readFile(resolve(root,'index.html'),'utf8');
 assert.doesNotMatch(html,/const PRODUCTS\b/,'the storefront must not embed a product catalog');
+const wrangler=await readFile(resolve(root,'wrangler.toml'),'utf8');
+assert.match(
+  wrangler,
+  /run_worker_first\s*=\s*\["\/admin",\s*"\/admin\/\*",\s*"\/pos",\s*"\/pos\/\*"\]/,
+  'bare and nested admin/POS asset paths must run through Worker authorization'
+);
 const clientFiles=[
   resolve(root,'dist','client','index.html'),
   resolve(root,'dist','client','admin','app.js'),
