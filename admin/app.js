@@ -7,11 +7,11 @@ const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':
 let state={products:[],orders:[],movements:[],sessions:[],accounts:[],me:null,dirty:false};
 const roleLabels={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'};
 const routeRoles={
-  dashboard:['super_admin','general_admin'],
+  dashboard:['super_admin'],
   products:['super_admin'],
   inventory:['super_admin','general_admin'],
   orders:['super_admin','general_admin'],
-  sessions:['super_admin','general_admin'],
+  sessions:['super_admin'],
   accounts:['super_admin']
 };
 
@@ -36,7 +36,7 @@ async function render(){
   const current=route();
   if(!state.me)return;
   if(!routeRoles[current]?.includes(state.me.role)){
-    location.hash='dashboard';
+    location.hash=state.me.role==='general_admin'?'orders':'dashboard';
     return;
   }
   $$('[data-route]').forEach(a=>a.classList.toggle('active',a.dataset.route===current));
@@ -222,7 +222,7 @@ async function accounts(){
     `${state.me.bootstrap?`<div class="card attention" style="margin:22px 0"><strong>${esc(state.me.email)}</strong> is the environment bootstrap Super Admin. Keep that setting until another Super Admin account has been tested.</div>`:''}
     <section class="role-grid" aria-label="Role permissions">
       <div class="card"><h2>Super Admin</h2><p>All features, including products and account management.</p></div>
-      <div class="card"><h2>General Admin</h2><p>Dashboard, orders and sales, inventory, sessions, and POS.</p></div>
+      <div class="card"><h2>General Admin</h2><p>Orders and sales, inventory, and POS.</p></div>
       <div class="card"><h2>Cashier</h2><p>POS only. No admin dashboard, orders, inventory, or accounts.</p></div>
     </section>
     <div class="toolbar"><button id="new-account" class="primary">Add account</button></div>

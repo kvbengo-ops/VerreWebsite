@@ -138,4 +138,19 @@ for (const path of ['/admin', '/admin/', '/admin/app.js', '/pos', '/pos/sw.js', 
 assert.equal((await shell('/', 'verre.workers.dev')).status, 200, 'the storefront stays public');
 assert.equal((await shell('/index.html', 'verre.workers.dev')).status, 200, 'storefront assets stay public');
 
+// Directory indexes belong to the asset layer. Rewriting '/admin/' to
+// '/admin/index.html' here makes it canonicalise back to '/admin/', and because
+// run_worker_first routes that through the Worker too, the browser ping-pongs
+// until it gives up with ERR_TOO_MANY_REDIRECTS.
+const seen = [];
+const recordingEnv = {
+  ...shellEnv,
+  ASSETS: { fetch: async (req) => { seen.push(new URL(req.url).pathname); return new Response('asset'); } }
+};
+for (const path of ['/admin', '/admin/', '/pos', '/pos/', '/admin/app.js']) {
+  seen.length = 0;
+  await worker.fetch(new Request('https://localhost' + path), recordingEnv);
+  assert.deepEqual(seen, [path], 'the Worker must hand ' + path + ' to ASSETS unrewritten');
+}
+
 console.log('ok');

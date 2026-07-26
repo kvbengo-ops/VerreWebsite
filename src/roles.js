@@ -8,7 +8,7 @@ export const ROLES = Object.freeze({
 
 const CAPABILITIES = Object.freeze({
   super_admin: ['admin', 'dashboard', 'catalog', 'inventory', 'sales', 'sessions', 'accounts', 'pos'],
-  general_admin: ['admin', 'dashboard', 'inventory', 'sales', 'sessions', 'pos'],
+  general_admin: ['admin', 'inventory', 'sales', 'pos'],
   cashier: ['pos']
 });
 

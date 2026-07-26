@@ -11,9 +11,11 @@ const cashier={email:'cashier@example.com',role:ROLES.CASHIER};
 for(const capability of ['admin','dashboard','catalog','inventory','sales','sessions','accounts','pos']){
   assert.equal(can(superAdmin,capability),true,'Super Admin needs '+capability);
 }
-for(const capability of ['admin','dashboard','inventory','sales','sessions','pos']){
+for(const capability of ['admin','inventory','sales','pos']){
   assert.equal(can(generalAdmin,capability),true,'General Admin needs '+capability);
 }
+assert.equal(can(generalAdmin,'dashboard'),false,'General Admin cannot view the Super Admin dashboard');
+assert.equal(can(generalAdmin,'sessions'),false,'General Admin cannot administer sessions outside POS');
 assert.equal(can(generalAdmin,'catalog'),false,'General Admin cannot manage products');
 assert.equal(can(generalAdmin,'accounts'),false,'General Admin cannot manage accounts');
 assert.equal(can(cashier,'pos'),true,'Cashier can use POS');

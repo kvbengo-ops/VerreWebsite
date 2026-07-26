@@ -116,7 +116,7 @@ the role stored under **Admin → Accounts**:
 | Role | Access |
 | --- | --- |
 | Super Admin | Every feature, including products and account management |
-| General Admin | Dashboard, sales/orders, inventory, sessions, and POS |
+| General Admin | Sales/orders, inventory, and POS |
 | Cashier | POS only |
 
 Set `SUPER_ADMIN_EMAILS` first so the initial Super Admin can open Accounts.

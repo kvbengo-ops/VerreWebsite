@@ -48,9 +48,12 @@ export default {
       if (access.response) return access.response;
       const capability = url.pathname === '/admin' || url.pathname.startsWith('/admin/') ? 'admin' : 'pos';
       if (!can(access.user, capability)) return forbidden();
-      if (url.pathname === '/admin' || url.pathname === '/admin/') url.pathname = '/admin/index.html';
-      if (url.pathname === '/pos' || url.pathname === '/pos/') url.pathname = '/pos/index.html';
-      return env.ASSETS.fetch(new Request(url, request));
+      // Pass the path through untouched. Rewriting '/admin/' to
+      // '/admin/index.html' makes the asset layer canonicalise it straight back
+      // to '/admin/', and since run_worker_first routes that here too, the
+      // browser bounces between the two forever. Directory indexes are the
+      // asset layer's job — let it do them.
+      return env.ASSETS.fetch(request);
     }
     return env.ASSETS.fetch(request);
   }
