@@ -1,0 +1,8 @@
+name = "verre"
+main = "dist/server/index.js"
+compatibility_date = "2025-05-01"
+
+# Run `npm run build` first — both of these point at build output.
+[assets]
+directory = "dist/client"
+binding = "ASSETS"

@@ -11,7 +11,7 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(resolve(client, "assets"), { recursive: true });
 await mkdir(server, { recursive: true });
 
-const page = await readFile(resolve(root, "Verre.dc.html"), "utf8");
+const page = await readFile(resolve(root, "index.html"), "utf8");
 await writeFile(resolve(client, "index.html"), page);
 await cp(resolve(root, "support.js"), resolve(client, "support.js"));
 await cp(
@@ -19,17 +19,6 @@ await cp(
   resolve(client, "assets", "verre-photo-atlas.png")
 );
 
-await writeFile(
-  resolve(server, "index.js"),
-  `export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/") {
-      url.pathname = "/index.html";
-      return env.ASSETS.fetch(new Request(url, request));
-    }
-    return env.ASSETS.fetch(request);
-  }
-};
-`
-);
+// The Worker lives in src/ now. Copy it plus its imports; wrangler bundles them.
+await cp(resolve(root, "src", "worker.js"), resolve(server, "index.js"));
+await cp(resolve(root, "src", "catalog.js"), resolve(server, "catalog.js"));

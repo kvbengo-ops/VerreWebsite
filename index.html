@@ -38,6 +38,10 @@
   [data-gramgrid] { grid-template-columns:repeat(2,1fr); }
   @media (min-width:600px) { [data-gramgrid] { grid-template-columns:repeat(3,1fr); } }
   @media (min-width:900px) { [data-gramgrid] { grid-template-columns:repeat(6,1fr); } }
+  [data-product-modal] { grid-template-columns:1fr; }
+  @media (min-width:760px) { [data-product-modal] { grid-template-columns:minmax(0,1fr) minmax(280px,.9fr); } }
+  [data-contact-form] { grid-template-columns:1fr; }
+  @media (min-width:700px) { [data-contact-form] { grid-template-columns:1fr 1fr; } }
 
   @media (prefers-reduced-motion:reduce) {
     html { scroll-behavior:auto; }
@@ -63,7 +67,7 @@
     <a href="#custom" style="color:#3A2430;" style-hover="color:#F157A8;">Custom Orders</a>
     <a href="#contact" style="color:#3A2430;" style-hover="color:#F157A8;">Contact</a>
   </div>
-  <button onClick="{{ openCart }}" aria-label="{{ cartAria }}" style="border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:10px 18px;border-radius:999px;box-shadow:0 5px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .18s;" style-hover="transform:translateY(-2px) rotate(-2deg);box-shadow:0 7px 0 rgba(239,64,86,.28);" style-active="transform:translateY(3px) scale(.97);box-shadow:0 2px 0 rgba(239,64,86,.28);">Cart {{ cartLabel }}</button>
+  <button data-cart-trigger onClick="{{ openCart }}" aria-label="{{ cartAria }}" style="border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:10px 18px;border-radius:999px;box-shadow:0 5px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .18s;" style-hover="transform:translateY(-2px) rotate(-2deg);box-shadow:0 7px 0 rgba(239,64,86,.28);" style-active="transform:translateY(3px) scale(.97);box-shadow:0 2px 0 rgba(239,64,86,.28);">Cart {{ cartLabel }}</button>
 </nav>
 
 <!-- HERO -->
@@ -143,15 +147,15 @@
       <sc-for list="{{ products }}" as="p" hint-placeholder-count="8">
         <article data-reveal style="position:relative;background:#fff;padding:12px 12px 18px;border-radius:14px;box-shadow:0 8px 22px rgba(160,40,90,.14);transform:rotate({{ p.rot }});transition:transform .3s cubic-bezier(.2,.9,.3,1.4),box-shadow .3s;" style-hover="transform:rotate(0deg) translateY(-6px);box-shadow:0 16px 32px rgba(160,40,90,.2);">
           <span style="position:absolute;top:-10px;left:14px;width:64px;height:22px;background:{{ p.tape }};opacity:.75;transform:rotate(-8deg);box-shadow:0 1px 3px rgba(0,0,0,.06);"></span>
-          <div style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};overflow:hidden;">{{ p.art }}</div>
+          <div role="button" tabindex="0" onClick="{{ p.open }}" onKeyDown="{{ p.keyOpen }}" aria-label="View details for {{ p.name }}" style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};overflow:hidden;cursor:pointer;">{{ p.art }}</div>
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:14px;">
             <div>
-              <h3 style="margin:0;font-size:14px;font-weight:600;color:#3A2430;line-height:1.3;">{{ p.name }}</h3>
+              <h3 style="margin:0;font-size:14px;font-weight:600;line-height:1.3;"><button onClick="{{ p.open }}" style="padding:0;border:0;background:none;color:#3A2430;font:inherit;text-align:left;cursor:pointer;">{{ p.name }}</button></h3>
               <p style="margin:3px 0 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;">{{ p.tag }}</p>
             </div>
             <span style="flex:none;transform:rotate(6deg);background:#FFF6F0;border:2px dashed #FFB6D9;border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:#EF4056;">{{ p.price }}</span>
           </div>
-          <button onClick="{{ p.add }}" aria-label="Add {{ p.name }} to cart" style="width:100%;margin-top:14px;border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:12.5px;letter-spacing:.06em;padding:10px 12px;border-radius:999px;box-shadow:0 4px 0 rgba(239,64,86,.26);cursor:pointer;transition:transform .16s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:translateY(-2px);" style-active="transform:translateY(3px) scale(.97);">Add to cart</button>
+          {{ p.addButton }}
         </article>
       </sc-for>
     </div>
@@ -230,29 +234,7 @@
       <h2 style="margin:10px 0 10px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6.5vw,40px);color:#3A2430;">Want something painted just for you?</h2>
       <p style="margin:0 auto;max-width:480px;font-size:14.5px;line-height:1.7;color:#7A5C6B;">Pets, portraits, band logos, wedding gifts — tell me what you're picturing and I'll send a quote within 2–3 days.</p>
     </div>
-    <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
-      <div role="status" style="text-align:center;padding:34px 10px;">
-        <div aria-hidden="true" style="font-size:44px;">✦</div>
-        <h3 style="margin:8px 0 6px;font-family:'Shrikhand',cursive;font-weight:400;font-size:26px;color:#EF4056;">Yay — request sent!</h3>
-        <p style="margin:0;font-size:14px;color:#7A5C6B;">I'll get back to you at your email very soon. 💗</p>
-      </div>
-    </sc-if>
-    <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
-      <form onSubmit="{{ submit }}" style="display:grid;gap:14px;">
-        <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
-          <label style="display:grid;gap:6px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#B98AA0;">Your name
-            <input required name="name" autocomplete="name" placeholder="Maria" style="border:3px solid #FFE0EE;border-radius:16px;padding:13px 16px;font-size:14px;color:#3A2430;background:#FFFBFD;outline:none;" style-focus="border-color:#FFB6D9;">
-          </label>
-          <label style="display:grid;gap:6px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#B98AA0;">Email
-            <input required type="email" name="email" autocomplete="email" placeholder="hello@email.com" style="border:3px solid #FFE0EE;border-radius:16px;padding:13px 16px;font-size:14px;color:#3A2430;background:#FFFBFD;outline:none;" style-focus="border-color:#FFB6D9;">
-          </label>
-        </div>
-        <label style="display:grid;gap:6px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#B98AA0;">Your request
-          <textarea required name="request" rows="4" placeholder="A little glass painting of my cat, Biscuit ✦" style="border:3px solid #FFE0EE;border-radius:18px;padding:13px 16px;font-size:14px;color:#3A2430;background:#FFFBFD;outline:none;resize:vertical;font-family:'Poppins',sans-serif;" style-focus="border-color:#FFB6D9;"></textarea>
-        </label>
-        <button type="submit" style="justify-self:center;margin-top:6px;border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:14px;letter-spacing:.06em;padding:14px 34px;border-radius:999px;box-shadow:0 6px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:translateY(-3px) rotate(-1.5deg);" style-active="transform:translateY(3px) scale(.97);">Send my request</button>
-      </form>
-    </sc-if>
+    {{ customForm }}
   </div>
 </section>
 
@@ -267,8 +249,16 @@
   <div style="max-width:1100px;margin:0 auto;padding:0 20px;">
     <div data-gramgrid style="display:grid;gap:14px;">
       <sc-for list="{{ gram }}" as="g" hint-placeholder-count="6">
-        <a href="#contact" aria-label="{{ g.label }}" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-3deg) scale(1.04);"></a>
+        <div role="img" aria-label="{{ g.label }}" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;"></div>
       </sc-for>
+    </div>
+    <div style="max-width:760px;margin:50px auto 0;background:#fff;border:5px solid #fff;border-radius:28px;padding:clamp(22px,5vw,38px);box-shadow:0 10px 0 rgba(239,64,86,.1),0 18px 30px rgba(160,40,90,.12);">
+      <div style="text-align:center;margin-bottom:24px;">
+        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Say hello</p>
+        <h2 style="margin:8px 0 8px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6vw,38px);color:#3A2430;">Send a little note</h2>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#7A5C6B;">Questions about a piece, a market, or an order? I’ll get back to you within 2–3 days.</p>
+      </div>
+      {{ contactForm }}
     </div>
   </div>
 </section>
@@ -292,6 +282,8 @@
   <p style="margin:0 0 6px;font-size:13px;"><a href="mailto:hello@verrecrafts.ph" style="color:#FFB6D9;">hello@verrecrafts.ph</a></p>
   <p style="margin:0;font-size:12px;color:#C9A4B7;">Made by hand in Cebu 💗</p>
 </footer>
+{{ overlay }}
+<div role="status" aria-live="polite" aria-atomic="true" style="position:fixed;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">{{ cartMessage }}</div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#F157A8&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#F157A8&quot;,&quot;#EF4056&quot;,&quot;#7ED3F2&quot;,&quot;#FFD166&quot;],&quot;section&quot;:&quot;Look&quot;},&quot;tilt&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:2.5,&quot;min&quot;:0,&quot;max&quot;:6,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Look&quot;}}">
@@ -337,61 +329,772 @@ const atlasBg = (index) => {
   return "url('./assets/verre-photo-atlas.png') " + stops[index % 4] + ' ' + stops[Math.floor(index / 4)] + ' / 400% 400% no-repeat';
 };
 
+// Product ids are permanent public slugs used by cart storage, links, and the Worker catalog.
+const PRODUCTS = [
+  {
+    id: 'peach-sky-glass-panel', name: 'Peach Sky Glass Panel', tag: 'Glass painting', category: 'glass',
+    price: 850, stock: 1, atlas: 0, gallery: [0, 8], bg: '#FFD9EC', tape: '#FFD166', m: -1.4,
+    blurb: 'A pocket-size sunset painted one soft layer at a time.',
+    description: 'A dreamy peach-and-blue sky painted in reverse on a clear glass panel, so every brushstroke glows through the front. The tiny clouds and hand-finished edges make this one-off piece especially sweet on a sunny shelf.',
+    dimensions: '12 × 12 cm · 4 mm glass', materials: 'Reverse-painted acrylic on tempered glass, sealed matte',
+    care: 'Wipe with a dry cloth. Do not submerge. Keep out of direct sun.', leadTime: 'Ships in 2–3 days'
+  },
+  {
+    id: 'star-cookie-charm', name: 'Star Cookie Charm', tag: 'Keychain', category: 'charms',
+    price: 280, stock: 4, atlas: 1, gallery: [1, 9], bg: '#DFF4FE', tape: '#7ED3F2', m: 1,
+    blurb: 'A sprinkle-bright star for keys, bags, and little adventures.',
+    description: 'A hand-assembled star charm inspired by iced sugar cookies, finished with a cheerful mix of glass and acrylic beads. Bead placement varies slightly, so each charm has its own tiny personality.',
+    dimensions: 'Approx. 11 cm long · 3.5 cm charm', materials: 'Resin charm, glass and acrylic beads, zinc-alloy clasp',
+    care: 'Keep dry and avoid perfume or alcohol. Wipe hardware gently after use.', leadTime: 'Ships in 2–3 days'
+  },
+  {
+    id: 'cloud-bead-bracelet', name: 'Cloud Bead Bracelet', tag: 'Accessory', category: 'charms',
+    price: 320, stock: 3, atlas: 2, gallery: [2, 9], bg: '#FFE1EF', tape: '#FFB6D9', m: -0.6,
+    blurb: 'Pastel beads and a tiny cloud for soft-sky days.',
+    description: 'This stretch bracelet pairs milky glass beads with pastel accents and a miniature cloud centerpiece. Each strand is balanced and knotted by hand for an easy everyday stack.',
+    dimensions: 'Fits wrists 15–17 cm · 8 mm beads', materials: 'Glass and acrylic beads, elastic cord',
+    care: 'Roll on and off instead of stretching. Keep dry and store away from direct sun.', leadTime: 'Ships in 2–3 days'
+  },
+  {
+    id: 'sweetheart-sticker-pack', name: 'Sweetheart Sticker Pack', tag: '6 die-cuts', category: 'stickers',
+    price: 180, stock: 8, atlas: 3, gallery: [3, 10], bg: '#FFF0C7', tape: '#FFD166', m: 1.6,
+    blurb: 'Six glossy little love notes for journals and gadgets.',
+    description: 'A set of six hand-drawn hearts, ribbons, and candy-bright doodles, printed in saturated color and cut individually. The glossy finish makes them perfect for notebooks, phone cases, and happy-mail envelopes.',
+    dimensions: '6 die-cuts · 4–6 cm each', materials: 'Gloss-laminated waterproof vinyl',
+    care: 'Apply to a clean, dry surface. Hand-wash decorated bottles; do not soak.', leadTime: 'Ships in 1–2 days'
+  },
+  {
+    id: 'little-daisy-glass-cup', name: 'Little Daisy Glass Cup', tag: 'Glass painting', category: 'glass',
+    price: 620, stock: 1, atlas: 4, gallery: [4, 8], bg: '#F3FBE7', tape: '#FFB6D9', m: -1,
+    blurb: 'A garden of tiny daisies wrapped around your favorite drink.',
+    description: 'A clear tumbler dotted with individually painted white daisies and sunny yellow centers. The flowers are sealed by hand, leaving the rim and inside completely paint-free.',
+    dimensions: '350 ml · 10.5 × 7.5 cm', materials: 'Soda-lime glass, cured glass paint, food-safe exterior seal',
+    care: 'Hand-wash gently with a soft sponge. Do not soak, microwave, or dishwash.', leadTime: 'Ships in 3–4 days'
+  },
+  {
+    id: 'sparkle-phone-charm', name: 'Sparkle Phone Charm', tag: 'Accessory', category: 'charms',
+    price: 260, stock: 5, atlas: 5, gallery: [5, 9], bg: '#EDE3FF', tape: '#7ED3F2', m: 0.8,
+    blurb: 'A candy-colored wrist loop with just enough sparkle.',
+    description: 'A lightweight phone charm strung with translucent stars, pearly beads, and playful pastel accents. Every loop is arranged by hand and finished with reinforced cord at the phone tab.',
+    dimensions: 'Approx. 18 cm loop · 6 mm cord end', materials: 'Acrylic and glass beads, nylon cord',
+    care: 'Use as a wrist loop, not a drop-proof strap. Keep dry and avoid sharp pulls.', leadTime: 'Ships in 2–3 days'
+  },
+  {
+    id: 'cloud-nine-vinyl-sheet', name: 'Cloud Nine Vinyl Sheet', tag: 'Sticker sheet', category: 'stickers',
+    price: 150, stock: 0, atlas: 6, gallery: [6, 10], bg: '#E7F7FF', tape: '#EF4056', m: -1.8,
+    blurb: 'Tiny clouds, stars, and daydreams on one cheerful sheet.',
+    description: 'A kiss-cut sheet filled with soft blue clouds, pink stars, and miniature sky-day doodles. The compact stickers are sized for planners, pen-pal letters, and all the awkward little notebook gaps.',
+    dimensions: '10 × 15 cm sheet · 18 stickers', materials: 'Gloss-laminated waterproof vinyl',
+    care: 'Peel slowly from the edge and apply to a clean, dry surface.', leadTime: 'Ships in 1–2 days'
+  },
+  {
+    id: 'cherry-red-mini-frame', name: 'Cherry Red Mini Frame', tag: 'Glass painting', category: 'glass',
+    price: 540, stock: 1, atlas: 7, gallery: [7, 8], bg: '#FFDCD9', tape: '#FFD166', m: 1.2,
+    blurb: 'A bright pair of cherries framed for the smallest happy corner.',
+    description: 'Two glossy red cherries are reverse-painted onto glass and set into a hand-finished mini frame. The bold color and tiny scale make it a playful desk piece or an easy handmade gift.',
+    dimensions: '9 × 11 cm framed · 3 mm glass', materials: 'Reverse-painted glass, acrylic paint, sealed wood-composite frame',
+    care: 'Dust with a soft dry cloth. Keep away from moisture and direct sun.', leadTime: 'Ships in 2–3 days'
+  }
+];
+const peso = (n) => '₱' + n.toLocaleString('en-PH');
+
+async function postInquiry(payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch('/api/inquiry', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    let body = null;
+    try { body = await response.json(); } catch {}
+    if (response.ok && body && body.ok && body.ref) return { ok: true, ref: body.ref };
+    return {
+      ok: false,
+      error: body && body.error ? body.error : 'That did not go through. Please try again in a moment.',
+      ...(body && body.field ? { field: body.field } : {})
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.name === 'AbortError'
+        ? 'That took too long. Please check your connection and try again.'
+        : 'I could not reach the studio. Please check your connection and try again.'
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const inputStyle = {
+  width: '100%', border: '3px solid #FFE0EE', borderRadius: 16, padding: '13px 16px',
+  fontSize: 14, color: '#3A2430', background: '#FFFBFD', outline: 'none'
+};
+const labelStyle = {
+  display: 'grid', gap: 6, fontSize: 11, fontWeight: 600, letterSpacing: '.18em',
+  textTransform: 'uppercase', color: '#B98AA0'
+};
+const primaryButtonStyle = {
+  border: '3px solid #fff', background: 'linear-gradient(140deg,#FFB6D9,#F157A8)',
+  color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '.06em', padding: '13px 24px',
+  borderRadius: 999, boxShadow: '0 6px 0 rgba(239,64,86,.28)', cursor: 'pointer',
+  transition: 'transform .18s cubic-bezier(.2,.9,.3,1.4)'
+};
+const hiddenFieldStyle = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden',
+  clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0
+};
+
 class Component extends DCLogic {
-  state = { cart: 0, sent: false };
+  state = {
+    cart: [],
+    overlay: null,
+    activeProductId: null,
+    galleryIndex: 0,
+    cartView: 'items',
+    cartMessage: '',
+    customFormState: 'idle',
+    customFormError: '',
+    customErrorField: '',
+    customFormRef: '',
+    customDraft: { name: '', email: '', message: '', hp: '' },
+    contactFormState: 'idle',
+    contactFormError: '',
+    contactErrorField: '',
+    contactFormRef: '',
+    contactDraft: { name: '', email: '', message: '', hp: '' },
+    orderFormState: 'idle',
+    orderFormError: '',
+    orderErrorField: '',
+    orderFormRef: '',
+    orderDraft: { name: '', email: '', phone: '', fulfillment: 'pickup', message: '', hp: '' }
+  };
 
   componentDidMount() {
-    // nav + instagram grid breakpoints live in CSS media queries now
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    this.restoreCart();
+    this._onPopState = () => this.syncProductFromUrl();
+    window.addEventListener('popstate', this._onPopState);
+    this.syncProductFromUrl(true);
 
-    const els = Array.from(document.querySelectorAll('[data-reveal]'));
-    els.forEach((el, i) => {
-      el.style.opacity = '0';
-      el.style.transition = 'opacity .7s cubic-bezier(.2,.8,.2,1) ' + ((i % 4) * 70) + 'ms, transform .7s cubic-bezier(.2,.8,.2,1) ' + ((i % 4) * 70) + 'ms';
-      el.dataset.baseTransform = el.style.transform || '';
-      el.style.transform = (el.dataset.baseTransform || '') + ' translateY(24px)';
-    });
-    this._io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting) return;
-        e.target.style.opacity = '1';
-        e.target.style.transform = e.target.dataset.baseTransform || '';
-        this._io.unobserve(e.target);
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const els = Array.from(document.querySelectorAll('[data-reveal]'));
+      els.forEach((el, i) => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity .7s cubic-bezier(.2,.8,.2,1) ' + ((i % 4) * 70) + 'ms, transform .7s cubic-bezier(.2,.8,.2,1) ' + ((i % 4) * 70) + 'ms';
+        el.dataset.baseTransform = el.style.transform || '';
+        el.style.transform = (el.dataset.baseTransform || '') + ' translateY(24px)';
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px' });
-    els.forEach((el) => this._io.observe(el));
+      this._io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          e.target.style.opacity = '1';
+          e.target.style.transform = e.target.dataset.baseTransform || '';
+          this._io.unobserve(e.target);
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px' });
+      els.forEach((el) => this._io.observe(el));
+    }
   }
 
   componentWillUnmount() {
     if (this._io) this._io.disconnect();
+    if (this._onPopState) window.removeEventListener('popstate', this._onPopState);
+    this.releaseOverlay(false);
+  }
+
+  product(id) {
+    return PRODUCTS.find((product) => product.id === id);
+  }
+
+  restoreCart() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('verre.cart.v1') || '[]');
+      if (!Array.isArray(raw)) return;
+      const restored = [];
+      const seen = new Set();
+      raw.forEach((entry) => {
+        if (!entry || typeof entry.id !== 'string' || seen.has(entry.id)) return;
+        const product = this.product(entry.id);
+        if (!product || product.stock < 1) return;
+        const qty = Math.max(1, Math.min(Number.isFinite(entry.qty) ? Math.floor(entry.qty) : 1, Math.min(20, product.stock)));
+        restored.push({ id: product.id, qty });
+        seen.add(product.id);
+      });
+      this.setState({ cart: restored });
+    } catch {
+      try { localStorage.removeItem('verre.cart.v1'); } catch {}
+    }
+  }
+
+  persistCart(cart) {
+    try {
+      if (cart.length) localStorage.setItem('verre.cart.v1', JSON.stringify(cart));
+      else localStorage.removeItem('verre.cart.v1');
+    } catch {}
+  }
+
+  updateCart(id, action) {
+    const product = this.product(id);
+    if (!product || product.stock < 1) return;
+    this.setState((state) => {
+      const existing = state.cart.find((entry) => entry.id === id);
+      let cart;
+      if (action === 'remove') {
+        cart = state.cart.filter((entry) => entry.id !== id);
+      } else if (!existing) {
+        cart = [...state.cart, { id, qty: 1 }];
+      } else {
+        const qty = Math.max(0, Math.min(existing.qty + action, Math.min(20, product.stock)));
+        cart = qty
+          ? state.cart.map((entry) => entry.id === id ? { ...entry, qty } : entry)
+          : state.cart.filter((entry) => entry.id !== id);
+      }
+      this.persistCart(cart);
+      const count = cart.reduce((sum, entry) => sum + entry.qty, 0);
+      return { cart, cartMessage: count ? product.name + ' updated. Cart now has ' + count + ' item' + (count === 1 ? '.' : 's.') : 'Cart is now empty.' };
+    });
+  }
+
+  addToCart(id, trigger) {
+    const product = this.product(id);
+    if (!product || product.stock < 1) return;
+    this.updateCart(id, 1);
+    this.openCart(trigger);
+  }
+
+  syncProductFromUrl(firstLoad) {
+    const url = new URL(location.href);
+    const id = url.searchParams.get('p');
+    const product = this.product(id);
+    if (id && !product) {
+      url.searchParams.delete('p');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    }
+    if (product) {
+      this._productPushed = false;
+      this._returnFocus = firstLoad ? null : document.activeElement;
+      this.setState({ overlay: 'product', activeProductId: product.id, galleryIndex: 0 });
+      setTimeout(() => this.activateOverlay(), 0);
+    } else if (this.state.overlay === 'product') {
+      this.setState({ overlay: null, activeProductId: null });
+      this.releaseOverlay(true);
+    }
+  }
+
+  openProduct(id, trigger) {
+    const product = this.product(id);
+    if (!product) return;
+    const url = new URL(location.href);
+    url.searchParams.set('p', id);
+    history.pushState({ ...(history.state || {}), verreProduct: id }, '', url.pathname + url.search + url.hash);
+    this._productPushed = true;
+    this._returnFocus = trigger || document.activeElement;
+    this.setState({ overlay: 'product', activeProductId: id, galleryIndex: 0 });
+    setTimeout(() => this.activateOverlay(), 0);
+  }
+
+  clearProductUrl() {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('p')) return;
+    if (this._productPushed) {
+      this._productPushed = false;
+      history.back();
+    } else {
+      url.searchParams.delete('p');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    }
+  }
+
+  openCart(trigger) {
+    if (this.state.overlay === 'product') this.clearProductUrl();
+    if (!this.state.overlay) this._returnFocus = trigger && trigger.currentTarget ? trigger.currentTarget : trigger || document.activeElement;
+    this.setState({ overlay: 'cart', activeProductId: null, cartView: this.state.cartView === 'success' ? 'items' : this.state.cartView });
+    setTimeout(() => this.activateOverlay(), 0);
+  }
+
+  closeOverlay(fromPop) {
+    if (this.state.overlay === 'product' && !fromPop) this.clearProductUrl();
+    this.setState({ overlay: null, activeProductId: null, galleryIndex: 0 });
+    this.releaseOverlay(true);
+  }
+
+  activateOverlay() {
+    if (!this._bodyLocked) {
+      this._scrollY = window.scrollY;
+      this._bodySnapshot = {
+        position: document.body.style.position,
+        top: document.body.style.top,
+        left: document.body.style.left,
+        right: document.body.style.right,
+        width: document.body.style.width,
+        overflow: document.body.style.overflow
+      };
+      Object.assign(document.body.style, {
+        position: 'fixed', top: '-' + this._scrollY + 'px', left: '0', right: '0', width: '100%', overflow: 'hidden'
+      });
+      this._bodyLocked = true;
+      this._overlayKeydown = (event) => this.handleOverlayKeydown(event);
+      document.addEventListener('keydown', this._overlayKeydown);
+    }
+    const panel = document.querySelector('[data-overlay-panel]');
+    if (panel) {
+      const first = panel.querySelector('button:not([disabled]),a[href],input:not([disabled]),textarea:not([disabled]),[tabindex="0"]');
+      (first || panel).focus();
+    }
+  }
+
+  handleOverlayKeydown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeOverlay(false);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const panel = document.querySelector('[data-overlay-panel]');
+    if (!panel) return;
+    const focusable = Array.from(panel.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),textarea:not([disabled]),[tabindex="0"]'));
+    if (!focusable.length) {
+      event.preventDefault();
+      panel.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  releaseOverlay(restoreFocus) {
+    if (this._overlayKeydown) document.removeEventListener('keydown', this._overlayKeydown);
+    this._overlayKeydown = null;
+    if (this._bodyLocked) {
+      Object.assign(document.body.style, this._bodySnapshot || {});
+      window.scrollTo(0, this._scrollY || 0);
+      this._bodyLocked = false;
+    }
+    const target = this._returnFocus;
+    this._returnFocus = null;
+    if (restoreFocus && target && target.focus) setTimeout(() => target.focus(), 0);
+  }
+
+  browseShop() {
+    this.closeOverlay(false);
+    setTimeout(() => {
+      const shop = document.getElementById('shop');
+      if (shop) shop.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }, 0);
+  }
+
+  setDraft(key, field, value) {
+    this.setState((state) => ({ [key]: { ...state[key], [field]: value } }));
+  }
+
+  validateDraft(draft, section, needsMessage) {
+    let field = '';
+    let error = '';
+    if (!draft.name.trim()) { field = 'name'; error = 'Please tell me your name.'; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) { field = 'email'; error = 'Please enter a valid email address.'; }
+    else if (needsMessage && !draft.message.trim()) { field = 'message'; error = 'Please add a message.'; }
+    if (field) {
+      setTimeout(() => {
+        const el = document.querySelector('#' + section + ' [name="' + field + '"]');
+        if (el) el.focus();
+      }, 0);
+      return { field, error };
+    }
+    return null;
+  }
+
+  async submitCustom(event) {
+    event.preventDefault();
+    if (this.state.customFormState === 'submitting') return;
+    const invalid = this.validateDraft(this.state.customDraft, 'custom', true);
+    if (invalid) {
+      this.setState({ customFormState: 'error', customFormError: invalid.error, customErrorField: invalid.field });
+      return;
+    }
+    this.setState({ customFormState: 'submitting', customFormError: '', customErrorField: '' });
+    const draft = this.state.customDraft;
+    const result = await postInquiry({ type: 'custom', name: draft.name, email: draft.email, message: draft.message, hp: draft.hp });
+    if (result.ok) this.setState({ customFormState: 'success', customFormRef: result.ref });
+    else {
+      this.setState({ customFormState: 'error', customFormError: result.error, customErrorField: result.field || '' });
+      if (result.field) setTimeout(() => { const el = document.querySelector('#custom [name="' + result.field + '"]'); if (el) el.focus(); }, 0);
+    }
+  }
+
+  async submitContact(event) {
+    event.preventDefault();
+    if (this.state.contactFormState === 'submitting') return;
+    const invalid = this.validateDraft(this.state.contactDraft, 'contact', true);
+    if (invalid) {
+      this.setState({ contactFormState: 'error', contactFormError: invalid.error, contactErrorField: invalid.field });
+      return;
+    }
+    this.setState({ contactFormState: 'submitting', contactFormError: '', contactErrorField: '' });
+    const draft = this.state.contactDraft;
+    const result = await postInquiry({ type: 'contact', name: draft.name, email: draft.email, message: draft.message, hp: draft.hp });
+    if (result.ok) this.setState({ contactFormState: 'success', contactFormRef: result.ref });
+    else {
+      this.setState({ contactFormState: 'error', contactFormError: result.error, contactErrorField: result.field || '' });
+      if (result.field) setTimeout(() => { const el = document.querySelector('#contact [name="' + result.field + '"]'); if (el) el.focus(); }, 0);
+    }
+  }
+
+  async submitOrder(event) {
+    event.preventDefault();
+    if (this.state.orderFormState === 'submitting') return;
+    const invalid = this.validateDraft(this.state.orderDraft, 'verre-order-form', false);
+    if (invalid) {
+      this.setState({ orderFormState: 'error', orderFormError: invalid.error, orderErrorField: invalid.field });
+      return;
+    }
+    if (!this.state.cart.length) {
+      this.setState({ cartView: 'items', orderFormState: 'error', orderFormError: 'Your cart is empty.' });
+      return;
+    }
+    this.setState({ orderFormState: 'submitting', orderFormError: '', orderErrorField: '' });
+    const draft = this.state.orderDraft;
+    const result = await postInquiry({
+      type: 'order', name: draft.name, email: draft.email, phone: draft.phone,
+      fulfillment: draft.fulfillment, message: draft.message, hp: draft.hp,
+      items: this.state.cart.map((entry) => ({ id: entry.id, qty: entry.qty }))
+    });
+    if (result.ok) {
+      this.persistCart([]);
+      this.setState({ cart: [], cartView: 'success', orderFormState: 'success', orderFormRef: result.ref, cartMessage: 'Order request sent.' });
+    } else {
+      this.setState({ orderFormState: 'error', orderFormError: result.error, orderErrorField: result.field || '' });
+      if (result.field && result.field !== 'items') setTimeout(() => { const el = document.querySelector('#verre-order-form [name="' + result.field + '"]'); if (el) el.focus(); }, 0);
+    }
+  }
+
+  field(section, draftKey, field, label, options) {
+    const stateName = section + 'FormState';
+    const errorField = this.state[section + 'ErrorField'];
+    const disabled = this.state[stateName] === 'submitting';
+    const id = section + '-' + field;
+    const props = {
+      id,
+      name: field,
+      value: this.state[draftKey][field],
+      disabled,
+      required: options.required !== false,
+      placeholder: options.placeholder,
+      autoComplete: options.autoComplete,
+      type: options.type,
+      rows: options.rows,
+      maxLength: options.maxLength,
+      'aria-describedby': errorField === field ? section + '-error' : undefined,
+      onChange: (event) => this.setDraft(draftKey, field, event.target.value),
+      style: { ...inputStyle, ...(options.textarea ? { resize: 'vertical', fontFamily: "'Poppins',sans-serif" } : {}) }
+    };
+    return h('label', { key: field, htmlFor: id, style: labelStyle }, [
+      label,
+      options.textarea ? h('textarea', props) : h('input', props)
+    ]);
+  }
+
+  honeypot(draftKey) {
+    return h('label', { style: hiddenFieldStyle }, [
+      'Leave this field empty',
+      h('input', {
+        name: 'hp', tabIndex: -1, autoComplete: 'off', value: this.state[draftKey].hp,
+        onChange: (event) => this.setDraft(draftKey, 'hp', event.target.value)
+      })
+    ]);
+  }
+
+  renderCustomForm() {
+    if (this.state.customFormState === 'success') {
+      return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '34px 10px' } }, [
+        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 44 } }, '✦'),
+        h('h3', { key: 'title', style: { margin: '8px 0 6px', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 26, color: '#EF4056' } }, 'Yay — request sent!'),
+        h('p', { key: 'copy', style: { margin: 0, fontSize: 14, color: '#7A5C6B' } }, "I'll reply within 2–3 days. Your reference is "),
+        h('strong', { key: 'ref', style: { color: '#3A2430' } }, this.state.customFormRef)
+      ]);
+    }
+    const busy = this.state.customFormState === 'submitting';
+    return h('form', { onSubmit: (event) => this.submitCustom(event), noValidate: true, style: { display: 'grid', gap: 14 } }, [
+      h('div', { key: 'row', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' } }, [
+        this.field('custom', 'customDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
+        this.field('custom', 'customDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' })
+      ]),
+      this.field('custom', 'customDraft', 'message', 'Your request', { placeholder: 'A little glass painting of my cat, Biscuit ✦', rows: 4, maxLength: 2000, textarea: true }),
+      this.honeypot('customDraft'),
+      this.state.customFormError ? h('p', { id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError) : null,
+      h('button', { key: 'button', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, justifySelf: 'center', marginTop: 6, opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending…' : 'Send my request')
+    ]);
+  }
+
+  renderContactForm() {
+    if (this.state.contactFormState === 'success') {
+      return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '24px 10px' } }, [
+        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 38 } }, '💗'),
+        h('h3', { key: 'title', style: { margin: '6px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 24, color: '#EF4056' } }, 'Your note is on its way!'),
+        h('p', { key: 'copy', style: { margin: 0, fontSize: 14, color: '#7A5C6B' } }, 'Reference ' + this.state.contactFormRef + ' · I’ll reply within 2–3 days.')
+      ]);
+    }
+    const busy = this.state.contactFormState === 'submitting';
+    return h('form', { onSubmit: (event) => this.submitContact(event), noValidate: true, style: { display: 'grid', gap: 14 } }, [
+      h('div', { key: 'row', 'data-contact-form': true, style: { display: 'grid', gap: 14 } }, [
+        this.field('contact', 'contactDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
+        this.field('contact', 'contactDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' })
+      ]),
+      this.field('contact', 'contactDraft', 'message', 'Message', { placeholder: 'Hi! I wanted to ask about…', rows: 4, maxLength: 2000, textarea: true }),
+      this.honeypot('contactDraft'),
+      this.state.contactFormError ? h('p', { id: 'contact-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.contactFormError) : null,
+      h('button', { key: 'button', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, justifySelf: 'center', opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending…' : 'Send my note')
+    ]);
+  }
+
+  closeButton(label) {
+    return h('button', {
+      onClick: () => this.closeOverlay(false),
+      'aria-label': label,
+      style: {
+        flex: 'none', width: 42, height: 42, borderRadius: '50%', border: '3px solid #FFE0EE',
+        background: '#fff', color: '#3A2430', fontSize: 24, lineHeight: 1, cursor: 'pointer'
+      }
+    }, '×');
+  }
+
+  renderCartLines(lines) {
+    return h('div', { style: { display: 'grid', gap: 14 } }, lines.map((line) =>
+      h('div', { key: line.id, style: { display: 'grid', gridTemplateColumns: '68px 1fr auto', gap: 12, alignItems: 'center', paddingBottom: 14, borderBottom: '2px solid #FFE0EE' } }, [
+        h('div', { key: 'art', style: { width: 68, height: 68, borderRadius: 12, overflow: 'hidden', background: line.bg } }, atlasPhoto(line.atlas, line.name)),
+        h('div', { key: 'info', style: { minWidth: 0 } }, [
+          h('p', { key: 'name', style: { margin: '0 0 3px', fontSize: 13, fontWeight: 600 } }, line.name),
+          h('p', { key: 'price', style: { margin: '0 0 8px', fontSize: 12, color: '#7A5C6B' } }, line.priceLabel + ' each'),
+          h('div', { key: 'stepper', style: { display: 'flex', alignItems: 'center', gap: 8 } }, [
+            h('button', { key: 'minus', onClick: () => this.updateCart(line.id, -1), 'aria-label': 'Decrease ' + line.name, style: { width: 30, height: 30, borderRadius: '50%', border: '2px solid #FFB6D9', background: '#fff', color: '#EF4056', cursor: 'pointer' } }, '−'),
+            h('span', { key: 'qty', 'aria-label': 'Quantity ' + line.qty, style: { minWidth: 18, textAlign: 'center', fontWeight: 700, fontSize: 13 } }, line.qty),
+            h('button', { key: 'plus', disabled: line.qty >= Math.min(20, line.stock), onClick: () => this.updateCart(line.id, 1), 'aria-label': 'Increase ' + line.name, style: { width: 30, height: 30, borderRadius: '50%', border: '2px solid #FFB6D9', background: '#fff', color: '#EF4056', cursor: line.qty >= line.stock ? 'not-allowed' : 'pointer', opacity: line.qty >= line.stock ? .45 : 1 } }, '+')
+          ])
+        ]),
+        h('div', { key: 'end', style: { alignSelf: 'stretch', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between' } }, [
+          h('button', { key: 'remove', onClick: () => this.updateCart(line.id, 'remove'), 'aria-label': 'Remove ' + line.name, style: { border: 0, background: 'none', color: '#B98AA0', fontSize: 20, cursor: 'pointer' } }, '×'),
+          h('strong', { key: 'total', style: { color: '#EF4056', fontSize: 13 } }, line.lineTotalLabel)
+        ])
+      ])
+    ));
+  }
+
+  renderOrderForm() {
+    const busy = this.state.orderFormState === 'submitting';
+    const draft = this.state.orderDraft;
+    const fulfillment = [
+      ['pickup', 'Pickup in Cebu'],
+      ['delivery', 'Cebu delivery'],
+      ['ship', 'Ship nationwide']
+    ];
+    return h('form', { id: 'verre-order-form', onSubmit: (event) => this.submitOrder(event), noValidate: true, style: { display: 'grid', gap: 14 } }, [
+      h('button', { key: 'back', type: 'button', disabled: busy, onClick: () => this.setState({ cartView: 'items' }), style: { justifySelf: 'start', border: 0, background: 'none', color: '#EF4056', fontWeight: 700, cursor: 'pointer', padding: 0 } }, '← Back to cart'),
+      h('p', { key: 'intro', style: { margin: 0, color: '#7A5C6B', fontSize: 13, lineHeight: 1.6 } }, 'Send your details and I’ll email the final total, shipping quote, and GCash or bank-transfer instructions.'),
+      this.field('order', 'orderDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
+      this.field('order', 'orderDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' }),
+      this.field('order', 'orderDraft', 'phone', 'Phone (optional)', { placeholder: '09…', autoComplete: 'tel', type: 'tel', required: false }),
+      h('fieldset', { key: 'fulfillment', disabled: busy, style: { margin: 0, padding: 0, border: 0 } }, [
+        h('legend', { key: 'legend', style: { ...labelStyle, marginBottom: 8 } }, 'How would you like it?'),
+        ...fulfillment.map(([value, label]) => h('label', { key: value, style: { display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', fontSize: 13, color: '#3A2430' } }, [
+          h('input', { type: 'radio', name: 'fulfillment', value, checked: draft.fulfillment === value, onChange: (event) => this.setDraft('orderDraft', 'fulfillment', event.target.value) }),
+          label
+        ]))
+      ]),
+      this.field('order', 'orderDraft', 'message', 'Note (optional)', { placeholder: 'Anything I should know?', rows: 3, maxLength: 2000, textarea: true, required: false }),
+      this.honeypot('orderDraft'),
+      this.state.orderFormError ? h('p', { id: 'order-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13 } }, this.state.orderFormError) : null,
+      h('button', { key: 'submit', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, width: '100%', opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending request…' : 'Send order request')
+    ]);
+  }
+
+  renderCartPanel(lines, subtotal) {
+    let body;
+    if (this.state.cartView === 'success') {
+      body = h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '44px 8px' } }, [
+        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 46 } }, '✦'),
+        h('h3', { key: 'title', style: { margin: '8px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 27, color: '#EF4056' } }, 'Order request sent!'),
+        h('p', { key: 'ref', style: { margin: '0 0 12px', fontWeight: 700 } }, 'Reference ' + this.state.orderFormRef),
+        h('p', { key: 'copy', style: { margin: 0, fontSize: 13.5, lineHeight: 1.7, color: '#7A5C6B' } }, "I’ll email you within 2–3 days with the total including shipping, and payment details.")
+      ]);
+    } else if (this.state.cartView === 'form') {
+      body = this.renderOrderForm();
+    } else if (!lines.length) {
+      body = h('div', { style: { textAlign: 'center', padding: '48px 8px' } }, [
+        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 42 } }, '♡'),
+        h('h3', { key: 'title', style: { margin: '8px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, color: '#3A2430', fontSize: 24 } }, 'Your basket is waiting'),
+        h('p', { key: 'copy', style: { margin: '0 0 18px', color: '#7A5C6B', lineHeight: 1.65, fontSize: 13 } }, 'Pick a tiny handmade thing and it’ll appear right here.'),
+        h('button', { key: 'browse', onClick: () => this.browseShop(), style: primaryButtonStyle }, 'Browse the shop')
+      ]);
+    } else {
+      body = h(React.Fragment, null, [
+        this.renderCartLines(lines),
+        h('div', { key: 'footer', style: { marginTop: 'auto', paddingTop: 20 } }, [
+          h('div', { key: 'subtotal', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 } }, [
+            h('strong', { key: 'label', style: { fontSize: 15 } }, 'Subtotal'),
+            h('strong', { key: 'value', style: { fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 24, color: '#EF4056' } }, peso(subtotal))
+          ]),
+          h('p', { key: 'shipping', style: { margin: '0 0 16px', color: '#7A5C6B', fontSize: 11.5 } }, 'Shipping is quoted separately. No payment is taken here.'),
+          h('button', { key: 'request', onClick: () => this.setState({ cartView: 'form', orderFormState: 'idle', orderFormError: '' }), style: { ...primaryButtonStyle, width: '100%' } }, 'Request this order')
+        ])
+      ]);
+    }
+
+    return h('div', {
+      key: 'panel', 'data-overlay-panel': true, role: 'dialog', 'aria-modal': true,
+      'aria-labelledby': 'cart-heading', tabIndex: -1,
+      style: {
+        position: 'relative', marginLeft: 'auto', width: 'min(400px,100%)', height: '100%',
+        background: '#FFF6F0', padding: '20px clamp(16px,4vw,24px)', boxShadow: '-18px 0 40px rgba(58,36,48,.22)',
+        display: 'flex', flexDirection: 'column', overflowY: 'auto',
+        transition: 'transform .24s cubic-bezier(.2,.9,.3,1.4)'
+      }
+    }, [
+      h('div', { key: 'head', style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginBottom: 20 } }, [
+        h('div', { key: 'titles' }, [
+          h('p', { key: 'eyebrow', style: { margin: 0, color: '#F157A8', textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, fontSize: 10 } }, 'Made by hand'),
+          h('h2', { key: 'heading', id: 'cart-heading', style: { margin: '3px 0 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 28, color: '#3A2430' } }, this.state.cartView === 'form' ? 'Order details' : 'Your cart')
+        ]),
+        this.closeButton('Close cart')
+      ]),
+      body
+    ]);
+  }
+
+  renderProductPanel(product) {
+    const atlasIndex = product.gallery[this.state.galleryIndex] ?? product.gallery[0];
+    const stockText = product.stock === 0 ? 'Sold out' : product.stock === 1 ? 'One of a kind' : 'Only ' + product.stock + ' left';
+    const detailRows = [
+      ['Dimensions', product.dimensions],
+      ['Materials', product.materials],
+      ['Care', product.care],
+      ['Ready in', product.leadTime]
+    ];
+    return h('div', {
+      key: 'panel', 'data-overlay-panel': true, role: 'dialog', 'aria-modal': true,
+      'aria-labelledby': 'product-heading', tabIndex: -1,
+      style: {
+        position: 'relative', width: 'min(940px,calc(100% - 24px))', maxHeight: 'calc(100% - 24px)',
+        overflowY: 'auto', background: '#FFF6F0', border: '5px solid #fff', borderRadius: 28,
+        padding: 'clamp(16px,4vw,30px)', boxShadow: '0 20px 60px rgba(58,36,48,.28)'
+      }
+    }, [
+      h('div', { key: 'close', style: { position: 'sticky', top: 0, zIndex: 2, height: 0, display: 'flex', justifyContent: 'flex-end' } }, this.closeButton('Close product details')),
+      h('div', { key: 'grid', 'data-product-modal': true, style: { display: 'grid', gap: 'clamp(22px,4vw,38px)', alignItems: 'start' } }, [
+        h('div', { key: 'gallery' }, [
+          h('div', { key: 'main', style: { aspectRatio: '1', borderRadius: 20, overflow: 'hidden', background: product.bg, border: '4px solid #fff', boxShadow: '0 10px 24px rgba(160,40,90,.14)' } }, atlasPhoto(atlasIndex, product.name + ' photo ' + (this.state.galleryIndex + 1))),
+          h('div', { key: 'thumbs', style: { display: 'flex', gap: 10, marginTop: 12 } }, product.gallery.map((index, galleryIndex) =>
+            h('button', {
+              key: index, onClick: () => this.setState({ galleryIndex }), 'aria-label': 'Show photo ' + (galleryIndex + 1),
+              'aria-pressed': this.state.galleryIndex === galleryIndex,
+              style: {
+                width: 64, height: 64, padding: 0, overflow: 'hidden', borderRadius: 12,
+                border: this.state.galleryIndex === galleryIndex ? '3px solid #EF4056' : '3px solid #fff',
+                background: product.bg, cursor: 'pointer'
+              }
+            }, atlasPhoto(index, product.name + ' thumbnail ' + (galleryIndex + 1)))
+          ))
+        ]),
+        h('div', { key: 'details', style: { paddingTop: 8 } }, [
+          h('p', { key: 'tag', style: { margin: 0, color: '#F157A8', textTransform: 'uppercase', letterSpacing: '.2em', fontWeight: 700, fontSize: 10.5 } }, product.tag),
+          h('h2', { key: 'name', id: 'product-heading', style: { margin: '8px 50px 6px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 'clamp(28px,6vw,42px)', lineHeight: 1.1, color: '#3A2430' } }, product.name),
+          h('div', { key: 'priceRow', style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 18 } }, [
+            h('strong', { key: 'price', style: { fontSize: 20, color: '#EF4056' } }, peso(product.price)),
+            h('span', { key: 'stock', style: { padding: '5px 10px', borderRadius: 999, background: product.stock ? '#FFE1EF' : '#EDE3FF', color: product.stock ? '#EF4056' : '#7A5C6B', fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.12em' } }, stockText)
+          ]),
+          h('p', { key: 'desc', style: { margin: '0 0 20px', color: '#7A5C6B', lineHeight: 1.75, fontSize: 14 } }, product.description),
+          h('dl', { key: 'specs', style: { margin: 0, display: 'grid', gap: 12 } }, detailRows.map(([term, description]) =>
+            h('div', { key: term, style: { paddingBottom: 10, borderBottom: '2px dashed #FFE0EE' } }, [
+              h('dt', { key: 'term', style: { marginBottom: 3, color: '#B98AA0', fontSize: 9.5, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase' } }, term),
+              h('dd', { key: 'description', style: { margin: 0, color: '#3A2430', lineHeight: 1.55, fontSize: 13 } }, description)
+            ])
+          )),
+          product.stock
+            ? h('button', { key: 'add', onClick: (event) => this.addToCart(product.id, event.currentTarget), style: { ...primaryButtonStyle, width: '100%', marginTop: 22 } }, 'Add to cart · ' + peso(product.price))
+            : h('div', { key: 'sold', style: { marginTop: 22, textAlign: 'center' } }, [
+                h('button', { key: 'button', disabled: true, style: { ...primaryButtonStyle, width: '100%', opacity: .5, cursor: 'not-allowed' } }, 'Sold out'),
+                h('a', { key: 'link', href: '#custom', onClick: () => this.closeOverlay(false), style: { display: 'inline-block', marginTop: 12, fontSize: 13, fontWeight: 700 } }, 'Request something similar')
+              ])
+        ])
+      ])
+    ]);
+  }
+
+  renderOverlay(lines, subtotal) {
+    if (!this.state.overlay) return null;
+    const product = this.product(this.state.activeProductId);
+    const panel = this.state.overlay === 'product' && product
+      ? this.renderProductPanel(product)
+      : this.renderCartPanel(lines, subtotal);
+    return h('div', {
+      onMouseDown: (event) => { if (event.target === event.currentTarget) this.closeOverlay(false); },
+      style: {
+        position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(58,36,48,.48)',
+        display: 'flex', alignItems: this.state.overlay === 'product' ? 'center' : 'stretch',
+        justifyContent: 'center', padding: this.state.overlay === 'product' ? 0 : 0
+      }
+    }, panel);
   }
 
   renderVals() {
     const accent = this.props.accent ?? '#F157A8';
     const tilt = this.props.tilt ?? 2.5;
     const rot = (m) => (tilt * m).toFixed(1) + 'deg';
-    const add = () => this.setState((s) => ({ cart: s.cart + 1 }));
-
-    const products = [
-      { name: 'Peach Sky Glass Panel', tag: 'Glass painting', price: '₱850', bg: '#FFD9EC', tape: '#FFD166', art: atlasPhoto(0, 'Peach Sky Glass Panel'), m: -1.4 },
-      { name: 'Star Cookie Charm', tag: 'Keychain', price: '₱280', bg: '#DFF4FE', tape: '#7ED3F2', art: atlasPhoto(1, 'Star Cookie Charm'), m: 1 },
-      { name: 'Cloud Bead Bracelet', tag: 'Accessory', price: '₱320', bg: '#FFE1EF', tape: '#FFB6D9', art: atlasPhoto(2, 'Cloud Bead Bracelet'), m: -0.6 },
-      { name: 'Sweetheart Sticker Pack', tag: '6 die-cuts', price: '₱180', bg: '#FFF0C7', tape: '#FFD166', art: atlasPhoto(3, 'Sweetheart Sticker Pack'), m: 1.6 },
-      { name: 'Little Daisy Glass Cup', tag: 'Glass painting', price: '₱620', bg: '#F3FBE7', tape: '#FFB6D9', art: atlasPhoto(4, 'Little Daisy Glass Cup'), m: -1 },
-      { name: 'Sparkle Phone Charm', tag: 'Accessory', price: '₱260', bg: '#EDE3FF', tape: '#7ED3F2', art: atlasPhoto(5, 'Sparkle Phone Charm'), m: 0.8 },
-      { name: 'Cloud Nine Vinyl Sheet', tag: 'Sticker sheet', price: '₱150', bg: '#E7F7FF', tape: '#EF4056', art: atlasPhoto(6, 'Cloud Nine Vinyl Sheet'), m: -1.8 },
-      { name: 'Cherry Red Mini Frame', tag: 'Glass painting', price: '₱540', bg: '#FFDCD9', tape: '#FFD166', art: atlasPhoto(7, 'Cherry Red Mini Frame'), m: 1.2 }
-    ].map((p) => ({ ...p, rot: rot(p.m), add }));
+    const cartCount = this.state.cart.reduce((sum, entry) => sum + entry.qty, 0);
+    const cartLines = this.state.cart.map((entry) => {
+      const product = this.product(entry.id);
+      return {
+        ...product,
+        qty: entry.qty,
+        priceLabel: peso(product.price),
+        lineTotal: product.price * entry.qty,
+        lineTotalLabel: peso(product.price * entry.qty)
+      };
+    });
+    const subtotal = cartLines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const products = PRODUCTS.map((p) => ({
+      ...p,
+      rot: rot(p.m),
+      art: atlasPhoto(p.atlas, p.name),
+      price: peso(p.price),
+      priceLabel: peso(p.price),
+      open: (event) => this.openProduct(p.id, event.currentTarget),
+      keyOpen: (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          this.openProduct(p.id, event.currentTarget);
+        }
+      },
+      addButton: h('button', {
+        onClick: (event) => { event.stopPropagation(); this.addToCart(p.id, event.currentTarget); },
+        disabled: p.stock < 1,
+        'aria-label': p.stock ? 'Add ' + p.name + ' to cart' : p.name + ' is sold out',
+        style: {
+          width: '100%', marginTop: 14, border: '3px solid #fff',
+          background: p.stock ? 'linear-gradient(140deg,#FFB6D9,#F157A8)' : '#D8C8D0',
+          color: '#fff', fontWeight: 700, fontSize: 12.5, letterSpacing: '.06em',
+          padding: '10px 12px', borderRadius: 999, boxShadow: p.stock ? '0 4px 0 rgba(239,64,86,.26)' : 'none',
+          cursor: p.stock ? 'pointer' : 'not-allowed', transition: 'transform .16s cubic-bezier(.2,.9,.3,1.4)'
+        }
+      }, p.stock ? 'Add to cart' : 'Sold out')
+    }));
 
     return {
       accent,
-      cartLabel: this.state.cart ? '(' + this.state.cart + ')' : '✦',
-      cartAria: this.state.cart ? 'Cart, ' + this.state.cart + ' item' + (this.state.cart > 1 ? 's' : '') : 'Cart, empty',
-      // ponytail: no cart drawer in the prototype — jump to the shop. Build the drawer when checkout is real.
-      openCart: () => { const el = document.getElementById('shop'); if (el) el.scrollIntoView({ behavior: 'smooth' }); },
-      sent: this.state.sent,
-      notSent: !this.state.sent,
-      submit: (e) => { e.preventDefault(); this.setState({ sent: true }); },
+      cartLabel: cartCount ? '(' + cartCount + ')' : '✦',
+      cartAria: cartCount ? 'Cart, ' + cartCount + ' item' + (cartCount > 1 ? 's' : '') : 'Cart, empty',
+      openCart: (event) => this.openCart(event),
+      cartMessage: this.state.cartMessage,
+      customForm: this.renderCustomForm(),
+      contactForm: this.renderContactForm(),
+      overlay: this.renderOverlay(cartLines, subtotal),
       categories: [
         { title: 'Glass Paintings', copy: 'Hand-painted panels, cups and mini frames — colour laid on the back of the glass.', bg: '#FFE1EF', art: atlasPhoto(8, 'Assortment of hand-painted glass art', 'landscape'), rot: rot(-1) },
         { title: 'Accessories & Charms', copy: 'Beaded bracelets, phone charms and keyrings strung one bead at a time.', bg: '#DFF4FE', art: atlasPhoto(9, 'Assortment of handmade bead charms', 'landscape'), rot: rot(0.6) },

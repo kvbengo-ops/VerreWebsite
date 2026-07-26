@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) and fill in for `wrangler dev`.
+RESEND_API_KEY=
+OWNER_EMAIL=
+FROM_EMAIL=Verre <hello@your-verified-domain.example>
