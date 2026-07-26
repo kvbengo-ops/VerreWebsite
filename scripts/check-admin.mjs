@@ -28,6 +28,10 @@ assert.match(
   /run_worker_first\s*=\s*\["\/admin",\s*"\/admin\/\*",\s*"\/pos",\s*"\/pos\/\*"\]/,
   'bare and nested admin/POS asset paths must run through Worker authorization'
 );
+for(const file of ['admin/app.js','pos/app.js']){
+  const clientAuth=await readFile(resolve(root,file),'utf8');
+  assert.match(clientAuth,/\/signin-with-chatgpt\?return_to=/,file+' must start the browser sign-in flow on 401');
+}
 const clientFiles=[
   resolve(root,'dist','client','index.html'),
   resolve(root,'dist','client','admin','app.js'),

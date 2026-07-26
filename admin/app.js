@@ -14,9 +14,14 @@ const routeRoles={
   sessions:['super_admin'],
   accounts:['super_admin']
 };
+function signIn(){
+  const returnTo=location.pathname+location.search+location.hash;
+  location.replace('/signin-with-chatgpt?return_to='+encodeURIComponent(returnTo));
+}
 
 async function api(path,options={}){
   const response=await fetch('/api/admin/'+path,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
+  if(response.status===401){signIn();return new Promise(()=>{})}
   const type=response.headers.get('content-type')||'';
   if(!type.includes('application/json'))throw new Error(response.redirected?'Session expired — sign in again.':'The server returned an unreadable response.');
   const body=await response.json();

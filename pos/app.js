@@ -3,6 +3,10 @@ const $$=(selector,root=document)=>[...root.querySelectorAll(selector)];
 const money=(cents=0)=>'₱'+(Number(cents)/100).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=(value)=>String(value??'').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const state={products:[],cart:new Map(),category:'all',payment:'cash',session:null,queue:[],review:[],lastSale:null,syncing:false,resetTimer:null};
+function signIn(){
+  const returnTo=location.pathname+location.search+location.hash;
+  location.replace('/signin-with-chatgpt?return_to='+encodeURIComponent(returnTo));
+}
 
 const openDb=()=>new Promise((resolve,reject)=>{
   const request=indexedDB.open('verre-pos',1);
@@ -32,7 +36,7 @@ async function api(path,options={}){
   const body=await response.json();
   if(response.status===401){const error=new Error('Session expired — reconnect to keep syncing.');error.auth=true;throw error}
   if(!response.ok||!body.ok)throw new Error(body.error||'Request failed');
-  return body.data;
+  return body.data??body;
 }
 function toast(message,error=false){const node=$('#toast');node.textContent=message;node.style.background=error?'#9C293B':'#3A2430';node.classList.add('show');setTimeout(()=>node.classList.remove('show'),3500)}
 function parsePeso(value){const clean=String(value||'').replace(/[₱,\s]/g,'');return /^\d+(?:\.\d{1,2})?$/.test(clean)?Math.round(Number(clean)*100):null}
@@ -41,11 +45,15 @@ function uuid(){return crypto.randomUUID()}
 async function init(){
   try{
     if('serviceWorker'in navigator)await navigator.serviceWorker.register('/pos/sw.js',{scope:'/pos/'});
-    api('me').then(({user})=>{
+    try{
+      const {user}=await api('me');
       const role={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'}[user.role]||user.role;
       $('#operator').textContent=(user.display_name||user.email)+' · '+role;
       $('#operator').title=user.email;
-    }).catch(()=>{$('#operator').textContent='Offline operator'});
+    }catch(error){
+      if(error.auth&&navigator.onLine){signIn();return}
+      $('#operator').textContent='Offline operator';
+    }
     state.queue=await all('queue');state.review=await all('review');
     state.session=await get('kv','session')||null;
     state.products=await get('kv','catalog')||[];
