@@ -25,14 +25,15 @@
   @keyframes vMarquee { from{transform:translateX(0);} to{transform:translateX(-50%);} }
   @keyframes vSpin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
   @keyframes vTwinkle { 0%,100%{opacity:.35;transform:scale(.85);} 50%{opacity:1;transform:scale(1.1);} }
+  .atlas { background-image:url('./assets/verre-photo-atlas.png'); background-size:400% 400%; background-repeat:no-repeat; background-color:#FFE1EF; }
 
   :focus-visible { outline:3px solid #EF4056; outline-offset:3px; }
 
   /* nav links: scrolling strip on mobile, inline row from 900px */
-  [data-desknav] { flex:1 0 100%; order:3; overflow-x:auto; gap:18px; scrollbar-width:none; }
+  [data-desknav] { flex:1 0 100%; order:3; overflow-x:auto; gap:16px; padding:4px 0; font-size:11.5px; scrollbar-width:none; }
   [data-desknav]::-webkit-scrollbar { display:none; }
   [data-desknav] a { white-space:nowrap; }
-  @media (min-width:900px) { [data-desknav] { flex:0 1 auto; order:0; overflow:visible; gap:26px; } }
+  @media (min-width:900px) { [data-desknav] { flex:0 1 auto; order:0; overflow:visible; gap:26px; padding:0; font-size:12.5px; } }
 
   [data-gramgrid] { grid-template-columns:repeat(2,1fr); }
   @media (min-width:600px) { [data-gramgrid] { grid-template-columns:repeat(3,1fr); } }
@@ -55,7 +56,7 @@
     <span style="display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:linear-gradient(150deg,#FFB6D9,#F157A8);border:3px solid #fff;box-shadow:0 4px 0 rgba(239,64,86,.22);font-family:'Shrikhand',cursive;color:#fff;font-size:19px;padding-bottom:3px;">V</span>
     <span style="font-family:'Shrikhand',cursive;font-size:20px;color:#EF4056;letter-spacing:.5px;">Verre</span>
   </a>
-  <div style="display:flex;align-items:center;font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;" data-desknav>
+  <div style="display:flex;align-items:center;font-weight:600;letter-spacing:.14em;text-transform:uppercase;" data-desknav>
     <a href="#shop" style="color:#3A2430;" style-hover="color:#F157A8;">Shop</a>
     <a href="#about" style="color:#3A2430;" style-hover="color:#F157A8;">About</a>
     <a href="#stockists" style="color:#3A2430;" style-hover="color:#F157A8;">Stockists &amp; Markets</a>
@@ -91,23 +92,17 @@
     </div>
 
     <!-- polaroid collage -->
-    <div aria-hidden="true" style="display:flex;justify-content:center;align-items:flex-start;gap:clamp(4px,1.5vw,14px);margin-top:52px;flex-wrap:nowrap;">
+    <div style="display:flex;justify-content:center;align-items:flex-start;gap:clamp(4px,1.5vw,14px);margin-top:52px;flex-wrap:nowrap;">
       <div style="transform:rotate(-9deg);background:#fff;padding:10px 10px 34px;border-radius:8px;box-shadow:0 12px 26px rgba(160,40,90,.25);width:clamp(110px,28vw,200px);transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-4deg) translateY(-8px) scale(1.03);">
-        <div style="aspect-ratio:1;border-radius:4px;background:linear-gradient(140deg,#7ED3F2,#BDE9FB);display:grid;place-items:center;">
-          <svg width="46%" viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="#fff" opacity=".7"/><path d="M32 12c3 12 8 17 20 20-12 3-17 8-20 20-3-12-8-17-20-20 12-3 17-8 20-20z" fill="#fff"/></svg>
-        </div>
+        <div class="atlas" role="img" aria-label="Peach sky glass painting" style="aspect-ratio:1;border-radius:4px;background-position:0% 0%;"></div>
         <p style="margin:10px 2px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;text-align:center;">glass no. 04</p>
       </div>
       <div style="transform:rotate(3deg) translateY(-16px);background:#fff;padding:10px 10px 34px;border-radius:8px;box-shadow:0 16px 30px rgba(160,40,90,.28);width:clamp(120px,30vw,220px);z-index:2;transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(0deg) translateY(-26px) scale(1.04);">
-        <div style="aspect-ratio:1;border-radius:4px;background:linear-gradient(140deg,#FFD166,#FFE9A8);display:grid;place-items:center;">
-          <svg width="52%" viewBox="0 0 64 64"><path d="M32 8l6 12 13 2-9 9 2 13-12-6-12 6 2-13-9-9 13-2z" fill="#fff"/></svg>
-        </div>
+        <div class="atlas" role="img" aria-label="Beaded star keychain" style="aspect-ratio:1;border-radius:4px;background-position:33.333% 0%;"></div>
         <p style="margin:10px 2px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;text-align:center;">star charm set</p>
       </div>
       <div style="transform:rotate(10deg);background:#fff;padding:10px 10px 34px;border-radius:8px;box-shadow:0 12px 26px rgba(160,40,90,.25);width:clamp(110px,28vw,200px);transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(5deg) translateY(-8px) scale(1.03);">
-        <div style="aspect-ratio:1;border-radius:4px;background:linear-gradient(140deg,#FFC2E0,#FF9BCD);display:grid;place-items:center;">
-          <svg width="48%" viewBox="0 0 58 54"><path d="M29 50C13 38 4 30 4 20 4 11 11 4 20 4c5 0 9 3 9 3s4-3 9-3c9 0 16 7 16 16 0 10-9 18-25 30z" fill="#fff"/></svg>
-        </div>
+        <div class="atlas" role="img" aria-label="Colorful heart sticker pack" style="aspect-ratio:1;border-radius:4px;background-position:100% 0%;"></div>
         <p style="margin:10px 2px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;text-align:center;">sticker pack</p>
       </div>
     </div>
@@ -123,9 +118,7 @@
     <div style="display:grid;gap:26px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
       <sc-for list="{{ categories }}" as="c" hint-placeholder-count="3">
         <a href="#featured" data-reveal style="display:block;background:#fff;border:5px solid #fff;border-radius:28px;padding:0 0 22px;overflow:hidden;box-shadow:0 10px 0 rgba(58,36,48,.10),0 18px 30px rgba(160,40,90,.12);transform:rotate({{ c.rot }});transition:transform .35s cubic-bezier(.2,.9,.3,1.4);text-align:center;" style-hover="transform:rotate(0deg) translateY(-6px);">
-          <div style="aspect-ratio:4/3;display:grid;place-items:center;background:{{ c.bg }};">
-            <div style="width:64%;max-width:180px;">{{ c.art }}</div>
-          </div>
+          <div style="aspect-ratio:4/3;display:grid;place-items:center;background:{{ c.bg }};overflow:hidden;">{{ c.art }}</div>
           <h3 style="margin:18px 16px 6px;font-family:'Shrikhand',cursive;font-weight:400;font-size:22px;color:#3A2430;">{{ c.title }}</h3>
           <p style="margin:0 22px;font-size:13.5px;line-height:1.6;color:#7A5C6B;">{{ c.copy }}</p>
           <span style="display:inline-block;margin-top:14px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#EF4056;">Browse ✦</span>
@@ -150,9 +143,7 @@
       <sc-for list="{{ products }}" as="p" hint-placeholder-count="8">
         <article data-reveal style="position:relative;background:#fff;padding:12px 12px 18px;border-radius:14px;box-shadow:0 8px 22px rgba(160,40,90,.14);transform:rotate({{ p.rot }});transition:transform .3s cubic-bezier(.2,.9,.3,1.4),box-shadow .3s;" style-hover="transform:rotate(0deg) translateY(-6px);box-shadow:0 16px 32px rgba(160,40,90,.2);">
           <span style="position:absolute;top:-10px;left:14px;width:64px;height:22px;background:{{ p.tape }};opacity:.75;transform:rotate(-8deg);box-shadow:0 1px 3px rgba(0,0,0,.06);"></span>
-          <div style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};">
-            <div style="width:52%;">{{ p.art }}</div>
-          </div>
+          <div style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};overflow:hidden;">{{ p.art }}</div>
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:14px;">
             <div>
               <h3 style="margin:0;font-size:14px;font-weight:600;color:#3A2430;line-height:1.3;">{{ p.name }}</h3>
@@ -172,10 +163,10 @@
   <div style="max-width:1000px;margin:0 auto;display:grid;gap:44px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-items:center;">
     <div style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
       <div style="grid-column:1/2;transform:rotate(-6deg);background:#fff;padding:9px 9px 30px;border-radius:6px;box-shadow:0 10px 24px rgba(40,90,120,.2);">
-        <div style="aspect-ratio:3/4;background:linear-gradient(150deg,#FFB6D9,#F157A8);border-radius:3px;"></div>
+        <div class="atlas" role="img" aria-label="Verre maker working at her colorful craft desk" style="aspect-ratio:3/4;background-size:533.333% 400%;background-position:0% 100%;border-radius:3px;"></div>
       </div>
       <div style="grid-column:2/3;transform:rotate(5deg) translateY(26px);background:#fff;padding:9px 9px 30px;border-radius:6px;box-shadow:0 10px 24px rgba(40,90,120,.2);">
-        <div style="aspect-ratio:3/4;background:linear-gradient(150deg,#FFD166,#FFE9A8);border-radius:3px;"></div>
+        <div class="atlas" role="img" aria-label="Hands painting a small glass panel" style="aspect-ratio:3/4;background-size:533.333% 400%;background-position:92.308% 66.667%;border-radius:3px;"></div>
       </div>
       <span style="position:absolute;top:-14px;left:32%;width:86px;height:26px;background:#FFD166;opacity:.8;transform:rotate(-6deg);"></span>
       <svg width="90" height="70" viewBox="0 0 90 70" style="position:absolute;right:-6px;bottom:-26px;"><path d="M6 8c26 34 52 44 76 40" stroke="#EF4056" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M68 38l14 10-16 6" stroke="#EF4056" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -276,9 +267,7 @@
   <div style="max-width:1100px;margin:0 auto;padding:0 20px;">
     <div data-gramgrid style="display:grid;gap:14px;">
       <sc-for list="{{ gram }}" as="g" hint-placeholder-count="6">
-        <a href="#contact" aria-label="View post on Instagram" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-3deg) scale(1.04);">
-          <span aria-hidden="true" style="font-size:28px;color:rgba(255,255,255,.9);">{{ g.icon }}</span>
-        </a>
+        <a href="#contact" aria-label="{{ g.label }}" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;transition:transform .3s cubic-bezier(.2,.9,.3,1.4);" style-hover="transform:rotate(-3deg) scale(1.04);"></a>
       </sc-for>
     </div>
   </div>
@@ -326,6 +315,27 @@ const flower = (fill) => svg([
   ...[0, 72, 144, 216, 288].map((a, i) => h('ellipse', { key: i, cx: 32, cy: 16, rx: 9, ry: 13, fill, stroke: '#fff', strokeWidth: 4, transform: 'rotate(' + a + ' 32 32)' })),
   h('circle', { key: 'c', cx: 32, cy: 32, r: 7, fill: '#fff' })
 ]);
+const atlasPhoto = (index, label, shape) => {
+  const stops = ['0%', '33.333%', '66.667%', '100%'];
+  const landscapeRows = ['0%', '30.769%', '61.538%', '92.308%'];
+  return h('div', {
+    className: 'atlas',
+    role: 'img',
+    'aria-label': label,
+    style: {
+      width: '100%',
+      height: '100%',
+      backgroundImage: "url('./assets/verre-photo-atlas.png')",
+      backgroundSize: shape === 'landscape' ? '400% auto' : '400% 400%',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: stops[index % 4] + ' ' + (shape === 'landscape' ? landscapeRows[Math.floor(index / 4)] : stops[Math.floor(index / 4)])
+    }
+  });
+};
+const atlasBg = (index) => {
+  const stops = ['0%', '33.333%', '66.667%', '100%'];
+  return "url('./assets/verre-photo-atlas.png') " + stops[index % 4] + ' ' + stops[Math.floor(index / 4)] + ' / 400% 400% no-repeat';
+};
 
 class Component extends DCLogic {
   state = { cart: 0, sent: false };
@@ -363,14 +373,14 @@ class Component extends DCLogic {
     const add = () => this.setState((s) => ({ cart: s.cart + 1 }));
 
     const products = [
-      { name: 'Peach Sky Glass Panel', tag: 'Glass painting', price: '₱850', bg: 'linear-gradient(150deg,#FFD9EC,#FFB6D9)', tape: '#FFD166', art: frame('#F157A8'), m: -1.4 },
-      { name: 'Star Cookie Charm', tag: 'Keychain', price: '₱280', bg: 'linear-gradient(150deg,#FFF0C7,#FFD166)', tape: '#7ED3F2', art: star('#EF4056'), m: 1 },
-      { name: 'Cloud Bead Bracelet', tag: 'Accessory', price: '₱320', bg: 'linear-gradient(150deg,#DFF4FE,#7ED3F2)', tape: '#FFB6D9', art: bead('#7ED3F2'), m: -0.6 },
-      { name: 'Sweetheart Sticker Pack', tag: '6 die-cuts', price: '₱180', bg: 'linear-gradient(150deg,#FFE1EF,#FF9BCD)', tape: '#FFD166', art: heart('#EF4056'), m: 1.6 },
-      { name: 'Little Daisy Glass Cup', tag: 'Glass painting', price: '₱620', bg: 'linear-gradient(150deg,#F3FBE7,#CDEFAE)', tape: '#FFB6D9', art: flower('#FFD166'), m: -1 },
-      { name: 'Sparkle Phone Charm', tag: 'Accessory', price: '₱260', bg: 'linear-gradient(150deg,#EDE3FF,#C9B4F5)', tape: '#7ED3F2', art: star('#FFD166'), m: 0.8 },
-      { name: 'Cloud Nine Vinyl Sheet', tag: 'Sticker sheet', price: '₱150', bg: 'linear-gradient(150deg,#E7F7FF,#B8E6FA)', tape: '#EF4056', art: cloud('#7ED3F2'), m: -1.8 },
-      { name: 'Cherry Red Mini Frame', tag: 'Glass painting', price: '₱540', bg: 'linear-gradient(150deg,#FFDCD9,#FFA9A2)', tape: '#FFD166', art: heart('#F157A8'), m: 1.2 }
+      { name: 'Peach Sky Glass Panel', tag: 'Glass painting', price: '₱850', bg: '#FFD9EC', tape: '#FFD166', art: atlasPhoto(0, 'Peach Sky Glass Panel'), m: -1.4 },
+      { name: 'Star Cookie Charm', tag: 'Keychain', price: '₱280', bg: '#DFF4FE', tape: '#7ED3F2', art: atlasPhoto(1, 'Star Cookie Charm'), m: 1 },
+      { name: 'Cloud Bead Bracelet', tag: 'Accessory', price: '₱320', bg: '#FFE1EF', tape: '#FFB6D9', art: atlasPhoto(2, 'Cloud Bead Bracelet'), m: -0.6 },
+      { name: 'Sweetheart Sticker Pack', tag: '6 die-cuts', price: '₱180', bg: '#FFF0C7', tape: '#FFD166', art: atlasPhoto(3, 'Sweetheart Sticker Pack'), m: 1.6 },
+      { name: 'Little Daisy Glass Cup', tag: 'Glass painting', price: '₱620', bg: '#F3FBE7', tape: '#FFB6D9', art: atlasPhoto(4, 'Little Daisy Glass Cup'), m: -1 },
+      { name: 'Sparkle Phone Charm', tag: 'Accessory', price: '₱260', bg: '#EDE3FF', tape: '#7ED3F2', art: atlasPhoto(5, 'Sparkle Phone Charm'), m: 0.8 },
+      { name: 'Cloud Nine Vinyl Sheet', tag: 'Sticker sheet', price: '₱150', bg: '#E7F7FF', tape: '#EF4056', art: atlasPhoto(6, 'Cloud Nine Vinyl Sheet'), m: -1.8 },
+      { name: 'Cherry Red Mini Frame', tag: 'Glass painting', price: '₱540', bg: '#FFDCD9', tape: '#FFD166', art: atlasPhoto(7, 'Cherry Red Mini Frame'), m: 1.2 }
     ].map((p) => ({ ...p, rot: rot(p.m), add }));
 
     return {
@@ -383,9 +393,9 @@ class Component extends DCLogic {
       notSent: !this.state.sent,
       submit: (e) => { e.preventDefault(); this.setState({ sent: true }); },
       categories: [
-        { title: 'Glass Paintings', copy: 'Hand-painted panels, cups and mini frames — colour laid on the back of the glass.', bg: 'linear-gradient(150deg,#FFE1EF,#FFB6D9)', art: frame('#F157A8'), rot: rot(-1) },
-        { title: 'Accessories & Charms', copy: 'Beaded bracelets, phone charms and keyrings strung one bead at a time.', bg: 'linear-gradient(150deg,#DFF4FE,#7ED3F2)', art: bead('#F157A8'), rot: rot(0.6) },
-        { title: 'Stickers', copy: 'Glossy die-cuts and sheets of tiny sweet things for your laptop and journals.', bg: 'linear-gradient(150deg,#FFF0C7,#FFD166)', art: heart('#EF4056'), rot: rot(1.4) }
+        { title: 'Glass Paintings', copy: 'Hand-painted panels, cups and mini frames — colour laid on the back of the glass.', bg: '#FFE1EF', art: atlasPhoto(8, 'Assortment of hand-painted glass art', 'landscape'), rot: rot(-1) },
+        { title: 'Accessories & Charms', copy: 'Beaded bracelets, phone charms and keyrings strung one bead at a time.', bg: '#DFF4FE', art: atlasPhoto(9, 'Assortment of handmade bead charms', 'landscape'), rot: rot(0.6) },
+        { title: 'Stickers', copy: 'Glossy die-cuts and sheets of tiny sweet things for your laptop and journals.', bg: '#FFF0C7', art: atlasPhoto(10, 'Assortment of colorful die-cut stickers', 'landscape'), rot: rot(1.4) }
       ],
       stockists: [
         { name: 'CR8 Cebu', address: '3F Ayala Central Bloc, Cebu Business Park', hours: 'Open daily · 11am – 9pm', dot: '#F157A8' },
@@ -398,12 +408,12 @@ class Component extends DCLogic {
         { day: '27', month: 'Sep', name: 'Tiny Things Market', place: 'Talamban Times Square', bg: '#EF4056' }
       ],
       gram: [
-        { bg: 'linear-gradient(150deg,#FFB6D9,#F157A8)', icon: '✦' },
-        { bg: 'linear-gradient(150deg,#FFD166,#FFB347)', icon: '♡' },
-        { bg: 'linear-gradient(150deg,#7ED3F2,#4FBEE8)', icon: '✦' },
-        { bg: 'linear-gradient(150deg,#FF9BCD,#EF4056)', icon: '❋' },
-        { bg: 'linear-gradient(150deg,#C9B4F5,#9B7FE0)', icon: '♡' },
-        { bg: 'linear-gradient(150deg,#CDEFAE,#8FD86B)', icon: '✦' }
+        { bg: atlasBg(11), label: 'Hands painting a glass panel' },
+        { bg: atlasBg(12), label: 'The Verre maker at her craft desk' },
+        { bg: atlasBg(13), label: 'Paint brushes and colorful beads' },
+        { bg: atlasBg(14), label: 'A handmade order ready to ship' },
+        { bg: atlasBg(15), label: 'Verre craft market display' },
+        { bg: atlasBg(8), label: 'A collection of hand-painted glass pieces' }
       ],
       products
     };
