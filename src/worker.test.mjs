@@ -138,6 +138,31 @@ for (const path of ['/admin', '/admin/', '/admin/app.js', '/pos', '/pos/sw.js', 
 assert.equal((await shell('/', 'verre.workers.dev')).status, 200, 'the storefront stays public');
 assert.equal((await shell('/index.html', 'verre.workers.dev')).status, 200, 'storefront assets stay public');
 
+// Sites owns /signin-with-chatgpt. Browser entry routes should start that flow,
+// while APIs and static assets keep returning machine-readable 401 responses.
+const sitesEnv = { ...env, TRUST_SITES_AUTH: 'true' };
+for (const path of ['/admin', '/admin/', '/pos', '/pos/']) {
+  const response = await worker.fetch(new Request('https://verre.test' + path), sitesEnv);
+  assert.equal(response.status, 302, path + ' redirects to sign-in on Sites');
+  const location = new URL(response.headers.get('location'));
+  assert.equal(location.pathname, '/signin-with-chatgpt');
+  assert.equal(location.searchParams.get('return_to'), path);
+}
+assert.equal(
+  (await worker.fetch(new Request('https://verre.test/api/admin/me'), sitesEnv)).status,
+  401,
+  'admin APIs never redirect to an HTML sign-in page'
+);
+assert.equal(
+  (await worker.fetch(new Request('https://verre.test/admin/app.js'), sitesEnv)).status,
+  401,
+  'protected static assets remain unavailable before sign-in'
+);
+
+// Role resolution past the bootstrap list needs a real admin_accounts table, so
+// NO_ADMIN_CONFIGURED vs FORBIDDEN is asserted in scripts/check-auth.mjs against
+// a live database rather than faked here.
+
 // Directory indexes belong to the asset layer. Rewriting '/admin/' to
 // '/admin/index.html' here makes it canonicalise back to '/admin/', and because
 // run_worker_first routes that through the Worker too, the browser ping-pongs

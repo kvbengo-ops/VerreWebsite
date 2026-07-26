@@ -17,6 +17,8 @@ const FULFILLMENT = {
 
 const isProtected = (p) =>
   p === '/admin' || p.startsWith('/admin/') || p === '/pos' || p.startsWith('/pos/');
+const isSignInEntry = (p) =>
+  p === '/admin' || p === '/admin/' || p === '/pos' || p === '/pos/';
 
 export default {
   async fetch(request, env) {
@@ -45,7 +47,16 @@ export default {
     // whole console is readable by anyone who guesses the path.
     if (isProtected(url.pathname)) {
       const access = await requestUser(request, env);
-      if (access.response) return access.response;
+      if (access.response) {
+        if (
+          access.response.status === 401 &&
+          env.TRUST_SITES_AUTH === 'true' &&
+          isSignInEntry(url.pathname)
+        ) {
+          return signInRedirect(request);
+        }
+        return access.response;
+      }
       const capability = url.pathname === '/admin' || url.pathname.startsWith('/admin/') ? 'admin' : 'pos';
       if (!can(access.user, capability)) return forbidden();
       // Pass the path through untouched. Rewriting '/admin/' to
@@ -72,7 +83,23 @@ async function requestUser(request, env) {
       })
     };
   }
-  return resolved.data ? { user: resolved.data } : { response: forbidden() };
+  if (resolved.data) return { user: resolved.data };
+
+  // With no bootstrap list AND an empty admin_accounts table, nobody can ever be
+  // granted a role — including whoever is trying to grant them. That is a
+  // deployment mistake, and "your account does not have permission" sends you
+  // hunting through roles instead of through the secrets. Name it.
+  if (!env.SUPER_ADMIN_EMAILS && !env.ADMIN_EMAILS) {
+    console.error('auth: SUPER_ADMIN_EMAILS is unset — no account can be granted admin');
+    return {
+      response: json(503, {
+        ok: false,
+        error: 'No administrator is configured. Set SUPER_ADMIN_EMAILS and restart.',
+        code: 'NO_ADMIN_CONFIGURED'
+      })
+    };
+  }
+  return { response: forbidden() };
 }
 
 const forbidden = () => json(403, {
@@ -80,6 +107,13 @@ const forbidden = () => json(403, {
   error:'Your account does not have permission for this area',
   code:'FORBIDDEN'
 });
+
+function signInRedirect(request) {
+  const requested = new URL(request.url);
+  const signIn = new URL('/signin-with-chatgpt', requested.origin);
+  signIn.searchParams.set('return_to', requested.pathname + requested.search);
+  return Response.redirect(signIn, 302);
+}
 
 /* ------------------------------------------------------------------ */
 /* rate limit                                                          */
