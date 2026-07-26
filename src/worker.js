@@ -14,6 +14,9 @@ const FULFILLMENT = {
   ship: 'Ship nationwide'
 };
 
+const isProtected = (p) =>
+  p === '/admin' || p.startsWith('/admin/') || p === '/pos' || p.startsWith('/pos/');
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -34,12 +37,14 @@ export default {
       url.pathname = '/index.html';
       return env.ASSETS.fetch(new Request(url, request));
     }
-    if (url.pathname === '/admin' || url.pathname === '/admin/') {
-      url.pathname = '/admin/index.html';
-      return env.ASSETS.fetch(new Request(url, request));
-    }
-    if (url.pathname === '/pos' || url.pathname === '/pos/') {
-      url.pathname = '/pos/index.html';
+    // The shells need the same gate as their APIs. Guarding only /api/admin/*
+    // leaves /admin/app.js and /pos/sw.js served straight off ASSETS, so the
+    // whole console is readable by anyone who guesses the path.
+    if (isProtected(url.pathname)) {
+      const user = await authenticate(request, env);
+      if (!user) return authError();
+      if (url.pathname === '/admin' || url.pathname === '/admin/') url.pathname = '/admin/index.html';
+      if (url.pathname === '/pos' || url.pathname === '/pos/') url.pathname = '/pos/index.html';
       return env.ASSETS.fetch(new Request(url, request));
     }
     return env.ASSETS.fetch(request);

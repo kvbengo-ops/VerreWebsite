@@ -109,4 +109,18 @@ assert.equal((await worker.fetch(request(order(), { ip: 'confirmation-fail-test'
 
 globalThis.fetch = originalFetch;
 
+// The admin and POS shells are static files. Guarding only /api/admin/* would
+// leave the whole console readable to anyone who guesses the path — which is
+// exactly what happens on a workers.dev host, where Cloudflare Access cannot
+// be attached at all.
+const shellEnv = { ...env, LOCAL_AUTH_BYPASS: 'true', LOCAL_AUTH_EMAIL: 'local@verre.test' };
+const shell = (path, host) => worker.fetch(new Request('https://' + host + path), shellEnv);
+
+for (const path of ['/admin', '/admin/', '/admin/app.js', '/pos', '/pos/sw.js', '/pos/manifest.json']) {
+  assert.equal((await shell(path, 'verre.workers.dev')).status, 401, path + ' is not public');
+  assert.equal((await shell(path, 'localhost')).status, 200, path + ' opens for local dev');
+}
+assert.equal((await shell('/', 'verre.workers.dev')).status, 200, 'the storefront stays public');
+assert.equal((await shell('/index.html', 'verre.workers.dev')).status, 200, 'storefront assets stay public');
+
 console.log('ok');
