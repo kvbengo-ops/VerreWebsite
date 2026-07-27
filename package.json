@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
     "create-admin": "node scripts/create-admin.mjs",
-    "test": "node scripts/check-catalog.mjs && node src/worker.test.mjs && node src/auth.test.mjs && node src/roles.test.mjs && node scripts/check-admin.mjs"
+    "test": "node scripts/check-catalog.mjs && node src/worker.test.mjs && node src/auth.test.mjs && node src/themes.test.mjs && node src/roles.test.mjs && node scripts/check-admin.mjs"
   }
 }

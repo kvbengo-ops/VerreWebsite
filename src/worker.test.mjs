@@ -270,4 +270,91 @@ assert.match(await goodToken.text(), /unsubscribed/i);
 
 globalThis.fetch = realFetchNews;
 
+/* ------------------------------------------------------------------ */
+/* seasonal theme injection                                            */
+/* ------------------------------------------------------------------ */
+
+const pageHtml = '<html><head><title>Verre</title></head><body>hi</body></html>';
+
+// Models the real asset layer, which canonicalises '/index.html' back to '/'
+// with a 307. With '/' in run_worker_first, a Worker that rewrites '/' to
+// '/index.html' gets that redirect, returns it, is called again, and the
+// browser dies with ERR_TOO_MANY_REDIRECTS. A stub that always returns the page
+// cannot see this, which is why it is modelled here.
+// Also models conditional requests. A real asset layer answers a repeat visit
+// carrying if-none-match with 304 Not Modified — true of index.html, false of
+// the page, because the season is injected after the file is read. Passing that
+// 304 through leaves the browser on whatever season it first loaded until
+// index.html itself changes, which is a rebuild.
+const ASSET_ETAG = '"index-v1"';
+const themeAssets = {
+  fetch: async (req) => {
+    const path = new URL(req.url).pathname;
+    if (path === '/index.html') {
+      return new Response('', { status: 307, headers: { location: '/' } });
+    }
+    if (req.headers.get('if-none-match') === ASSET_ETAG) {
+      return new Response('', { status: 304, headers: { etag: ASSET_ETAG } });
+    }
+    return new Response(pageHtml, { headers: { 'content-type': 'text/html', etag: ASSET_ETAG } });
+  }
+};
+const themeEnv = { ASSETS: themeAssets };
+
+// The storefront path must reach ASSETS exactly as it arrived.
+const storefrontSeen = [];
+await worker.fetch(new Request('https://verre.test/'), {
+  ASSETS: { fetch: async (req) => { storefrontSeen.push(new URL(req.url).pathname); return new Response(pageHtml, { headers: { 'content-type': 'text/html' } }); } }
+});
+assert.deepEqual(storefrontSeen, ['/'], "the Worker must not rewrite '/' to '/index.html'");
+
+// No Supabase configured here, so the override read fails. The homepage must
+// still render — a decoration lookup must never be able to take the storefront
+// down.
+const home = await worker.fetch(new Request('https://verre.test/'), themeEnv);
+const homeHtml = await home.text();
+assert.equal(home.status, 200, 'the storefront renders even when the settings read fails');
+assert.match(homeHtml, /window\.__VERRE_THEME__=\{[\s\S]*<\/head>/, 'the theme is injected before </head>');
+assert.ok(home.headers.get('x-verre-theme'), 'the resolved theme is reported in a header');
+assert.equal(home.headers.get('content-length'), null, 'stale content-length must not survive the rewrite');
+
+// A direct hit on /index.html gets the asset layer's canonical redirect to '/'
+// and stops there. One redirect is correct; a second one means the loop is back.
+const explicit = await worker.fetch(new Request('https://verre.test/index.html'), themeEnv);
+assert.equal(explicit.status, 307, '/index.html canonicalises to / and is passed through');
+assert.equal(explicit.headers.get('location'), '/');
+const afterRedirect = await worker.fetch(new Request('https://verre.test/'), themeEnv);
+assert.equal(afterRedirect.status, 200, 'following that redirect must land on the page, not another redirect');
+assert.match(await afterRedirect.text(), /window\.__VERRE_THEME__=/, 'and it is themed');
+
+// A returning browser sends if-none-match. It must still get a full, freshly
+// themed document — not a 304 that pins it to the season it first saw.
+const revisit = await worker.fetch(
+  new Request('https://verre.test/', { headers: { 'if-none-match': ASSET_ETAG } }),
+  themeEnv
+);
+assert.equal(revisit.status, 200, 'a conditional request must not be answered with 304');
+assert.match(await revisit.text(), /window\.__VERRE_THEME__=/, 'and the page is themed again');
+assert.equal(revisit.headers.get('etag'), null, "the asset's etag must not describe a page we rewrote");
+assert.equal(revisit.headers.get('last-modified'), null);
+
+// Localhost is never cached, so flipping a season in admin shows up on the next
+// refresh rather than up to a minute later.
+const localhost = await worker.fetch(new Request('http://localhost:8787/'), themeEnv);
+assert.equal(localhost.headers.get('cache-control'), 'no-store', 'local development must not cache the storefront');
+
+// Previews are shareable by design, but must never be cached for other people.
+const preview = await worker.fetch(new Request('https://verre.test/?theme=sinulog'), themeEnv);
+assert.equal(preview.headers.get('x-verre-theme'), 'sinulog');
+assert.equal(preview.headers.get('cache-control'), 'no-store', 'a preview must not be cached');
+
+// The theme id reaches the page inside a <script>. An unescaped "<" would end
+// the element early and turn a query parameter into markup.
+const hostile = await worker.fetch(new Request('https://verre.test/?theme=' + encodeURIComponent('</script><img src=x onerror=alert(1)>')), themeEnv);
+const hostileHtml = await hostile.text();
+assert.equal(hostile.headers.get('x-verre-theme'), 'default', 'an unknown theme falls back rather than erroring');
+assert.ok(!hostileHtml.includes('onerror=alert(1)'), 'a hostile theme parameter never reaches the document');
+assert.ok(!/__VERRE_THEME__=[^\n]*<\/script>/.test(hostileHtml.split('</head>')[0].replace(/<\/script>\s*$/, '')),
+  'the injected JSON must not be able to close its own script element');
+
 console.log('ok');

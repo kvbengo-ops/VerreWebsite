@@ -119,6 +119,35 @@ the role stored under **Admin → Accounts**:
 | General Admin | Sales/orders, inventory, and POS |
 | Cashier | POS only |
 
+## Local development
+
+```
+npm run dev
+```
+
+Builds once, starts `wrangler dev`, then watches `src/`, `admin/`, `pos/`,
+`login/`, `assets/`, `index.html` and `support.js` and rebuilds on save.
+wrangler picks the rebuild up and reloads itself, so a change needs a save and a
+browser refresh — not a manual `npm run build` and a restart.
+
+This exists because `wrangler.toml` points at build output (`main =
+dist/server/index.js`, `[assets] directory = dist/client`). wrangler only ever
+serves what the build produced, so an unbuilt edit genuinely does not exist yet.
+Pointing wrangler at the source tree instead looks simpler and is a trap:
+`[assets]` serves everything beneath its directory, and the repo root contains
+`.dev.vars` — that would publish the Supabase service role key on localhost.
+
+Two things still need the command restarted, because neither is watched:
+
+- **`wrangler.toml`** — read once at startup.
+- **New Cloudflare bindings or secrets.**
+
+And two client caches will hide a fresh build from you:
+
+- **The POS** is a cache-first PWA. Bump `VERSION` in `pos/sw.js` when a SHELL
+  file changes, then reload twice or unregister the service worker.
+- **Stylesheets** need a hard refresh (`Ctrl+Shift+R`).
+
 ## Signing in
 
 Verre owns its own login. `/login` posts to `/api/auth/login`, which sets a

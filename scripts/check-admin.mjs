@@ -49,18 +49,33 @@ assert.ok(html.includes('{{ connectPanel }}')&&html.includes('{{ connectTabs }}'
 assert.ok(!/connectTab[\s\S]{0,200}setInterval/.test(html),'the connect carousel must never rotate on a timer');
 
 const wrangler=await readFile(resolve(root,'wrangler.toml'),'utf8');
-assert.match(
-  wrangler,
-  /run_worker_first\s*=\s*\["\/admin",\s*"\/admin\/\*",\s*"\/pos",\s*"\/pos\/\*"\]/,
-  'bare and nested admin/POS asset paths must run through Worker authorization'
-);
+const workerFirst=wrangler.match(/run_worker_first\s*=\s*\[([^\]]*)\]/);
+assert.ok(workerFirst,'run_worker_first must be configured');
+const workerFirstPaths=[...workerFirst[1].matchAll(/"([^"]+)"/g)].map(m=>m[1]);
+for(const path of ['/admin','/admin/*','/pos','/pos/*']){
+  assert.ok(workerFirstPaths.includes(path),path+' must run through Worker authorization before the asset layer');
+}
+// Not authorization — the Worker injects the seasonal theme into this document.
+// Served straight off the asset layer that code never runs and the storefront
+// is undressed all year, with nothing anywhere reporting a problem.
+for(const path of ['/','/index.html']){
+  assert.ok(workerFirstPaths.includes(path),path+' must reach the Worker so the season can be injected');
+}
+assert.ok(!workerFirstPaths.includes('/login'),'/login must not be gated');
+// A section needs its nav link, its route permission and its PAGES entry to
+// agree. Miss one and the link either 404s to the dashboard or renders a header
+// with no body — both silent.
+const adminApp=await readFile(resolve(root,'admin','app.js'),'utf8');
+const adminHtml=await readFile(resolve(root,'admin','index.html'),'utf8');
+for(const route of ['dashboard','products','inventory','orders','sessions','accounts','themes']){
+  assert.ok(adminHtml.includes('data-route="'+route+'"'),route+' needs a nav link');
+  assert.ok(new RegExp('^\\s*'+route+':','m').test(adminApp),route+' needs a routeRoles and PAGES entry');
+}
+
 for(const file of ['admin/app.js','pos/app.js']){
   const clientAuth=await readFile(resolve(root,file),'utf8');
   assert.match(clientAuth,/\/login\?return_to=/,file+' must send a 401 to the login page');
 }
-// /login is the page you reach *because* you are not signed in. Listing it in
-// run_worker_first would gate the sign-in form behind sign-in.
-assert.ok(!/run_worker_first[^\]]*\/login/.test(wrangler),'/login must not be gated');
 
 // A wildcard select on admin_accounts now drags password_hash out of the
 // database, and listAccounts renders into the browser.

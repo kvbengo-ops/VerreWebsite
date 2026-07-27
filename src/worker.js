@@ -71,9 +71,7 @@ export default {
     // The storefront is served with its season already resolved and injected,
     // so the hero never paints the everyday pink and then swaps.
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      const page = new URL(url);
-      page.pathname = '/index.html';
-      return themedPage(request, env, new Request(page, request));
+      return themedPage(request, env);
     }
     // The reset link is a real URL people click from email, but it is the same
     // document as /login — the token in the query string is what selects the

@@ -9,8 +9,30 @@ import { getThemeOverride } from '../db/settings.js';
  * everyday pink and then swap to Christmas a moment later. A marketing feature
  * that visibly changes its mind is worse than not having it.
  */
-export async function themedPage(request, env, assetRequest) {
+export async function themedPage(request, env) {
+  // Hand the path to ASSETS untouched.
+  //
+  // Rewriting '/' to '/index.html' makes the asset layer canonicalise it
+  // straight back to '/' with a 307, and now that '/' is in run_worker_first
+  // that redirect comes back here and does it again — the browser ping-pongs
+  // until it gives up with ERR_TOO_MANY_REDIRECTS. Directory indexes are the
+  // asset layer's job, exactly as noted for '/admin/' in worker.js.
+  // Strip the conditional headers before asking for the asset.
+  //
+  // Left in place, the asset layer answers a repeat visit with 304 Not
+  // Modified — correct about index.html, wrong about the page, because the
+  // theme is injected here and is not part of that file. The browser then
+  // reuses its cached copy with whatever season was live when it first loaded,
+  // and the only thing that shakes it loose is index.html changing, i.e. a
+  // rebuild. We need the body every time so we can dress it.
+  const assetRequest = new Request(request);
+  assetRequest.headers.delete('if-none-match');
+  assetRequest.headers.delete('if-modified-since');
+
   const response = await env.ASSETS.fetch(assetRequest);
+  // Anything that is not a document — a redirect, a 404 — passes through
+  // untouched. Injecting into it would also mean returning it, which is how the
+  // loop above sustained itself.
   if (!response.ok) return response;
 
   const url = new URL(request.url);
@@ -44,9 +66,19 @@ export async function themedPage(request, env, assetRequest) {
 
   const headers = new Headers(response.headers);
   headers.set('content-type', 'text/html; charset=utf-8');
-  // Short and revalidated: a season starting or an override flipping should
-  // reach visitors in about a minute, not whenever a CDN feels like it.
-  headers.set('cache-control', preview ? 'no-store' : 'public, max-age=60, must-revalidate');
+  // These describe the file on disk, not the document actually sent. Keeping
+  // them lets a browser revalidate a themed page against an undressed one and
+  // be told, wrongly, that nothing changed.
+  headers.delete('etag');
+  headers.delete('last-modified');
+  // Nothing is cached on localhost. In production a minute is the right trade;
+  // in development it means flipping a season in admin appears to do nothing
+  // for up to a minute, which reads as broken.
+  const local = ['localhost', '127.0.0.1'].includes(url.hostname);
+  headers.set(
+    'cache-control',
+    preview || local ? 'no-store' : 'public, max-age=60, must-revalidate'
+  );
   headers.set('x-verre-theme', payload.id);
   headers.delete('content-length'); // body length changed
   return new Response(themed, { status: response.status, headers });
