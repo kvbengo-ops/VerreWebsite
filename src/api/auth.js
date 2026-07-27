@@ -107,6 +107,24 @@ const tooMany = (retryAfter = 900) =>
   json(429, { ok: false, error: 'Too many attempts. Try again shortly.', code: 'RATE_LIMITED' },
     { 'retry-after': String(retryAfter) });
 
+/**
+ * Sign-in could not be attempted — the database was unreachable or not
+ * configured. Distinct from a wrong password, which is a 401.
+ *
+ * The visible message stays vague on purpose, but a misconfigured deployment
+ * and a database outage need different fixes, and "temporarily unavailable"
+ * tells whoever is deploying nothing. `NOT_CONFIGURED` means the secrets were
+ * never set on this Worker, so say that much in the code field and log the
+ * rest — the details live in `wrangler tail`, not in the response.
+ */
+const unavailable = (error) => json(503, {
+  ok: false,
+  error: error?.code === 'NOT_CONFIGURED'
+    ? 'Sign-in is not configured on this deployment yet.'
+    : 'Sign-in is temporarily unavailable.',
+  code: error?.code === 'NOT_CONFIGURED' ? 'AUTH_NOT_CONFIGURED' : 'AUTH_UNAVAILABLE'
+});
+
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -178,7 +196,7 @@ async function login(request, env, url) {
   const verified = await verifyPassword(env, email, password);
   if (verified.error) {
     console.error('auth: verify_password failed — ' + verified.error.code);
-    return json(503, { ok: false, error: 'Sign-in is temporarily unavailable.', code: 'AUTH_UNAVAILABLE' });
+    return unavailable(verified.error);
   }
   if (!verified.data?.ok) {
     // The reason code (INVALID vs LOCKED) is deliberately not surfaced.
@@ -190,7 +208,7 @@ async function login(request, env, url) {
   const created = await createSession(env, account.id, request);
   if (created.error) {
     console.error('auth: session create failed — ' + created.error.code);
-    return json(503, { ok: false, error: 'Sign-in is temporarily unavailable.', code: 'AUTH_UNAVAILABLE' });
+    return unavailable(created.error);
   }
 
   console.log('auth: login ok for ' + email);

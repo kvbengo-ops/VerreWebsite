@@ -1,11 +1,46 @@
-name = "verre"
+# Must match the deployed Worker exactly — it is the subdomain in
+# verreweb.kvb-engo.workers.dev. `wrangler secret put` and `wrangler deploy`
+# both target this name, so a mismatch quietly creates a second, empty Worker
+# and puts your secrets on it while the live one stays unconfigured.
+name = "verreweb"
 main = "dist/server/index.js"
 compatibility_date = "2025-05-01"
 
-# No *.workers.dev origin. That hostname has no dispatcher and no Cloudflare
-# Access in front of it, so leaving it on publishes a second, unprotected door
-# into /admin and /pos. Routes are bound to the real hostname only.
-workers_dev = false
+# The *.workers.dev origin is on, which is how this deploys before a domain
+# exists.
+#
+# It was off while admin auth depended on a trusted header from a dispatcher:
+# that hostname has no dispatcher in front of it, so it was an unprotected door
+# into /admin and /pos. It is not any more. Authentication is a session cookie
+# checked by the Worker itself, on every hostname, so workers.dev is exactly as
+# protected as the real domain will be.
+#
+# Turn this back off once a custom domain and a route are in place — a second
+# public origin is still a second thing to think about, and search engines will
+# index it.
+workers_dev = true
+
+# Non-secret configuration. Anything here is committed to git, so nothing that
+# grants access belongs in this block — SUPABASE_SERVICE_ROLE_KEY and
+# RESEND_API_KEY go through `wrangler secret put`, never here.
+[vars]
+LOCAL_AUTH_BYPASS = "false"
+
+# Optional caches. Create them with:
+#   npx wrangler kv namespace create CATALOG_CACHE
+# then paste the printed id below and uncomment. The site works without them;
+# it just reads Supabase more often. AUTH_LIMITS is the one worth doing first —
+# without it, login rate limiting falls back to an in-memory map that resets
+# whenever Cloudflare recycles the isolate.
+# [[kv_namespaces]]
+# binding = "AUTH_LIMITS"
+# id = ""
+# [[kv_namespaces]]
+# binding = "CATALOG_CACHE"
+# id = ""
+# [[kv_namespaces]]
+# binding = "DASHBOARD_CACHE"
+# id = ""
 
 # Run `npm run build` first — both of these point at build output.
 [assets]

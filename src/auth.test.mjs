@@ -184,5 +184,83 @@ assert.equal(authApiTest.readCookie(new Request('https://verre.test/')),null);
 assert.ok(!authApiTest.sessionCookie('t',new URL('http://localhost/')).includes('Secure'));
 assert.ok(authApiTest.sessionCookie('t',new URL('https://verre.test/')).includes('Secure'));
 
-console.log('ok — Access signature, password login, session cookies, enumeration parity, redirect safety');
+/* ------------------------------------------------------------------ */
+/* unconfigured deployment                                             */
+/* ------------------------------------------------------------------ */
+
+// A Worker deployed without Supabase secrets. Every branch below is an error
+// path, which is exactly the code least likely to have been run before it
+// matters — an earlier version called an `unavailable()` helper that was never
+// defined, so this path threw a ReferenceError and returned a 500 with no JSON
+// body. The login page then reported "unreadable response" and the real cause
+// was invisible.
+const bare = { ASSETS: { fetch: async () => new Response('asset') } };
+const loginRequest = () => new Request('https://verre.test/api/auth/login', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'kyle@example.com', password: 'correct horse battery' })
+});
+
+const unconfigured = await worker.fetch(loginRequest(), bare);
+assert.equal(unconfigured.status, 503, 'sign-in on an unconfigured deployment is 503, not a crash');
+assert.match(unconfigured.headers.get('content-type'), /application\/json/, 'and it is still JSON the page can read');
+const unconfiguredBody = await unconfigured.json();
+assert.equal(unconfiguredBody.ok, false);
+// "temporarily unavailable" sends whoever is deploying looking for an outage.
+// Missing secrets is a different problem with a different fix, so name it.
+assert.equal(unconfiguredBody.code, 'AUTH_NOT_CONFIGURED');
+assert.match(unconfiguredBody.error, /not configured/i);
+
+/* ------------------------------------------------------------------ */
+/* health                                                              */
+/* ------------------------------------------------------------------ */
+
+const health = await worker.fetch(new Request('https://verre.test/api/health'), bare);
+assert.equal(health.status, 503, 'an unconfigured deployment is not ready');
+const healthBody = await health.json();
+assert.equal(healthBody.data.ready, false);
+assert.equal(healthBody.data.database, 'not-configured');
+assert.equal(healthBody.data.configured.database, false);
+assert.equal(healthBody.data.configured.email, false);
+assert.match(healthBody.data.hint, /SUPABASE_URL/, 'health must say what to do, not just what is wrong');
+
+// The failure that actually happened in production: tables read fine, so the
+// credentials are right and products load — but verify_password was never
+// created, so sign-in alone is dead. A health check that only probes a table
+// reports "ok" through this and is worse than useless.
+const missingFn = {
+  ...bare,
+  SUPABASE_URL: 'https://db.test',
+  SUPABASE_SERVICE_ROLE_KEY: 'k',
+  SUPER_ADMIN_EMAILS: 'kyle@example.com'
+};
+const realFetchHealth = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  const path = new URL(url).pathname;
+  if (path.endsWith('/rpc/verify_password')) {
+    return new Response(
+      JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.verify_password' }),
+      { status: 404, headers: { 'content-type': 'application/json' } }
+    );
+  }
+  return new Response(JSON.stringify([{ id: true }]), { headers: { 'content-type': 'application/json' } });
+};
+const partial = await worker.fetch(new Request('https://verre.test/api/health'), missingFn);
+const partialBody = await partial.json();
+globalThis.fetch = realFetchHealth;
+
+assert.equal(partial.status, 503, 'a database that cannot authenticate is not ready');
+assert.equal(partialBody.data.database, 'ok', 'tables are readable');
+assert.equal(partialBody.data.auth, 'missing-function', 'but the sign-in function is absent, and it says so');
+assert.match(partialBody.data.hint, /db push/i, 'and names the fix');
+
+// Booleans only. A public endpoint that echoes a URL or a key fragment would be
+// a far worse problem than the one it was added to solve.
+const healthText = JSON.stringify(healthBody);
+for (const secret of ['supabase.co', 'sb_secret', 're_', 'http']) {
+  assert.ok(!healthText.includes(secret), 'health must not leak "' + secret + '"');
+}
+assert.equal((await worker.fetch(new Request('https://verre.test/api/health', { method: 'POST' }), bare)).status, 405);
+
+console.log('ok — Access signature, password login, session cookies, enumeration parity, redirect safety, unconfigured deploys');
 

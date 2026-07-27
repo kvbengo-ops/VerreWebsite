@@ -6,6 +6,7 @@ import { posApi } from './api/pos.js';
 import { listPublicProducts } from './db/products.js';
 import { createInquiry } from './db/orders.js';
 import { addSubscriber, removeSubscriber } from './db/subscribers.js';
+import { db } from './db/client.js';
 import { themedPage } from './api/theme.js';
 import { can, resolveUser } from './roles.js';
 
@@ -43,6 +44,13 @@ export default {
       const resolved = identity ? await resolveUser(env, identity) : { data: null };
       return authApi(request, env, url, resolved.data ? { ...identity, ...resolved.data } : null);
     }
+
+    // Unauthenticated on purpose, and booleans only — never a value, a hostname
+    // or a key fragment. Its whole job is to answer "did the secrets actually
+    // reach this Worker?" without a deploy-guess-redeploy loop. Every symptom
+    // in this project so far (no backend, no theme, sign-in unavailable) had
+    // the same root cause and no way to see it from outside.
+    if (url.pathname === '/api/health') return handleHealth(request, env);
 
     if (url.pathname === '/api/inquiry') return handleInquiry(request, env);
     if (url.pathname === '/api/subscribe') return handleSubscribe(request, env);
@@ -295,6 +303,77 @@ async function handleInquiry(request, env) {
 
   console.log('inquiry ' + ref + ': ' + parsed.type + ' ok'); // no names, no bodies
   return json(200, { ok: true, ref });
+}
+
+/* ------------------------------------------------------------------ */
+/* health                                                              */
+/* ------------------------------------------------------------------ */
+
+async function handleHealth(request, env) {
+  if (request.method !== 'GET') return json(405, { ok: false, error: 'Method not allowed' }, { allow: 'GET' });
+
+  const configured = {
+    database: Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
+    email: Boolean(env.RESEND_API_KEY && env.OWNER_EMAIL && env.FROM_EMAIL),
+    bootstrapAdmin: Boolean(env.SUPER_ADMIN_EMAILS || env.ADMIN_EMAILS),
+    kvAuthLimits: Boolean(env.AUTH_LIMITS),
+    kvCatalogCache: Boolean(env.CATALOG_CACHE),
+    kvDashboardCache: Boolean(env.DASHBOARD_CACHE)
+  };
+
+  // Configured and reachable are different failures with different fixes, so
+  // actually touch the database rather than trusting that a URL was set.
+  let database = 'not-configured';
+  let auth = 'not-configured';
+  if (configured.database) {
+    const probe = await db(env).rest('site_settings', 'select=id&limit=1');
+    database = probe.error ? 'unreachable' : 'ok';
+    if (probe.error) console.error('health: table probe failed — ' + probe.error.code);
+
+    // Reading a table and calling a function are different permissions and
+    // different migrations. Products can load perfectly while sign-in is dead
+    // because verify_password was never created — or was created and PostgREST
+    // has not reloaded its schema cache yet. Both look identical from outside,
+    // so probe the function itself.
+    //
+    // Safe to call with junk: verify_password runs a dummy comparison for an
+    // unknown email and returns ok:false. It does not lock anything out.
+    if (database === 'ok') {
+      const rpc = await db(env).rpc('verify_password', { p_email: 'health-probe@invalid.test', p_password: '' });
+      if (!rpc.error) auth = 'ok';
+      else {
+        // PGRST202 is PostgREST for "no such function".
+        const missing = rpc.error.code === 'PGRST202' ||
+          /could not find|does not exist/i.test(rpc.error.message || '');
+        auth = missing ? 'missing-function' : 'unreachable';
+        console.error('health: verify_password probe failed — ' + rpc.error.code + ' ' + (rpc.error.message || ''));
+      }
+    }
+  }
+
+  const ready = database === 'ok' && auth === 'ok' && configured.bootstrapAdmin;
+  return json(ready ? 200 : 503, {
+    ok: ready,
+    data: {
+      ready,
+      database,
+      auth,
+      configured,
+      // Whatever is wrong, say what to do about it. This endpoint exists
+      // because every failure so far looked the same from the browser.
+      hint: hintFor({ database, auth, configured })
+    }
+  }, { 'cache-control': 'no-store' });
+}
+
+function hintFor({ database, auth, configured }) {
+  if (!configured.database) return 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY as secrets on this Worker.';
+  if (database === 'unreachable') return 'Credentials are set but Supabase rejected the call. Check you used the sb_secret_ key, not sb_publishable_.';
+  if (auth === 'missing-function') return 'verify_password does not exist in this database. Run `supabase db push` against this project, then reload the schema cache in Supabase (Settings → API → Reload).';
+  if (auth === 'unreachable') return 'verify_password exists but errored. Check pgcrypto is installed in the extensions schema.';
+  if (!configured.bootstrapAdmin) return 'Set SUPER_ADMIN_EMAILS so at least one account can be granted admin.';
+  if (!configured.email) return 'Ready to sign in. Email is unset, so enquiries and password resets will not send.';
+  return 'Ready.';
 }
 
 /* ------------------------------------------------------------------ */
