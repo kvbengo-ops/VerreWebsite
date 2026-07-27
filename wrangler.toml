@@ -1,4 +1,4 @@
-name = "verre"
+name = "verreweb"
 main = "dist/server/index.js"
 compatibility_date = "2025-05-01"
 
