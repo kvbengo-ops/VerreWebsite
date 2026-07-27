@@ -2,6 +2,11 @@ name = "verre"
 main = "dist/server/index.js"
 compatibility_date = "2025-05-01"
 
+# No *.workers.dev origin. That hostname has no dispatcher and no Cloudflare
+# Access in front of it, so leaving it on publishes a second, unprotected door
+# into /admin and /pos. Routes are bound to the real hostname only.
+workers_dev = false
+
 # Run `npm run build` first — both of these point at build output.
 [assets]
 directory = "dist/client"

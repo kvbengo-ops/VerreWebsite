@@ -25,6 +25,10 @@
   @keyframes vMarquee { from{transform:translateX(0);} to{transform:translateX(-50%);} }
   @keyframes vSpin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
   @keyframes vTwinkle { 0%,100%{opacity:.35;transform:scale(.85);} 50%{opacity:1;transform:scale(1.1);} }
+  /* Runs once when a slide mounts. The panel is keyed on the active tab, so
+     React remounts it and the animation replays. Killed by the
+     prefers-reduced-motion block below along with everything else. */
+  @keyframes vSlideIn { from{opacity:0;transform:translateX(var(--from,22px));} to{opacity:1;transform:none;} }
   .atlas { background-image:url('./assets/verre-photo-atlas.png'); background-size:400% 400%; background-repeat:no-repeat; background-color:#FFE1EF; }
 
   :focus-visible { outline:3px solid #EF4056; outline-offset:3px; }
@@ -64,26 +68,22 @@
     <a href="#shop" style="color:#3A2430;" style-hover="color:#F157A8;">Shop</a>
     <a href="#about" style="color:#3A2430;" style-hover="color:#F157A8;">About</a>
     <a href="#stockists" style="color:#3A2430;" style-hover="color:#F157A8;">Stockists &amp; Markets</a>
+    <a href="#newsletter" style="color:#3A2430;" style-hover="color:#F157A8;">New Drops</a>
     <a href="#custom" style="color:#3A2430;" style-hover="color:#F157A8;">Custom Orders</a>
     <a href="#contact" style="color:#3A2430;" style-hover="color:#F157A8;">Contact</a>
   </div>
   <button data-cart-trigger onClick="{{ openCart }}" aria-label="{{ cartAria }}" style="border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:10px 18px;border-radius:999px;box-shadow:0 5px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .18s;" style-hover="transform:translateY(-2px) rotate(-2deg);box-shadow:0 7px 0 rgba(239,64,86,.28);" style-active="transform:translateY(3px) scale(.97);box-shadow:0 2px 0 rgba(239,64,86,.28);">Cart {{ cartLabel }}</button>
 </nav>
 
+<!-- SEASON RIBBON -->
+<!-- Present only when a season defines one, so the everyday site is unchanged. -->
+{{ themeRibbon }}
+
 <!-- HERO -->
-<header id="top" style="position:relative;overflow:hidden;background:linear-gradient(165deg,#FFB6D9 0%,#F98AC4 45%,#F157A8 100%);padding:64px 20px 90px;text-align:center;">
-  <div aria-hidden="true" style="position:absolute;top:8%;left:6%;--r:-12deg;animation:vFloat 6s ease-in-out infinite;opacity:.95;">
-    <svg width="86" height="60" viewBox="0 0 86 60" fill="none"><path d="M22 52c-11 0-18-7-18-15S11 22 20 22c2-11 11-18 21-18 11 0 20 8 21 19 10 0 20 5 20 15S72 52 62 52z" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/><path d="M22 52c-11 0-18-7-18-15S11 22 20 22c2-11 11-18 21-18 11 0 20 8 21 19 10 0 20 5 20 15S72 52 62 52z" fill="#EAF7FF"/></svg>
-  </div>
-  <div aria-hidden="true" style="position:absolute;top:22%;right:7%;--r:14deg;animation:vFloat 7.5s ease-in-out .6s infinite;">
-    <svg width="64" height="64" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="#FFD166" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
-  </div>
-  <div aria-hidden="true" style="position:absolute;bottom:14%;left:11%;--r:-8deg;animation:vFloat 8s ease-in-out 1.2s infinite;">
-    <svg width="58" height="54" viewBox="0 0 58 54"><path d="M29 50C13 38 4 30 4 20 4 11 11 4 20 4c5 0 9 3 9 3s4-3 9-3c9 0 16 7 16 16 0 10-9 18-25 30z" fill="#EF4056" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
-  </div>
-  <div aria-hidden="true" style="position:absolute;bottom:26%;right:14%;--r:6deg;animation:vFloat 6.8s ease-in-out .3s infinite;">
-    <svg width="46" height="46" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="#7ED3F2" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
-  </div>
+<!-- Gradient and floating shapes come from the active season, resolved on the
+     server and injected before this page renders. See src/themes.js. -->
+<header id="top" style="position:relative;overflow:hidden;background:{{ heroBg }};padding:64px 20px 90px;text-align:center;">
+  {{ heroDecor }}
 
   <div style="position:relative;max-width:1060px;margin:0 auto;">
     <p style="margin:0 0 14px;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#fff;opacity:.95;">Cebu City, Philippines ✦ est. 2022</p>
@@ -227,20 +227,47 @@
   </div>
 </section>
 
-<!-- CUSTOM ORDERS -->
-<section id="custom" style="padding:70px 20px;background:linear-gradient(180deg,#FFF0F7,#FFE2F0);">
-  <div style="max-width:900px;margin:0 auto;background:#fff;border:6px solid #fff;border-radius:34px;padding:clamp(24px,5vw,44px);box-shadow:0 14px 0 rgba(239,64,86,.12),0 26px 44px rgba(160,40,90,.14);position:relative;">
-    <span style="position:absolute;top:-22px;left:50%;transform:translateX(-50%) rotate(-3deg);background:#FFD166;border:4px solid #fff;border-radius:999px;padding:6px 20px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#7A4A00;">Commissions open</span>
-    <div style="text-align:center;margin-bottom:26px;">
-      <h2 style="margin:10px 0 10px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6.5vw,40px);color:#3A2430;">Want something painted just for you?</h2>
-      <p style="margin:0 auto;max-width:480px;font-size:14.5px;line-height:1.7;color:#7A5C6B;">Pets, portraits, band logos, wedding gifts — tell me what you're picturing and I'll send a quote within 2–3 days.</p>
+<!-- CONNECT — one card, three slides -->
+<!-- Sits directly after Stockists on purpose: someone who just read "come find
+     us at a market" and cannot make that date is exactly the person who wants
+     to hear about the next drop.
+
+     Newsletter, commissions and general enquiries used to be three stacked
+     sections, roughly 900px of consecutive forms. They are one panel now.
+     Never auto-rotates: swapping the slide under someone mid-sentence would
+     lose what they had typed. -->
+<section id="connect" style="position:relative;padding:20px 20px 76px;background:#FFF6F0;">
+  <!-- The nav still links to #newsletter, #custom and #contact, and those may
+       be in the wild. They stay as scroll anchors and each selects its slide.
+       Offset upward to clear the sticky nav. -->
+  <span id="newsletter" aria-hidden="true" style="position:absolute;top:-80px;"></span>
+  <span id="custom" aria-hidden="true" style="position:absolute;top:-80px;"></span>
+  <span id="contact" aria-hidden="true" style="position:absolute;top:-80px;"></span>
+
+  <div style="max-width:880px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:22px;">
+      <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Come say hello</p>
+      <h2 style="margin:10px 0 0;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,44px);color:#3A2430;">Let's talk</h2>
     </div>
-    {{ customForm }}
+
+    {{ connectTabs }}
+
+    <div style="position:relative;overflow:hidden;border:6px solid #fff;border-radius:34px;box-shadow:0 14px 0 rgba(239,64,86,.12),0 26px 44px rgba(160,40,90,.16);background:{{ connectBg }};transition:background .45s ease;">
+      <div aria-hidden="true" style="position:absolute;top:-18px;right:-14px;--r:12deg;animation:vFloat 7s ease-in-out infinite;opacity:.9;">
+        <svg width="88" height="88" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="{{ connectStar }}" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg>
+      </div>
+      <div aria-hidden="true" style="position:absolute;bottom:-22px;left:-16px;--r:-10deg;animation:vFloat 8.5s ease-in-out .8s infinite;opacity:.85;">
+        <svg width="74" height="70" viewBox="0 0 58 54"><path d="M29 50C13 38 4 30 4 20 4 11 11 4 20 4c5 0 9 3 9 3s4-3 9-3c9 0 16 7 16 16 0 10-9 18-25 30z" fill="{{ connectHeart }}" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg>
+      </div>
+      {{ connectPanel }}
+    </div>
   </div>
 </section>
 
 <!-- INSTAGRAM -->
-<section id="contact" style="padding:0 0 70px;background:#FFF6F0;">
+<!-- The contact form moved into #connect above. The id moved with it, since the
+     nav and any existing links point at the form, not at this grid. -->
+<section id="instagram" style="padding:0 0 70px;background:#FFF6F0;">
   <div aria-hidden="true" style="overflow:hidden;background:linear-gradient(90deg,#FFB6D9,#F157A8);padding:14px 0;margin-bottom:34px;">
     <div style="display:flex;width:max-content;animation:vMarquee 26s linear infinite;">
       <span style="font-family:'Shrikhand',cursive;font-size:26px;color:#fff;white-space:nowrap;">@verrecrafts ✦ made by hand ✦ Cebu City ✦ @verrecrafts ✦ made by hand ✦ Cebu City ✦ </span>
@@ -252,14 +279,6 @@
       <sc-for list="{{ gram }}" as="g" hint-placeholder-count="6">
         <div role="img" aria-label="{{ g.label }}" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;"></div>
       </sc-for>
-    </div>
-    <div style="max-width:760px;margin:50px auto 0;background:#fff;border:5px solid #fff;border-radius:28px;padding:clamp(22px,5vw,38px);box-shadow:0 10px 0 rgba(239,64,86,.1),0 18px 30px rgba(160,40,90,.12);">
-      <div style="text-align:center;margin-bottom:24px;">
-        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Say hello</p>
-        <h2 style="margin:8px 0 8px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6vw,38px);color:#3A2430;">Send a little note</h2>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#7A5C6B;">Questions about a piece, a market, or an order? I’ll get back to you within 2–3 days.</p>
-      </div>
-      {{ contactForm }}
     </div>
   </div>
 </section>
@@ -347,6 +366,103 @@ const productPhoto = (product, galleryIndex, thumbnail) => {
 
 const peso = (n) => '₱' + n.toLocaleString('en-PH');
 
+/* ------------------------------------------------------------------ */
+/* seasonal theme                                                      */
+/* ------------------------------------------------------------------ */
+
+// Injected into <head> by the Worker before this script runs, so the hero
+// paints the right season on the first frame. The fallback is the everyday
+// look — if the injection ever fails the site is simply not dressed up, which
+// is a non-event rather than a broken page.
+const THEME = (typeof window !== 'undefined' && window.__VERRE_THEME__) || {
+  id: 'default',
+  hero: 'linear-gradient(165deg,#FFB6D9 0%,#F98AC4 45%,#F157A8 100%)',
+  accent: '#F157A8',
+  accentDeep: '#EF4056',
+  onHero: '#fff',
+  ribbon: null,
+  decor: [
+    { kind: 'cloud', fill: '#EAF7FF' },
+    { kind: 'star', fill: '#FFD166' },
+    { kind: 'heart', fill: '#EF4056' },
+    { kind: 'star', fill: '#7ED3F2' }
+  ]
+};
+
+// Each shape is drawn on a 64×64 grid so they can be swapped freely between
+// seasons without any of them needing its own sizing rules.
+const DECOR_SHAPES = {
+  star: 'M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z',
+  heart: 'M32 56C15 43 6 35 6 24 6 14 13 7 22 7c5 0 9 3 10 6 1-3 5-6 10-6 9 0 22 7 22 17 0 11-15 19-32 32z',
+  cloud: 'M20 48c-8 0-14-5-14-12s6-12 13-12c2-8 9-13 17-13s16 6 17 15c8 0 13 4 13 11s-6 11-14 11z',
+  sparkle: 'M32 6l6 18 18 6-18 6-6 18-6-18-18-6 18-6z',
+  sun: 'M32 16a16 16 0 1 0 .01 32A16 16 0 0 0 32 16zM32 0l5 10h-10zM32 64l-5-10h10zM0 32l10-5v10zM64 32l-10 5V27zM9 9l10 4-6 6zM55 55l-10-4 6-6zM55 9l-4 10-6-6zM9 55l4-10 6 6z',
+  // A parol is the star lantern that goes up all over the Philippines from
+  // September. Five points with a tail on each lower arm.
+  parol: 'M32 2l8 20 22 3-16 15 4 22-18-11-18 11 4-22L2 25l22-3zM20 46l-8 14 10-4zM44 46l8 14-10-4z',
+  candle: 'M32 4c5 7 8 11 8 15a8 8 0 0 1-16 0c0-4 3-8 8-15zM22 30h20v30H22z'
+};
+
+function renderDecor() {
+  // Fixed positions and drifts so the arrangement stays recognisably Verre
+  // whatever shapes a season puts in it.
+  const slots = [
+    { style: { top: '8%', left: '6%' }, size: 78, r: '-12deg', dur: '6s', delay: '0s' },
+    { style: { top: '22%', right: '7%' }, size: 64, r: '14deg', dur: '7.5s', delay: '.6s' },
+    { style: { bottom: '14%', left: '11%' }, size: 58, r: '-8deg', dur: '8s', delay: '1.2s' },
+    { style: { bottom: '26%', right: '14%' }, size: 46, r: '6deg', dur: '6.8s', delay: '.3s' }
+  ];
+  return (THEME.decor || []).slice(0, 4).map((piece, index) => {
+    const slot = slots[index];
+    const path = DECOR_SHAPES[piece.kind] || DECOR_SHAPES.star;
+    return h('div', {
+      key: index,
+      'aria-hidden': true,
+      style: {
+        position: 'absolute', ...slot.style, '--r': slot.r,
+        animation: 'vFloat ' + slot.dur + ' ease-in-out ' + slot.delay + ' infinite'
+      }
+    }, h('svg', { width: slot.size, height: slot.size, viewBox: '0 0 64 64' },
+      h('path', { d: path, fill: piece.fill, stroke: '#fff', strokeWidth: 5, strokeLinejoin: 'round' })
+    ));
+  });
+}
+
+// One table drives the tab strip, the panel copy and the card tint, so a slide
+// cannot end up with a label that disagrees with its heading.
+const CONNECT_TABS = [
+  {
+    id: 'newsletter', label: 'New drops',
+    accent: 'linear-gradient(140deg,#7ED3F2,#3FA9D4)', shadow: 'rgba(40,90,120,.24)',
+    bg: 'linear-gradient(150deg,#7ED3F2 0%,#A8E2F7 45%,#D6F0FC 100%)',
+    star: '#FFD166', heart: '#F157A8',
+    ink: '#20475C', body: '#2B5568',
+    eyebrow: 'Never miss a drop',
+    title: 'Get first look at new pieces',
+    copy: "Everything is made in small batches and the one-of-a-kind pieces usually go within a day. I'll email you when a new batch lands, and when I'll be at a market near you. No more than twice a month."
+  },
+  {
+    id: 'custom', label: 'Custom order',
+    accent: 'linear-gradient(140deg,#FFB6D9,#F157A8)', shadow: 'rgba(239,64,86,.24)',
+    bg: 'linear-gradient(150deg,#FFF0F7 0%,#FFE2F0 55%,#FFD9EC 100%)',
+    star: '#FFD166', heart: '#EF4056',
+    ink: '#3A2430', body: '#7A5C6B',
+    badge: 'Commissions open',
+    title: 'Want something painted just for you?',
+    copy: "Pets, portraits, band logos, wedding gifts — tell me what you're picturing and I'll send a quote within 2–3 days."
+  },
+  {
+    id: 'contact', label: 'Say hello',
+    accent: 'linear-gradient(140deg,#FFC9A8,#EF4056)', shadow: 'rgba(239,64,86,.24)',
+    bg: 'linear-gradient(150deg,#FFF6F0 0%,#FFEFE6 55%,#FFE4E0 100%)',
+    star: '#7ED3F2', heart: '#F157A8',
+    ink: '#3A2430', body: '#7A5C6B',
+    eyebrow: 'Say hello',
+    title: 'Send a little note',
+    copy: 'Questions about a piece, a market, or an order? I’ll get back to you within 2–3 days.'
+  }
+];
+
 async function postInquiry(payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
@@ -416,6 +532,11 @@ class Component extends DCLogic {
     contactErrorField: '',
     contactFormRef: '',
     contactDraft: { name: '', email: '', message: '', hp: '' },
+    connectTab: 'newsletter',
+    connectFrom: 1,
+    newsletterState: 'idle',
+    newsletterError: '',
+    newsletterDraft: { email: '', hp: '' },
     orderFormState: 'idle',
     orderFormError: '',
     orderErrorField: '',
@@ -426,6 +547,18 @@ class Component extends DCLogic {
   componentDidMount() {
     this._onPopState = () => this.syncProductFromUrl();
     window.addEventListener('popstate', this._onPopState);
+
+    // #newsletter, #custom and #contact are still linked from the nav and may
+    // exist as bookmarks. They now share one section, so the hash also picks
+    // the slide — otherwise "Custom Orders" would scroll you to a card showing
+    // the newsletter.
+    this._onHash = () => {
+      const id = location.hash.slice(1);
+      if (CONNECT_TABS.some((t) => t.id === id)) this.selectConnect(id);
+    };
+    window.addEventListener('hashchange', this._onHash);
+    this._onHash();
+
     this.loadCatalog();
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -451,6 +584,7 @@ class Component extends DCLogic {
   componentWillUnmount() {
     if (this._io) this._io.disconnect();
     if (this._onPopState) window.removeEventListener('popstate', this._onPopState);
+    if (this._onHash) window.removeEventListener('hashchange', this._onHash);
     this.releaseOverlay(false);
   }
 
@@ -741,6 +875,49 @@ class Component extends DCLogic {
     }
   }
 
+  async subscribe(event) {
+    event.preventDefault();
+    if (this.state.newsletterState === 'submitting') return;
+    const email = (this.state.newsletterDraft.email || '').trim();
+    if (!email || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) {
+      this.setState({ newsletterState: 'error', newsletterError: "That email doesn't look right." });
+      setTimeout(() => { const el = document.querySelector('#newsletter [name="email"]'); if (el) el.focus(); }, 0);
+      return;
+    }
+    this.setState({ newsletterState: 'submitting', newsletterError: '' });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, source: 'storefront', hp: this.state.newsletterDraft.hp }),
+        signal: controller.signal
+      });
+      let body = null;
+      try { body = await response.json(); } catch {}
+      if (response.ok && body && body.ok) {
+        this.setState({ newsletterState: 'success', newsletterDraft: { email: '', hp: '' } });
+      } else {
+        // The typed address stays in state, so a failure never costs a retype.
+        this.setState({
+          newsletterState: 'error',
+          newsletterError: (body && body.error) || 'That did not go through. Please try again in a moment.'
+        });
+      }
+    } catch (error) {
+      this.setState({
+        newsletterState: 'error',
+        newsletterError: error && error.name === 'AbortError'
+          ? 'That took too long. Please check your connection and try again.'
+          : 'I could not reach the studio. Please check your connection and try again.'
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async submitOrder(event) {
     event.preventDefault();
     if (this.state.orderFormState === 'submitting') return;
@@ -845,6 +1022,176 @@ class Component extends DCLogic {
       this.honeypot('contactDraft'),
       this.state.contactFormError ? h('p', { id: 'contact-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.contactFormError) : null,
       h('button', { key: 'button', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, justifySelf: 'center', opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending…' : 'Send my note')
+    ]);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* connect carousel                                                  */
+  /* ---------------------------------------------------------------- */
+
+  selectConnect(tab) {
+    if (tab === this.state.connectTab) return;
+    const order = CONNECT_TABS.map((t) => t.id);
+    // Direction so the panel slides in from the side you came from, which is
+    // what makes a tab strip read as a carousel rather than a swap.
+    const from = order.indexOf(tab) > order.indexOf(this.state.connectTab) ? 1 : -1;
+    this.setState({ connectTab: tab, connectFrom: from });
+  }
+
+  // Arrow keys move between tabs, which is what a tablist is expected to do.
+  connectKeys(event) {
+    const order = CONNECT_TABS.map((t) => t.id);
+    const at = order.indexOf(this.state.connectTab);
+    let next = null;
+    if (event.key === 'ArrowRight') next = order[(at + 1) % order.length];
+    if (event.key === 'ArrowLeft') next = order[(at - 1 + order.length) % order.length];
+    if (event.key === 'Home') next = order[0];
+    if (event.key === 'End') next = order[order.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    this.selectConnect(next);
+    setTimeout(() => { const el = document.getElementById('tab-' + next); if (el) el.focus(); }, 0);
+  }
+
+  renderConnectTabs() {
+    return h('div', {
+      role: 'tablist',
+      'aria-label': 'Ways to get in touch',
+      onKeyDown: (event) => this.connectKeys(event),
+      style: { display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 22 }
+    }, CONNECT_TABS.map((tab) => {
+      const active = tab.id === this.state.connectTab;
+      return h('button', {
+        key: tab.id,
+        id: 'tab-' + tab.id,
+        role: 'tab',
+        type: 'button',
+        'aria-selected': active ? 'true' : 'false',
+        // Only the selected tab points at a panel. Just one panel is mounted at
+        // a time, so pointing every tab at it would have the inactive tabs
+        // claiming to control a panel that is not theirs.
+        'aria-controls': active ? 'panel-' + tab.id : undefined,
+        // Only the selected tab is in the tab order; arrows move within the
+        // strip. Three separate tab stops for one control is noise.
+        tabIndex: active ? 0 : -1,
+        onClick: () => this.selectConnect(tab.id),
+        style: {
+          border: '3px solid #fff', cursor: 'pointer', fontFamily: "'Poppins',sans-serif",
+          fontWeight: 700, fontSize: 13.5, letterSpacing: '.02em', padding: '12px 22px',
+          borderRadius: 999,
+          background: active ? tab.accent : '#fff',
+          color: active ? '#fff' : '#7A5C6B',
+          boxShadow: active ? '0 6px 0 ' + tab.shadow : '0 4px 0 rgba(160,40,90,.10)',
+          transform: active ? 'translateY(-2px)' : 'none',
+          transition: 'background .25s, color .25s, transform .2s cubic-bezier(.2,.9,.3,1.4), box-shadow .2s'
+        }
+      }, tab.label);
+    }));
+  }
+
+  renderConnectPanel() {
+    const tab = CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0];
+    const body = tab.id === 'newsletter' ? this.renderNewsletterForm()
+      : tab.id === 'custom' ? this.renderCustomForm()
+      : this.renderContactForm();
+
+    return h('div', {
+      // Keyed on the tab so React remounts it and the entry animation replays.
+      key: tab.id,
+      id: 'panel-' + tab.id,
+      role: 'tabpanel',
+      'aria-labelledby': 'tab-' + tab.id,
+      tabIndex: -1,
+      style: {
+        position: 'relative',
+        padding: 'clamp(30px,5vw,46px) clamp(20px,5vw,44px)',
+        '--from': (this.state.connectFrom * 22) + 'px',
+        animation: 'vSlideIn .34s cubic-bezier(.2,.9,.3,1.4) both'
+      }
+    }, [
+      h('div', { key: 'head', style: { maxWidth: 520, margin: '0 auto', textAlign: 'center' } }, [
+        tab.badge
+          ? h('span', {
+              key: 'badge',
+              style: {
+                display: 'inline-block', marginBottom: 14, background: '#FFD166', border: '3px solid #fff',
+                borderRadius: 999, padding: '5px 18px', fontSize: 11, fontWeight: 700,
+                letterSpacing: '.18em', textTransform: 'uppercase', color: '#7A4A00', transform: 'rotate(-2deg)'
+              }
+            }, tab.badge)
+          : h('p', {
+              key: 'eyebrow',
+              style: { margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '.3em', textTransform: 'uppercase', color: tab.ink }
+            }, tab.eyebrow),
+        h('h3', {
+          key: 'title',
+          style: {
+            margin: '12px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400,
+            fontSize: 'clamp(25px,6vw,38px)', color: tab.ink, lineHeight: 1.15
+          }
+        }, tab.title),
+        h('p', { key: 'copy', style: { margin: '0 0 24px', fontSize: 14.5, lineHeight: 1.7, color: tab.body } }, tab.copy)
+      ]),
+      h('div', { key: 'form', style: { maxWidth: 520, margin: '0 auto' } }, body)
+    ]);
+  }
+
+  renderNewsletterForm() {
+    if (this.state.newsletterState === 'success') {
+      return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '18px 10px' } }, [
+        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 38 } }, '✦'),
+        h('h3', { key: 'title', style: { margin: '6px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 24, color: '#20475C' } }, "You're on the list!"),
+        h('p', { key: 'copy', style: { margin: 0, fontSize: 14, color: '#2B5568' } }, "I'll email you the moment the next batch is ready. 💗")
+      ]);
+    }
+    const busy = this.state.newsletterState === 'submitting';
+    return h('form', { onSubmit: (event) => this.subscribe(event), noValidate: true, style: { display: 'grid', gap: 12 } }, [
+      // Row on desktop, stacked on mobile — flexWrap does this without a media
+      // query, which this inline-styled document has no way to express.
+      h('div', { key: 'row', style: { display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' } }, [
+        h('label', { key: 'field', htmlFor: 'newsletter-email', style: hiddenFieldStyle }, 'Email address'),
+        h('input', {
+          key: 'input',
+          id: 'newsletter-email',
+          name: 'email',
+          type: 'email',
+          required: true,
+          autoComplete: 'email',
+          placeholder: 'hello@email.com',
+          value: this.state.newsletterDraft.email,
+          disabled: busy,
+          'aria-invalid': this.state.newsletterState === 'error' ? 'true' : undefined,
+          'aria-describedby': this.state.newsletterError ? 'newsletter-error' : undefined,
+          onChange: (event) => this.setState({
+            newsletterDraft: { ...this.state.newsletterDraft, email: event.target.value }
+          }),
+          style: {
+            flex: '1 1 240px', minWidth: 0, border: '3px solid #fff', borderRadius: 999,
+            padding: '14px 20px', fontSize: 15, color: '#20475C', background: '#fff',
+            outline: 'none', fontFamily: "'Poppins',sans-serif"
+          }
+        }),
+        h('button', {
+          key: 'button',
+          type: 'submit',
+          disabled: busy,
+          style: {
+            flex: 'none', border: '3px solid #fff', background: busy ? '#F98AC4' : 'linear-gradient(140deg,#FFB6D9,#F157A8)',
+            color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '.05em',
+            padding: '14px 28px', borderRadius: 999, boxShadow: '0 6px 0 rgba(32,71,92,.22)',
+            cursor: busy ? 'wait' : 'pointer', fontFamily: "'Poppins',sans-serif"
+          }
+        }, busy ? 'Signing up…' : 'Keep me posted')
+      ]),
+      this.honeypot('newsletterDraft'),
+      this.state.newsletterError
+        ? h('p', {
+            key: 'error', id: 'newsletter-error', role: 'status', 'aria-live': 'polite',
+            style: { margin: 0, color: '#A81F32', background: '#fff', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 600 }
+          }, this.state.newsletterError)
+        : null,
+      h('p', { key: 'promise', style: { margin: 0, fontSize: 12, color: '#2B5568', opacity: .8 } },
+        'Just new drops and market dates. Unsubscribe from any email.')
     ]);
   }
 
@@ -1091,8 +1438,21 @@ class Component extends DCLogic {
         role: 'status',
         style: { margin: '8px 0 0', color: '#9C536E', fontSize: 12 }
       }, 'Stock may be a little out of date while the studio reconnects.') : null,
-      customForm: this.renderCustomForm(),
-      contactForm: this.renderContactForm(),
+      heroBg: THEME.hero,
+      heroDecor: renderDecor(),
+      themeRibbon: THEME.ribbon
+        ? h('div', {
+            style: {
+              background: THEME.accentDeep, color: '#fff', textAlign: 'center',
+              padding: '9px 18px', fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em'
+            }
+          }, THEME.ribbon)
+        : null,
+      connectTabs: this.renderConnectTabs(),
+      connectPanel: this.renderConnectPanel(),
+      connectBg: (CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0]).bg,
+      connectStar: (CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0]).star,
+      connectHeart: (CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0]).heart,
       overlay: this.renderOverlay(cartLines, subtotal),
       categories: [
         { title: 'Glass Paintings', copy: 'Hand-painted panels, cups and mini frames — colour laid on the back of the glass.', bg: '#FFE1EF', art: atlasPhoto(8, 'Assortment of hand-painted glass art', 'landscape'), rot: rot(-1) },

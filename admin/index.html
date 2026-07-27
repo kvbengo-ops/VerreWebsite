@@ -22,11 +22,26 @@
         <a href="#orders" data-route="orders" data-roles="super_admin general_admin">Orders</a>
         <a href="/pos" data-roles="super_admin general_admin">Open POS ↗</a>
         <a href="#sessions" data-route="sessions" data-roles="super_admin">Sessions</a>
+        <a href="#themes" data-route="themes" data-roles="super_admin">Seasons</a>
         <a href="#accounts" data-route="accounts" data-roles="super_admin">Accounts</a>
       </nav>
-      <div class="account"><small>Signed in as</small><strong id="account-email">Checking…</strong><span id="account-role" class="role-badge">Checking role…</span><a href="/signout-with-chatgpt?return_to=/">Sign out</a></div>
+      <div class="account"><small>Signed in as</small><strong id="account-email">Checking…</strong><span id="account-role" class="role-badge">Checking role…</span><button type="button" id="sign-out" class="linklike">Sign out</button></div>
     </aside>
-    <main id="main" tabindex="-1"><div class="loading">Loading the studio…</div></main>
+    <!-- First paint, before app.js runs. A skeleton of roughly the right shape
+         rather than a centred line of text, so the very first frame is already
+         the size the page will settle at. -->
+    <main id="main" tabindex="-1" aria-busy="true">
+      <div class="page-head">
+        <div class="skeleton sk-line" style="width:130px;height:11px"></div>
+        <div class="skeleton sk-line" style="width:min(340px,60%);height:38px;margin-top:10px"></div>
+      </div>
+      <div class="grid metrics">
+        <div class="skeleton sk-card"></div><div class="skeleton sk-card"></div>
+        <div class="skeleton sk-card"></div><div class="skeleton sk-card"></div>
+      </div>
+      <div class="skeleton" style="height:230px;border-radius:22px"></div>
+      <span class="sr-only">Loading the studio…</span>
+    </main>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <dialog id="modal"><button class="modal-close" aria-label="Close dialog">×</button><div id="modal-body"></div></dialog>

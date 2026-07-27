@@ -119,15 +119,63 @@ the role stored under **Admin → Accounts**:
 | General Admin | Sales/orders, inventory, and POS |
 | Cashier | POS only |
 
-Set `SUPER_ADMIN_EMAILS` first so the initial Super Admin can open Accounts.
-Adding an account in Verre does not create a password or update the Cloudflare
-Access policy, so the same email must also be allowed in Access. Deactivate an
-account in Verre to remove its feature access immediately.
+## Signing in
 
-For local `wrangler dev`, set `LOCAL_AUTH_BYPASS=true`; the Worker only honors
-that flag on `localhost` or `127.0.0.1`.
-`TRUST_SITES_AUTH` is off by default and should only be enabled for a verified
-owner-only Sites dispatcher that strips client-supplied identity headers.
+Verre owns its own login. `/login` posts to `/api/auth/login`, which sets a
+`verre_session` cookie — `HttpOnly`, `Secure`, `SameSite=Lax`, 24 hours, fixed
+rather than sliding. `/admin/*` and `/pos/*` require it. A browser navigating
+without one is redirected to `/login`; a `fetch` gets `401` JSON so the admin
+bundle can show "session expired" instead of trying to parse an HTML page.
+
+### Creating the first account
+
+```
+npm run create-admin
+```
+
+Prompts for email, display name, role and password, then writes them through
+`set_admin_account` and `set_password`. It needs `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`, so it runs from a terminal with access to
+`.dev.vars` — deliberately not an HTTP endpoint. **This is also the break-glass
+path**: if you lock yourself out and password reset cannot send email, re-run it
+to set a new password.
+
+`SUPER_ADMIN_EMAILS` still grants the Super Admin role, but an account with no
+password hash can never sign in. Being on that list is authorization, not
+authentication.
+
+### Where hashing happens
+
+In Postgres, via `pgcrypto` bcrypt at cost factor 12 — not in the Worker.
+Cloudflare's free plan allows roughly 10ms CPU per request and a safely-tuned
+hash costs far more, so hashing in the Worker either fails or gets weakened
+until it fits, which makes it cheap to attack too. `verify_password` also runs a
+dummy comparison for unknown emails so response time cannot be used to discover
+which accounts exist. Confirm Supabase statement logging is not capturing
+parameter values before going live; the password crosses as a bound parameter.
+
+### Lockout and rate limits
+
+Five consecutive failures lock an account for 15 minutes, doubling on repeat.
+Logins are also limited to 10 per IP per 15 minutes. Every failure — unknown
+email, wrong password, locked account — returns one identical message, and
+`/api/auth/request-reset` always returns `200`, so neither endpoint can be used
+to enumerate accounts.
+
+Bind a KV namespace as `AUTH_LIMITS` in production. Without it the limiter falls
+back to an in-memory map that resets whenever Cloudflare recycles the isolate —
+acceptable for the contact form, not for a password gate.
+
+### Other identity sources
+
+Cloudflare Access support remains in `src/auth.js` and is still correctly
+signature-verified. It costs nothing when unconfigured and putting Access in
+front of `/admin/*` is real defence in depth. `LOCAL_AUTH_BYPASS` also remains,
+gated to `localhost` / `127.0.0.1`, and cannot work on a deployed host.
+
+The hosting dispatcher's `oai-authenticated-user-email` header has been
+**removed**. It was an unsigned string whose trustworthiness depended entirely
+on deployment topology. Do not reintroduce it.
 
 The optional KV bindings are `CATALOG_CACHE` (60-second live catalog plus a
 last-known-good snapshot) and `DASHBOARD_CACHE` (five-minute snapshots).

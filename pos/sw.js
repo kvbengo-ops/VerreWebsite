@@ -1,4 +1,7 @@
-const VERSION = 'verre-pos-v3';
+// Bump on every change to a SHELL file. The shell is cache-first, so a stale
+// version keeps serving the old markup and stylesheet forever — a redesign that
+// "did not apply" is almost always this line not having moved.
+const VERSION = 'verre-pos-v5';
 const SHELL = ['/pos/', '/pos/index.html', '/pos/style.css', '/pos/app.js', '/pos/manifest.json', '/pos/icon.svg', '/assets/verre-photo-atlas.png'];
 
 self.addEventListener('install', (event) => {

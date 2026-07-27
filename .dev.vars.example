@@ -23,6 +23,7 @@ SUPER_ADMIN_EMAILS=
 LOCAL_AUTH_BYPASS=true
 LOCAL_AUTH_EMAIL=local@verre.test
 
-# Only enable when the hosting dispatcher strips the client-supplied header and
-# injects its own verified owner identity. Cloudflare Access does not need this.
-TRUST_SITES_AUTH=false
+# Optional KV namespace for login rate limiting. The in-memory fallback resets
+# whenever Cloudflare recycles the isolate, which is fine for the contact form
+# and NOT fine for a password gate. Bind this in production.
+#   [[kv_namespaces]] binding = "AUTH_LIMITS"

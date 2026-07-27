@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Verre</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;
+    font-family:'Poppins',system-ui,sans-serif;color:#3A2430;
+    background:linear-gradient(165deg,#FFB6D9 0%,#F98AC4 45%,#F157A8 100%)}
+  .card{width:100%;max-width:26rem;background:#fff;border:6px solid #fff;border-radius:32px;
+    padding:34px 32px 30px;box-shadow:0 14px 0 rgba(239,64,86,.16),0 26px 44px rgba(160,40,90,.22)}
+  .mark{display:grid;place-items:center;width:56px;height:56px;margin:0 auto 14px;border-radius:50%;
+    background:linear-gradient(150deg,#FFB6D9,#F157A8);border:4px solid #fff;
+    font-family:'Shrikhand',cursive;color:#fff;font-size:22px;padding-bottom:4px}
+  h1{margin:0 0 6px;text-align:center;font-family:'Shrikhand',cursive;font-weight:400;font-size:27px}
+  .sub{margin:0 0 22px;text-align:center;font-size:13.5px;color:#7A5C6B;line-height:1.6}
+  label{display:grid;gap:6px;margin-bottom:14px;font-size:11px;font-weight:600;
+    letter-spacing:.18em;text-transform:uppercase;color:#B98AA0}
+  input{border:3px solid #FFE0EE;border-radius:16px;padding:13px 16px;font-size:15px;
+    color:#3A2430;background:#FFFBFD;outline:none;font-family:inherit;width:100%}
+  input:focus{border-color:#FFB6D9}
+  input[aria-invalid="true"]{border-color:#EF4056}
+  button{width:100%;margin-top:8px;border:3px solid #fff;cursor:pointer;
+    background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-family:inherit;
+    font-weight:700;font-size:14.5px;letter-spacing:.05em;padding:14px 22px;border-radius:999px;
+    box-shadow:0 6px 0 rgba(239,64,86,.28);transition:transform .18s cubic-bezier(.2,.9,.3,1.4)}
+  button:hover:not(:disabled){transform:translateY(-2px)}
+  button:active:not(:disabled){transform:translateY(3px) scale(.98);box-shadow:0 2px 0 rgba(239,64,86,.28)}
+  button:disabled{opacity:.62;cursor:progress;transform:none}
+  .alert{margin:0 0 16px;padding:11px 15px;border-radius:14px;font-size:13.5px;line-height:1.55;
+    background:#FFE7EA;border:2px solid #EF4056;color:#A81F32}
+  .alert.good{background:#E9F8EF;border-color:#2E9E63;color:#1C6B42}
+  .links{margin:18px 0 0;text-align:center;font-size:13px}
+  a{color:#EF4056;text-decoration:none;font-weight:600}
+  a:hover{color:#F157A8;text-decoration:underline}
+  .hint{margin:6px 0 0;font-size:11.5px;color:#B98AA0;letter-spacing:0;text-transform:none;font-weight:400}
+  :focus-visible{outline:3px solid #EF4056;outline-offset:3px}
+  [hidden]{display:none !important}
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="mark" aria-hidden="true">V</div>
+
+  <!-- Sign in -->
+  <section id="view-login">
+    <h1>Welcome back</h1>
+    <p class="sub">Sign in to the Verre workroom.</p>
+    <div class="alert" id="login-alert" role="alert" hidden></div>
+    <form id="form-login" novalidate>
+      <label>Email
+        <input type="email" name="email" autocomplete="username" required autofocus
+               placeholder="you@example.com" aria-describedby="login-alert">
+      </label>
+      <label>Password
+        <input type="password" name="password" autocomplete="current-password" required
+               aria-describedby="login-alert">
+      </label>
+      <button type="submit">Sign in</button>
+    </form>
+    <p class="links"><a href="#" id="to-forgot">Forgot your password?</a></p>
+  </section>
+
+  <!-- Request a reset -->
+  <section id="view-forgot" hidden>
+    <h1>Reset password</h1>
+    <p class="sub">We'll email you a link to set a new one.</p>
+    <div class="alert" id="forgot-alert" role="alert" hidden></div>
+    <form id="form-forgot" novalidate>
+      <label>Email
+        <input type="email" name="email" autocomplete="username" required placeholder="you@example.com">
+      </label>
+      <button type="submit">Send reset link</button>
+    </form>
+    <p class="links"><a href="#" id="to-login">Back to sign in</a></p>
+  </section>
+
+  <!-- Choose a new password (arrives via emailed link) -->
+  <section id="view-reset" hidden>
+    <h1>Set a new password</h1>
+    <p class="sub">Pick something long. Length beats punctuation.</p>
+    <div class="alert" id="reset-alert" role="alert" hidden></div>
+    <form id="form-reset" novalidate>
+      <label>New password
+        <input type="password" name="password" autocomplete="new-password" required minlength="12">
+        <span class="hint">At least 12 characters. A short phrase works well.</span>
+      </label>
+      <label>Confirm
+        <input type="password" name="confirm" autocomplete="new-password" required minlength="12">
+      </label>
+      <button type="submit">Save password</button>
+    </form>
+    <p class="links"><a href="/login">Back to sign in</a></p>
+  </section>
+</main>
+<!-- Absolute, not relative: this same document is served at /login/reset, where
+     './app.js' would resolve to /login/reset/app.js and 404. -->
+<script src="/login/app.js"></script>
+</body>
+</html>

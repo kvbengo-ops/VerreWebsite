@@ -5,6 +5,10 @@ import { dashboard } from '../db/stats.js';
 import { body, json, result } from './http.js';
 import { purgeReadCaches } from '../db/client.js';
 import { listAccounts, saveAccount } from '../db/accounts.js';
+import { listSubscribers } from '../db/subscribers.js';
+import { setThemeOverride } from '../db/settings.js';
+import { currentTheme, isKnownTheme } from './theme.js';
+import { ALL_THEMES } from '../themes.js';
 import { can } from '../roles.js';
 
 async function mutation(env, value, success = 200) {
@@ -18,7 +22,12 @@ export async function adminApi(request, env, user) {
   const parts = path.split('/').filter(Boolean);
   const method = request.method;
 
-  if (path === 'me' && method === 'GET') return json(200,{ok:true,user});
+  // Under `data`, like every other route here. The client unwraps
+  // `body.data ?? body`, so returning {ok,user} hands it the envelope instead
+  // of the user: state.me.role comes back undefined, render() bounces the hash
+  // to the value it already has, no hashchange fires, and the shell sits on
+  // "Loading the studio…" forever with no error anywhere.
+  if (path === 'me' && method === 'GET') return json(200,{ok:true,data:user});
   if (parts[0] === 'accounts') {
     if (!can(user,'accounts')) return denied();
     if (parts.length === 1 && method === 'GET') return result(await listAccounts(env));
@@ -85,6 +94,38 @@ export async function adminApi(request, env, user) {
     if(url.searchParams.get('format')==='csv'&&!value.error)return csv(value.data);
     return result(value);
   }
+  if (path === 'theme' && method === 'GET') {
+    if (!can(user,'admin')) return denied();
+    const state=await currentTheme(env);
+    return json(200,{ok:true,data:{
+      ...state,
+      // Palettes travel with the state so the admin never keeps its own copy —
+      // a swatch that disagreed with the live site would be worse than none.
+      themes:ALL_THEMES.map(t=>({id:t.id,label:t.label,blurb:t.blurb,swatch:t.swatch,hero:t.hero,ribbon:t.ribbon,
+        window:t.from?{from:t.from,to:t.to}:null}))
+    }});
+  }
+  if (path === 'theme' && method === 'POST') {
+    if (!can(user,'catalog')) return denied();
+    const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+    const value=String(parsed.data?.theme??'auto');
+    if(!isKnownTheme(value))return json(400,{ok:false,error:'That is not a theme we know about',field:'theme'});
+    // 'auto' clears the override and hands the storefront back to the calendar.
+    const saved=await setThemeOverride(env,value==='auto'?null:value,user.email);
+    if(saved.error)return result(saved);
+    // The homepage caches the override for a minute; drop it so a change made
+    // for a market day is visible immediately rather than eventually.
+    if(env.CATALOG_CACHE){try{await env.CATALOG_CACHE.delete('theme:override')}catch{}}
+    return json(200,{ok:true,data:await currentTheme(env)});
+  }
+  if (path === 'subscribers' && method === 'GET') {
+    if (!can(user,'admin')) return denied();
+    const value=await listSubscribers(env);
+    if(url.searchParams.get('format')==='csv'&&!value.error){
+      return toCsv(['email','source','created_at','unsubscribed_at'],value.data,'verre-subscribers.csv');
+    }
+    return result(value);
+  }
   if (path === 'inventory/adjust' && method === 'POST') {
     if (!can(user,'inventory')) return denied();
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
@@ -127,9 +168,16 @@ export async function adminApi(request, env, user) {
 
 const denied = () => json(403,{ok:false,error:'Your role does not allow this action',code:'FORBIDDEN'});
 
-function csv(rows) {
-  const columns=['created_at','product_id','delta','reason','note','created_by'];
-  const quote=(value)=>'"'+String(value??'').replace(/"/g,'""')+'"';
-  const text=[columns.join(','),...(rows||[]).map(row=>columns.map(key=>quote(row[key])).join(','))].join('\n');
-  return new Response(text,{headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="verre-stock-movements.csv"'}});
-}
+// A leading =, +, - or @ makes Excel and Sheets treat a cell as a formula, so a
+// crafted subscriber address or product note can execute on open. Prefixing an
+// apostrophe keeps the value visible and inert.
+const quoteCell=(value)=>{
+  const text=String(value??'');
+  return '"'+(/^[=+\-@\t\r]/.test(text)?"'"+text:text).replace(/"/g,'""')+'"';
+};
+const toCsv=(columns,rows,filename)=>new Response(
+  [columns.join(','),...(rows||[]).map(row=>columns.map(key=>quoteCell(row[key])).join(','))].join('\n'),
+  {headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="'+filename+'"'}}
+);
+
+const csv=(rows)=>toCsv(['created_at','product_id','delta','reason','note','created_by'],rows,'verre-stock-movements.csv');

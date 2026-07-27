@@ -138,26 +138,53 @@ for (const path of ['/admin', '/admin/', '/admin/app.js', '/pos', '/pos/sw.js', 
 assert.equal((await shell('/', 'verre.workers.dev')).status, 200, 'the storefront stays public');
 assert.equal((await shell('/index.html', 'verre.workers.dev')).status, 200, 'storefront assets stay public');
 
-// Sites owns /signin-with-chatgpt. Browser entry routes should start that flow,
-// while APIs and static assets keep returning machine-readable 401 responses.
-const sitesEnv = { ...env, TRUST_SITES_AUTH: 'true' };
+// Browser navigation to a protected shell goes to the login page. A fetch from
+// already-loaded admin JS gets JSON — following a redirect there hands the
+// caller HTML where it expected a payload, which is how "session expired"
+// becomes an unreadable parse error.
 for (const path of ['/admin', '/admin/', '/pos', '/pos/']) {
-  const response = await worker.fetch(new Request('https://verre.test' + path), sitesEnv);
-  assert.equal(response.status, 302, path + ' redirects to sign-in on Sites');
+  const response = await worker.fetch(
+    new Request('https://verre.test' + path, { headers: { 'sec-fetch-mode': 'navigate' } }),
+    env
+  );
+  assert.equal(response.status, 302, path + ' sends a person to the login page');
   const location = new URL(response.headers.get('location'));
-  assert.equal(location.pathname, '/signin-with-chatgpt');
+  assert.equal(location.pathname, '/login');
   assert.equal(location.searchParams.get('return_to'), path);
 }
 assert.equal(
-  (await worker.fetch(new Request('https://verre.test/api/admin/me'), sitesEnv)).status,
+  (await worker.fetch(new Request('https://verre.test/api/admin/me'), env)).status,
   401,
   'admin APIs never redirect to an HTML sign-in page'
 );
 assert.equal(
-  (await worker.fetch(new Request('https://verre.test/admin/app.js'), sitesEnv)).status,
+  (await worker.fetch(new Request('https://verre.test/admin/app.js'), env)).status,
   401,
   'protected static assets remain unavailable before sign-in'
 );
+
+// The old host sign-in entry points still resolve, so a stale bookmark or a
+// cached admin bundle lands on /login instead of a 404.
+for (const [raw, expected] of [['https://evil.com', '/'], ['//evil.com', '/'], ['/admin/', '/admin/']]) {
+  const res = await worker.fetch(
+    new Request('http://localhost/signout-with-chatgpt?return_to=' + encodeURIComponent(raw)),
+    shellEnv
+  );
+  assert.equal(res.status, 302);
+  const target = new URL(res.headers.get('location'));
+  assert.equal(target.pathname, '/login');
+  assert.equal(target.searchParams.get('return_to'), expected, 'return_to ' + raw + ' must resolve to ' + expected);
+}
+
+// The reset link is a real URL from an email, but it is the same document as
+// /login — the token in the query string selects the view.
+const resetSeen = [];
+const resetEnv = { ...shellEnv, ASSETS: { fetch: async (req) => { resetSeen.push(new URL(req.url).pathname); return new Response('page'); } } };
+await worker.fetch(new Request('https://verre.test/login/reset?token=abc'), resetEnv);
+assert.deepEqual(resetSeen, ['/login/index.html'], '/login/reset serves the login document');
+
+// /login itself must never be gated, or the sign-in page hides behind sign-in.
+assert.equal((await worker.fetch(new Request('https://verre.test/login'), shellEnv)).status, 200);
 
 // Role resolution past the bootstrap list needs a real admin_accounts table, so
 // NO_ADMIN_CONFIGURED vs FORBIDDEN is asserted in scripts/check-auth.mjs against
@@ -177,5 +204,70 @@ for (const path of ['/admin', '/admin/', '/pos', '/pos/', '/admin/app.js']) {
   await worker.fetch(new Request('https://localhost' + path), recordingEnv);
   assert.deepEqual(seen, [path], 'the Worker must hand ' + path + ' to ASSETS unrewritten');
 }
+
+/* ------------------------------------------------------------------ */
+/* newsletter                                                          */
+/* ------------------------------------------------------------------ */
+
+// Stub Supabase so subscribe() reaches the RPC without a database.
+const subscribeCalls = [];
+const realFetchNews = globalThis.fetch;
+globalThis.fetch = async (url, options = {}) => {
+  const path = new URL(url).pathname;
+  if (path.endsWith('/rpc/subscribe')) {
+    subscribeCalls.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ ok: true, id: 'x', token: 'tok' }), { headers: { 'content-type': 'application/json' } });
+  }
+  if (path.endsWith('/rpc/unsubscribe')) {
+    return new Response(JSON.stringify({ ok: true, removed: true }), { headers: { 'content-type': 'application/json' } });
+  }
+  return new Response('null', { headers: { 'content-type': 'application/json' } });
+};
+const newsEnv = { ...env, SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'k' };
+const subscribe = (payload, headers = {}) => new Request('https://verre.test/api/subscribe', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(payload)
+});
+
+assert.equal((await worker.fetch(new Request('https://verre.test/api/subscribe'), newsEnv)).status, 405, 'GET is not a signup');
+assert.equal((await worker.fetch(subscribe({ email: 'nope' }), newsEnv)).status, 400, 'a malformed address is rejected');
+assert.equal((await worker.fetch(subscribe({}), newsEnv)).status, 400, 'a missing address is rejected');
+
+subscribeCalls.length = 0;
+const first = await worker.fetch(subscribe({ email: 'Someone@Example.com ' }, { 'CF-Connecting-IP': '10.0.0.9' }), newsEnv);
+assert.equal(first.status, 200);
+assert.equal(subscribeCalls[0].p_email, 'someone@example.com', 'the address is normalised before it reaches the database');
+
+// Signing up twice is the most common thing a hesitant person does. It must
+// look identical to a first signup — both to be kind, and because a different
+// answer would reveal whether an address is already on the list.
+const again = await worker.fetch(subscribe({ email: 'someone@example.com' }, { 'CF-Connecting-IP': '10.0.0.10' }), newsEnv);
+assert.equal(again.status, 200);
+assert.deepEqual(await again.json(), await first.json(), 'a repeat signup is indistinguishable from the first');
+
+// Honeypot: answered as success, never written.
+subscribeCalls.length = 0;
+const trapped = await worker.fetch(subscribe({ email: 'bot@example.com', hp: 'filled' }, { 'CF-Connecting-IP': '10.0.0.11' }), newsEnv);
+assert.equal(trapped.status, 200, 'a caught bot is told it worked');
+assert.equal(subscribeCalls.length, 0, 'a caught bot is never written to the database');
+
+// Shares the inquiry rate limiter, so a flood from one IP is capped.
+let limited = false;
+for (let i = 0; i < 8; i += 1) {
+  const res = await worker.fetch(subscribe({ email: 'flood' + i + '@example.com' }, { 'CF-Connecting-IP': '10.9.9.9' }), newsEnv);
+  if (res.status === 429) limited = true;
+}
+assert.ok(limited, 'repeated signups from one IP are rate limited');
+
+// Unsubscribe must be calm and identical whether or not the token is real —
+// otherwise it becomes a way to test tokens, and someone trying to leave a list
+// should never meet an error page.
+const goodToken = await worker.fetch(new Request('https://verre.test/unsubscribe?t=tok'), newsEnv);
+const noToken = await worker.fetch(new Request('https://verre.test/unsubscribe'), newsEnv);
+assert.equal(goodToken.status, 200);
+assert.equal(noToken.status, 200, 'a missing token still shows the confirmation page');
+assert.match(goodToken.headers.get('content-type'), /text\/html/);
+assert.match(await goodToken.text(), /unsubscribed/i);
+
+globalThis.fetch = realFetchNews;
 
 console.log('ok');

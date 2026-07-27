@@ -41,7 +41,7 @@ const deniedAccounts=await adminApi(
 assert.equal(deniedAccounts.status,403,'General Admin account management is denied');
 const cashierMe=await posApi(new Request('https://verre.test/api/pos/me'),{},cashier);
 assert.equal(cashierMe.status,200);
-assert.equal((await cashierMe.json()).user.role,ROLES.CASHIER);
+assert.equal((await cashierMe.json()).data.role,ROLES.CASHIER);
 
 const originalFetch=globalThis.fetch;
 globalThis.fetch=async (url)=>{

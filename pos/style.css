@@ -1,7 +1,314 @@
-:root{--pink:#F157A8;--red:#EF4056;--cream:#FFF6F0;--ink:#3A2430;--muted:#765B68;--pale:#FFE0EE;--blue:#7ED3F2;--yellow:#FFD166;--green:#2C8051}
+/* ============================================================
+   Verre Market POS
+   ============================================================
+   Designed for one hand, standing up, in bad light, with a queue
+   forming. Every decision below serves that:
+
+     - Nothing that matters mid-sale may scroll out of reach.
+       Total and "Complete sale" are pinned. Only the line list moves.
+     - Touch targets are 48px minimum, 56px for anything hit repeatedly.
+     - Money is tabular-figured so digits do not shift as they change.
+     - Personality lives in the chrome. Prices and quantities stay flat,
+       upright and high-contrast, because a misread number at a market
+       stall costs real money.
+   ============================================================ */
+
+:root{
+  --pink:#F157A8;
+  --pink-light:#FFB6D9;
+  --pink-pale:#FFE0EE;
+  --pink-wash:#FFF0F7;
+  --red:#EF4056;
+  --cream:#FFF6F0;
+  --ink:#3A2430;
+  --ink-soft:#5B3D4D;
+  --muted:#765B68;
+  --faint:#B98AA0;
+  --blue:#7ED3F2;
+  --yellow:#FFD166;
+  --green:#2C8051;
+  --green-wash:#DDF5E6;
+
+  --pale:#FFE0EE;              /* legacy alias */
+  --bar:74px;                  /* header height — the cart is sized against it */
+
+  --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:26px; --r-pill:999px;
+  --lift:0 5px 0 rgba(58,36,48,.10), 0 10px 22px rgba(160,40,90,.08);
+  --ease:cubic-bezier(.2,.9,.3,1.4);
+}
+
+*{box-sizing:border-box}
 [hidden]{display:none!important}
-.operator{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pale);font-size:12px;font-weight:800}
-*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:15px/1.45 system-ui,sans-serif}button,input,select{font:inherit}button{min-height:48px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:#fff;font-weight:750;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid var(--blue);outline-offset:2px}header{position:sticky;top:0;z-index:5;min-height:70px;padding:10px 18px;background:var(--ink);color:#fff;display:flex;align-items:center;gap:14px}.brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}.brand span{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--pink);font:25px Georgia}.session{margin:auto;background:#5B3D4D}.signals{display:flex;align-items:center;gap:8px}.signal{padding:8px 12px;border-radius:99px;background:#5B3D4D;font-size:12px;font-weight:800}.signal.online{background:var(--green)}.signal.offline{background:#9C293B}.queue{background:#fff;color:var(--ink)}.queue b{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:50%;background:var(--pink);color:#fff}main{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,410px);min-height:calc(100vh - 70px)}.catalog{padding:22px}.catalog-tools{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}input,select{min-height:48px;border:2px solid var(--pale);border-radius:14px;padding:10px 13px;background:#fff;color:var(--ink)}#search{width:min(360px,100%);font-size:17px}.categories{display:flex;gap:7px}.categories button{background:#fff;color:var(--ink);border:2px solid var(--pale)}.categories button.active{background:var(--pink);color:#fff;border-color:var(--pink)}.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}.product{position:relative;min-height:210px;padding:0;overflow:hidden;text-align:left;background:#fff;color:var(--ink);box-shadow:0 6px 0 rgba(58,36,48,.1)}.product-art{display:grid;place-items:center;height:112px;background:var(--product-bg);overflow:hidden}.product-art img{width:100%;height:100%;object-fit:cover}.product-art span{font-size:45px}.product-copy{display:block;padding:12px}.product-copy strong,.product-copy small{display:block}.product-copy small{color:var(--muted);margin-top:4px}.product.out{opacity:.55}.product.out::after{content:"Sold out · tap to override";position:absolute;top:8px;left:8px;right:8px;padding:5px;background:var(--ink);color:#fff;text-align:center;border-radius:8px;font-size:10px}.cart{position:sticky;top:70px;height:calc(100vh - 70px);overflow:auto;padding:22px;background:#fff;border-left:3px solid var(--pale);display:flex;flex-direction:column;gap:15px}.eyebrow{margin:0;color:var(--pink);font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase}h1,h2{margin:3px 0;font-family:Georgia,serif}.warning{padding:10px;border-radius:12px;background:#FFF0BF}.cart-lines{display:grid;gap:9px;min-height:80px}.empty{padding:25px;text-align:center;color:var(--muted);border:2px dashed var(--pale);border-radius:16px}.line{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border-radius:14px;background:var(--cream)}.line strong,.line small{display:block}.stepper{display:flex;align-items:center;gap:6px}.stepper button{width:48px;padding:0}.stepper b{min-width:22px;text-align:center}.discount{display:grid;grid-template-columns:1fr 1.2fr;gap:8px}.discount label,.payment label{display:grid;gap:4px;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.discount-row{display:grid;grid-template-columns:1fr 58px}.discount-row input{border-radius:14px 0 0 14px;min-width:0}.discount-row select{border-radius:0 14px 14px 0}.totals{border-block:2px solid var(--pale);padding:8px 0}.totals p{display:flex;justify-content:space-between;margin:8px 0}.totals .grand{font-size:22px}.pay-tabs,.quick,.actions{display:flex;gap:8px}.pay-tabs button,.quick button{flex:1;background:#fff;color:var(--ink);border:2px solid var(--pale)}.pay-tabs button.active{background:var(--pink);color:#fff}.quick{margin:8px 0}.change{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:14px;background:#DDF5E6}.change strong{font-size:28px;color:var(--green)}.complete{width:100%;margin-top:auto;background:linear-gradient(140deg,var(--pink),var(--red));font-size:18px}.primary{background:var(--pink)!important}dialog{border:0;border-radius:24px;padding:0;max-width:min(500px,calc(100% - 20px));width:100%;color:var(--ink)}dialog::backdrop{background:rgba(58,36,48,.65)}.success-card,.dialog-card{position:relative;padding:28px}.success-card{text-align:center}.success-card h2{font-size:34px}.qr{width:180px;height:180px;margin:16px auto;display:grid;place-items:center;border-radius:16px;background:var(--cream);overflow:hidden}.qr img{width:100%;height:100%}.receipt{display:block;color:var(--red);font-weight:800}.actions{margin-top:18px}.actions button{flex:1}.close{position:absolute;right:14px;top:14px;width:48px;padding:0}.queue-item{padding:10px;border-bottom:1px solid var(--pale)}#toast{position:fixed;z-index:20;right:16px;bottom:16px;max-width:340px;padding:13px 16px;border-radius:14px;background:var(--ink);color:#fff;transform:translateY(140%);transition:.2s}#toast.show{transform:none}
-@media(max-width:850px){header{flex-wrap:wrap}.brand strong,.operator{display:none}.session{order:3;width:100%;margin:0}.signals{margin-left:auto}main{display:block}.catalog{padding:14px 12px 470px}.cart{position:fixed;z-index:4;left:0;right:0;bottom:0;top:auto;height:455px;border-left:0;border-top:3px solid var(--pale);border-radius:24px 24px 0 0;padding:16px}.products{grid-template-columns:repeat(2,minmax(0,1fr))}.discount,.payment,.totals{flex-shrink:0}.cart-lines{overflow:auto}.product{min-height:185px}.product-art{height:92px}}
-@media(orientation:landscape) and (max-width:850px){main{display:grid;grid-template-columns:1fr 370px}.catalog{padding:14px}.cart{position:sticky;top:110px;height:calc(100vh - 110px);border-radius:0;border-top:0;border-left:3px solid var(--pale)}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+body{
+  margin:0;background:var(--cream);color:var(--ink);
+  font:15px/1.45 Poppins,system-ui,sans-serif;font-weight:500;
+  -webkit-font-smoothing:antialiased;
+  /* A stall tablet gets prodded. Stop double-tap zoom fighting the buttons. */
+  touch-action:manipulation;
+}
+
+button,input,select{font:inherit;font-family:Poppins,system-ui,sans-serif}
+button{
+  min-height:48px;border:0;border-radius:var(--r-md);padding:11px 16px;
+  background:var(--ink);color:#fff;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 0 rgba(58,36,48,.22);
+  transition:transform .14s var(--ease),box-shadow .14s,background .14s;
+}
+button:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 rgba(58,36,48,.22)}
+button:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:4px solid var(--blue);outline-offset:2px}
+
+input,select{
+  min-height:48px;border:2.5px solid var(--pink-pale);border-radius:var(--r-md);
+  padding:10px 13px;background:#fff;color:var(--ink);
+}
+input:focus,select:focus{border-color:var(--pink);outline:none}
+
+/* Money and counts. Tabular figures stop digits jittering as totals update —
+   at a counter that shimmer reads as the number being uncertain. */
+.money,.totals strong,.change strong,.stepper b,.product-copy small{
+  font-variant-numeric:tabular-nums;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+
+header{
+  position:sticky;top:0;z-index:5;min-height:var(--bar);padding:10px 18px;
+  background:linear-gradient(120deg,#4A2F3D,var(--ink) 60%,#2E1B26);
+  color:#fff;display:flex;align-items:center;gap:14px;
+  box-shadow:0 3px 0 rgba(0,0,0,.18);
+}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none}
+.brand span{
+  display:grid;place-items:center;width:44px;height:44px;border-radius:50%;
+  background:linear-gradient(140deg,var(--pink-light),var(--pink));
+  border:3px solid #fff;font:22px/1 Shrikhand,Georgia,serif;padding-bottom:3px;
+}
+.brand strong{font:20px/1 Shrikhand,Georgia,serif;letter-spacing:.3px}
+.operator{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pink-pale);font-size:12px;font-weight:700}
+
+.session{margin:auto;background:#5B3D4D;border:2px solid rgba(255,255,255,.16)}
+/* An unopened session is a real problem at close-out — sales land unattributed
+   and the cash count has nothing to reconcile against. Make it look like one. */
+.session.none{background:#8A2438;border-color:#C4566B}
+
+.signals{display:flex;align-items:center;gap:8px}
+.signal{padding:9px 14px;border-radius:var(--r-pill);background:#5B3D4D;font-size:12px;font-weight:700;letter-spacing:.04em}
+.signal.online{background:var(--green)}
+.signal.offline{background:#9C293B}
+.queue{background:#fff;color:var(--ink);display:flex;align-items:center;gap:8px}
+.queue b{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:var(--pink);color:#fff;font-size:13px}
+/* Unsynced sales are money not yet recorded anywhere but this device. */
+.queue.pending b{background:var(--red);animation:nudge 1.6s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,420px);min-height:calc(100vh - var(--bar))}
+
+.catalog{padding:22px}
+.catalog-tools{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+#search{width:min(380px,100%);font-size:17px;border-radius:var(--r-pill);padding-inline:20px}
+.categories{display:flex;gap:8px;flex-wrap:wrap}
+.categories button{background:#fff;color:var(--ink);border:2.5px solid var(--pink-pale);border-radius:var(--r-pill);box-shadow:none}
+.categories button.active{background:var(--pink);color:#fff;border-color:var(--pink);box-shadow:0 4px 0 rgba(239,64,86,.24)}
+
+/* ============================================================
+   Products
+   ============================================================ */
+
+.products{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:16px}
+.product{
+  position:relative;min-height:216px;padding:0;overflow:hidden;text-align:left;
+  background:#fff;color:var(--ink);border-radius:var(--r-lg);box-shadow:var(--lift);
+}
+.product:active:not(:disabled){transform:translateY(3px)}
+.product-art{display:grid;place-items:center;height:116px;background:var(--product-bg);overflow:hidden}
+.product-art img{width:100%;height:100%;object-fit:cover}
+.product-art span{font-size:44px}
+.product-copy{display:block;padding:13px}
+.product-copy strong{display:block;font-size:14.5px;line-height:1.3}
+.product-copy small{display:block;margin-top:5px;color:var(--muted);font-size:13px;font-weight:600}
+
+/* Stock is the thing you actually need at a glance when someone asks
+   "do you have another one of these?" */
+.product .stock{display:inline-block;margin-top:6px;padding:2px 9px;border-radius:var(--r-pill);background:var(--pink-wash);color:var(--ink-soft);font-size:11px;font-weight:700}
+.product.low .stock{background:#FFF0C7;color:#6B4A00}
+
+.product.out{opacity:.62}
+.product.out::after{
+  content:"Sold out · tap to override";
+  position:absolute;top:10px;left:10px;right:10px;padding:6px;
+  background:var(--ink);color:#fff;text-align:center;border-radius:var(--r-sm);
+  font-size:10.5px;font-weight:700;letter-spacing:.03em;
+}
+
+/* ============================================================
+   Cart — three bands, one scroll region
+   ============================================================ */
+
+.cart{
+  position:sticky;top:var(--bar);height:calc(100vh - var(--bar));
+  padding:0;background:#fff;border-left:3px solid var(--pink-pale);
+  display:flex;flex-direction:column;
+  /* hidden, not auto: the panel itself must never scroll, or the total and the
+     Complete button leave the screen exactly when they are needed. */
+  overflow:hidden;
+}
+.cart-head{flex:none;padding:18px 20px 12px}
+.cart-foot{flex:none;padding:12px 20px 18px;border-top:2.5px solid var(--pink-pale);background:#fff;display:grid;gap:12px}
+
+.eyebrow{margin:0;color:var(--pink);font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase}
+h1,h2{margin:3px 0;font-family:Shrikhand,Georgia,serif;font-weight:400}
+h1{font-size:30px}
+
+.warning{margin-top:10px;padding:10px 12px;border-radius:var(--r-md);background:#FFF0BF;border:1px solid #E8CE7A;font-size:13px;font-weight:600}
+
+/*  min-height:0 is load-bearing.
+    A flex child will not shrink below its content by default, so the line list
+    grew past its band and overflowed on top of the totals — which is precisely
+    the overlap this panel used to show. With min-height:0 it is allowed to
+    shrink, and overflow-y gives it its own scrollbar instead. */
+.cart-lines,.pay-pane{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:0 20px;display:grid;gap:10px;align-content:start;
+}
+.cart-lines::after,.pay-pane::after{content:'';display:block;height:4px}
+.pay-pane{gap:14px;align-content:start}
+
+/* Only one step is on screen at a time. Hidden with display, not removed:
+   app.js reads #tendered, #discount and #gcash-reference straight out of the
+   DOM, so both panes have to stay mounted. */
+.cart[data-view="cart"] .pay-pane,
+.cart[data-view="cart"] #complete{display:none}
+.cart[data-view="pay"] .cart-lines,
+.cart[data-view="pay"] .discount-block,
+.cart[data-view="pay"] #to-payment{display:none}
+
+.back{
+  justify-self:start;min-height:40px;padding:7px 14px;margin-bottom:6px;
+  background:var(--pink-wash);color:var(--ink);font-size:13px;box-shadow:none;
+}
+.back:active{background:var(--pink-pale)}
+
+.empty{
+  display:grid;place-items:center;gap:8px;padding:34px 20px;text-align:center;color:var(--muted);
+  border:2.5px dashed var(--pink-pale);border-radius:var(--r-lg);font-size:14px;
+}
+
+.line{
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+  padding:12px;border-radius:var(--r-md);background:var(--cream);
+}
+.line strong{display:block;font-size:14.5px;line-height:1.3}
+.line small{display:block;margin-top:3px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{
+  width:48px;min-height:48px;padding:0;font-size:22px;line-height:1;
+  background:#fff;color:var(--ink);border:2.5px solid var(--pink-pale);box-shadow:0 3px 0 rgba(239,64,86,.12);
+}
+.stepper button:active:not(:disabled){background:var(--pink);color:#fff;border-color:var(--pink)}
+.stepper b{min-width:28px;text-align:center;font-size:17px}
+
+/* Discount is folded away by default. It is used on a minority of sales and
+   was taking permanent space from the line list, which is used on all of them. */
+.discount-block>summary{
+  list-style:none;cursor:pointer;padding:9px 12px;border-radius:var(--r-md);
+  background:var(--pink-wash);color:var(--ink-soft);
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+}
+.discount-block>summary::-webkit-details-marker{display:none}
+.discount-block>summary::after{content:' +';color:var(--pink)}
+.discount-block[open]>summary::after{content:' −'}
+.discount{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;margin-top:10px}
+.discount label,.payment label{display:grid;gap:4px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.discount-row{display:grid;grid-template-columns:1fr 62px}
+.discount-row input{border-radius:var(--r-md) 0 0 var(--r-md);min-width:0}
+.discount-row select{border-radius:0 var(--r-md) var(--r-md) 0;border-left:0}
+
+.totals p{display:flex;justify-content:space-between;align-items:baseline;margin:6px 0;color:var(--muted);font-size:13.5px;font-weight:600}
+.totals strong{color:var(--ink)}
+.totals .grand{margin-top:10px;padding-top:10px;border-top:2.5px solid var(--pink-pale);font-size:15px;color:var(--ink)}
+.totals .grand strong{font:400 30px/1 Shrikhand,Georgia,serif;color:var(--red)}
+
+.pay-tabs,.quick,.actions{display:flex;gap:8px}
+.pay-tabs button,.quick button{flex:1;background:#fff;color:var(--ink);border:2.5px solid var(--pink-pale);box-shadow:none}
+.pay-tabs button.active{background:linear-gradient(140deg,var(--pink-light),var(--pink));color:#fff;border-color:var(--pink);box-shadow:0 4px 0 rgba(239,64,86,.24)}
+.quick{margin:8px 0}
+.change{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:var(--r-md);background:var(--green-wash);border:1px solid #B6E3C8}
+.change span{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#1C6B42}
+.change strong{font-size:30px;color:var(--green)}
+
+.complete{
+  width:100%;min-height:60px;font-size:18px;letter-spacing:.02em;
+  background:linear-gradient(140deg,var(--pink),var(--red));
+  box-shadow:0 6px 0 rgba(168,31,50,.3);
+}
+.complete:active:not(:disabled){box-shadow:0 2px 0 rgba(168,31,50,.3)}
+.primary{background:var(--pink)!important}
+
+/* ============================================================
+   Dialogs
+   ============================================================ */
+
+dialog{border:0;border-radius:var(--r-xl);padding:0;max-width:min(500px,calc(100% - 20px));width:100%;color:var(--ink);box-shadow:0 18px 0 rgba(239,64,86,.12),0 28px 54px rgba(160,40,90,.3)}
+dialog::backdrop{background:rgba(58,36,48,.65)}
+.success-card,.dialog-card{position:relative;padding:28px}
+.success-card{text-align:center}
+.success-card h2{font-size:34px}
+.qr{width:180px;height:180px;margin:16px auto;display:grid;place-items:center;border-radius:var(--r-lg);background:var(--cream);overflow:hidden}
+.qr img{width:100%;height:100%}
+.receipt{display:block;color:var(--red);font-weight:700}
+.actions{margin-top:18px}
+.actions button{flex:1}
+.close{position:absolute;right:14px;top:14px;width:48px;padding:0;background:var(--pink-wash);color:var(--ink);box-shadow:none}
+.queue-item{padding:12px 0;border-bottom:1px solid var(--pink-pale);font-size:14px}
+/* Rendered into #session-body by app.js as bare labels and a button. */
+#session-body{display:grid;gap:14px;margin-top:8px}
+#session-body label{display:grid;gap:5px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+#session-body button{width:100%}
+
+#toast{position:fixed;z-index:20;right:16px;bottom:16px;max-width:340px;padding:14px 17px;border-radius:var(--r-md);background:var(--ink);color:#fff;font-weight:600;box-shadow:0 10px 28px rgba(0,0,0,.34);transform:translateY(140%);transition:transform .25s var(--ease)}
+#toast.show{transform:none}
+
+/* ============================================================
+   Small screens — cart becomes a bottom sheet
+   ============================================================ */
+
+@media(max-width:850px){
+  header{flex-wrap:wrap}
+  .brand strong,.operator{display:none}
+  .session{order:3;width:100%;margin:0}
+  .signals{margin-left:auto}
+  main{display:block}
+  /* Bottom padding clears the sheet so the last row of products is reachable. */
+  .catalog{padding:14px 12px 480px}
+  .cart{
+    position:fixed;z-index:4;left:0;right:0;bottom:0;top:auto;height:min(468px,72vh);
+    border-left:0;border-top:3px solid var(--pink-pale);
+    border-radius:var(--r-xl) var(--r-xl) 0 0;box-shadow:0 -10px 30px rgba(160,40,90,.16);
+  }
+  .cart-head{padding:14px 16px 10px}
+  .cart-lines{padding-inline:16px}
+  .cart-foot{padding:10px 16px 14px}
+  h1{font-size:24px}
+  .products{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .product{min-height:190px}
+  .product-art{height:94px}
+}
+
+@media(orientation:landscape) and (max-width:850px){
+  main{display:grid;grid-template-columns:1fr 370px}
+  .catalog{padding:14px}
+  .cart{position:sticky;top:118px;height:calc(100vh - 118px);border-radius:0;border-top:0;border-left:3px solid var(--pink-pale);box-shadow:none}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}

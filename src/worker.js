@@ -1,9 +1,12 @@
 import { authenticate, authError } from './auth.js';
+import { authApi } from './api/auth.js';
 import { publicProducts, receiptPage } from './api/public.js';
 import { adminApi } from './api/admin.js';
 import { posApi } from './api/pos.js';
 import { listPublicProducts } from './db/products.js';
 import { createInquiry } from './db/orders.js';
+import { addSubscriber, removeSubscriber } from './db/subscribers.js';
+import { themedPage } from './api/theme.js';
 import { can, resolveUser } from './roles.js';
 
 const MAX_BODY = 16 * 1024;
@@ -17,14 +20,33 @@ const FULFILLMENT = {
 
 const isProtected = (p) =>
   p === '/admin' || p.startsWith('/admin/') || p === '/pos' || p.startsWith('/pos/');
-const isSignInEntry = (p) =>
-  p === '/admin' || p === '/admin/' || p === '/pos' || p === '/pos/';
+
+// Top-level navigation, as opposed to fetch/XHR from a page that is already
+// loaded. Sec-Fetch-Mode is the reliable signal in current browsers; the Accept
+// sniff is the fallback for anything that does not send it.
+const wantsHtml = (request) => {
+  const mode = request.headers.get('sec-fetch-mode');
+  if (mode) return mode === 'navigate';
+  const accept = request.headers.get('accept') || '';
+  return accept.includes('text/html');
+};
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Before every gate below: /api/auth/* is how you get a session in the
+    // first place, so it cannot require one. Each route inside does its own
+    // rate limiting and its own authorization.
+    if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
+      const identity = await authenticate(request, env);
+      const resolved = identity ? await resolveUser(env, identity) : { data: null };
+      return authApi(request, env, url, resolved.data ? { ...identity, ...resolved.data } : null);
+    }
+
     if (url.pathname === '/api/inquiry') return handleInquiry(request, env);
+    if (url.pathname === '/api/subscribe') return handleSubscribe(request, env);
+    if (url.pathname === '/unsubscribe') return handleUnsubscribe(request, env, url);
     if (url.pathname === '/api/products' && request.method === 'GET') return publicProducts(request, env);
     if (url.pathname.startsWith('/api/admin/') || url.pathname === '/api/admin') {
       const access = await requestUser(request, env);
@@ -38,9 +60,28 @@ export default {
     }
     if (/^\/r\/VR-[A-Z2-9]{4}$/.test(url.pathname)) return receiptPage(env, url.pathname.slice(3));
 
-    if (url.pathname === '/') {
-      url.pathname = '/index.html';
-      return env.ASSETS.fetch(new Request(url, request));
+    // Old host-provided sign-in entry points. Verre owns login now; keep these
+    // redirecting so any bookmark or cached admin bundle still lands somewhere
+    // sensible instead of a 404.
+    if (url.pathname === '/signin-with-chatgpt' || url.pathname === '/signout-with-chatgpt') {
+      const back = safeReturn(url.searchParams.get('return_to'));
+      return Response.redirect(new URL('/login?return_to=' + encodeURIComponent(back), url.origin), 302);
+    }
+
+    // The storefront is served with its season already resolved and injected,
+    // so the hero never paints the everyday pink and then swaps.
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      const page = new URL(url);
+      page.pathname = '/index.html';
+      return themedPage(request, env, new Request(page, request));
+    }
+    // The reset link is a real URL people click from email, but it is the same
+    // document as /login — the token in the query string is what selects the
+    // view. Serving the asset directly avoids shipping a duplicate page.
+    if (url.pathname === '/login/reset' || url.pathname === '/login/reset/') {
+      const page = new URL(url);
+      page.pathname = '/login/index.html';
+      return env.ASSETS.fetch(new Request(page, request));
     }
     // The shells need the same gate as their APIs. Guarding only /api/admin/*
     // leaves /admin/app.js and /pos/sw.js served straight off ASSETS, so the
@@ -48,13 +89,12 @@ export default {
     if (isProtected(url.pathname)) {
       const access = await requestUser(request, env);
       if (access.response) {
-        if (
-          access.response.status === 401 &&
-          env.TRUST_SITES_AUTH === 'true' &&
-          isSignInEntry(url.pathname)
-        ) {
-          return signInRedirect(request);
-        }
+        // A person typing /admin should land on the login form. A fetch from
+        // already-loaded admin JS should get JSON it can branch on — following
+        // a redirect there just hands the caller an HTML page where it expected
+        // a payload, which is exactly how "session expired" turns into an
+        // unreadable parse error.
+        if (access.response.status === 401 && wantsHtml(request)) return signInRedirect(request);
         return access.response;
       }
       const capability = url.pathname === '/admin' || url.pathname.startsWith('/admin/') ? 'admin' : 'pos';
@@ -108,9 +148,16 @@ const forbidden = () => json(403, {
   code:'FORBIDDEN'
 });
 
+// return_to arrives from the query string, so it is attacker-controlled. Only
+// same-origin paths — '//evil.com' is a protocol-relative URL, not a path.
+const safeReturn = (raw) => {
+  const value = String(raw || '/');
+  return value.startsWith('/') && !value.startsWith('//') ? value : '/';
+};
+
 function signInRedirect(request) {
   const requested = new URL(request.url);
-  const signIn = new URL('/signin-with-chatgpt', requested.origin);
+  const signIn = new URL('/login', requested.origin);
   signIn.searchParams.set('return_to', requested.pathname + requested.search);
   return Response.redirect(signIn, 302);
 }
@@ -250,6 +297,80 @@ async function handleInquiry(request, env) {
 
   console.log('inquiry ' + ref + ': ' + parsed.type + ' ok'); // no names, no bodies
   return json(200, { ok: true, ref });
+}
+
+/* ------------------------------------------------------------------ */
+/* newsletter                                                          */
+/* ------------------------------------------------------------------ */
+
+async function handleSubscribe(request, env) {
+  if (request.method !== 'POST') {
+    return json(405, { ok: false, error: 'Method not allowed' }, { allow: 'POST' });
+  }
+
+  let body;
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 2048) return bad('That request is too large');
+    body = JSON.parse(raw);
+  } catch {
+    return bad('Expected JSON');
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return bad('Expected JSON');
+
+  // Same trick as the enquiry form: a caught bot is told it succeeded.
+  if (str(body.hp)) return json(200, { ok: true });
+
+  const email = str(body.email).toLowerCase();
+  if (!email || email.length > 254 || !EMAIL_RE.test(email)) {
+    return bad("That email doesn't look right", 'email');
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (rateLimited(ip)) {
+    return json(429, { ok: false, error: 'Too many requests' }, { 'retry-after': '600' });
+  }
+
+  const saved = await addSubscriber(env, email, str(body.source) || 'storefront');
+  if (saved.error) {
+    console.error('subscribe: failed — ' + saved.error.code); // never the address
+    return json(502, { ok: false, error: 'Could not sign you up just now. Please try again shortly.' });
+  }
+
+  // One response for a new address and for one already on the list. Saying
+  // "you're already subscribed" turns this box into a way to check whether any
+  // given person has signed up.
+  console.log('subscribe: ok');
+  return json(200, { ok: true });
+}
+
+async function handleUnsubscribe(request, env, url) {
+  const token = str(url.searchParams.get('t'));
+  // Never 404 or error on a bad token — an unsubscribe page that behaves
+  // differently for real and fake tokens is a way to probe them, and someone
+  // trying to leave a mailing list should never see a failure.
+  if (token) {
+    const done = await removeSubscriber(env, token);
+    if (done.error) console.error('unsubscribe: failed — ' + done.error.code);
+  }
+  return new Response(
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex">' +
+    '<title>Unsubscribed — Verre</title>' +
+    '<div style="font-family:Poppins,system-ui,sans-serif;color:#3A2430;background:#FFF6F0;min-height:100vh;' +
+    'display:grid;place-items:center;padding:24px;line-height:1.65;text-align:center">' +
+    '<div style="max-width:28rem;background:#fff;border:6px solid #fff;border-radius:30px;padding:34px 32px;' +
+    'box-shadow:0 14px 0 rgba(239,64,86,.12),0 26px 44px rgba(160,40,90,.16)">' +
+    '<div style="font-size:38px" aria-hidden="true">💗</div>' +
+    '<h1 style="margin:6px 0 10px;font-family:Shrikhand,cursive;font-weight:400;font-size:26px">You\'re unsubscribed</h1>' +
+    '<p style="margin:0 0 22px;color:#7A5C6B;font-size:14px">No more new-drop emails. Thank you for having been here — ' +
+    'the shop is always open if you change your mind.</p>' +
+    '<a href="/" style="display:inline-block;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;' +
+    'text-decoration:none;font-weight:700;font-size:14px;padding:13px 26px;border-radius:999px;' +
+    'border:3px solid #fff;box-shadow:0 5px 0 rgba(239,64,86,.28)">Back to Verre</a>' +
+    '</div></div>',
+    { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
 }
 
 /* ------------------------------------------------------------------ */
