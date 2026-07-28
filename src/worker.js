@@ -1,6 +1,7 @@
 import { authenticate, authError } from './auth.js';
 import { authApi } from './api/auth.js';
 import { publicProducts, receiptPage } from './api/public.js';
+import { customWizardApi, customRequestApi, customUploadApi, trackPage } from './api/custom.js';
 import { adminApi } from './api/admin.js';
 import { posApi } from './api/pos.js';
 import { listPublicProducts } from './db/products.js';
@@ -53,6 +54,17 @@ export default {
     if (url.pathname === '/api/health') return handleHealth(request, env);
 
     if (url.pathname === '/api/inquiry') return handleInquiry(request, env);
+
+    // The commission wizard. Public and unauthenticated like /api/inquiry, and
+    // it shares that endpoint's rate limiter deliberately: both are "a stranger
+    // can make Kyle's phone buzz", so one budget covers both rather than
+    // letting a flooder use each to top the other up.
+    if (url.pathname === '/api/custom/wizard') return customWizardApi(request, env);
+    if (url.pathname === '/api/custom/request') {
+      return customRequestApi(request, env, { rateLimited, makeRef, sendEmail });
+    }
+    if (url.pathname === '/api/custom/upload') return customUploadApi(request, env);
+
     if (url.pathname === '/api/subscribe') return handleSubscribe(request, env);
     if (url.pathname === '/unsubscribe') return handleUnsubscribe(request, env, url);
     if (url.pathname === '/api/products' && request.method === 'GET') return publicProducts(request, env);
@@ -67,6 +79,15 @@ export default {
       return can(access.user, 'pos') ? posApi(request, env, access.user) : forbidden();
     }
     if (/^\/r\/VR-[A-Z2-9]{4}$/.test(url.pathname)) return receiptPage(env, url.pathname.slice(3));
+
+    // Public commission tracking. Unlike /r/{ref}, this one also requires the
+    // 128-bit token from the confirmation email — a receipt shows items and a
+    // total, but an order status shows a name and where a piece is headed, and
+    // four characters of ref is not enough to guard that.
+    if (/^\/order\/VR-[A-Z2-9]{4}$/.test(url.pathname)) {
+      return trackPage(request, env, url.pathname.slice(7));
+    }
+
 
     // Old host-provided sign-in entry points. Verre owns login now; keep these
     // redirecting so any bookmark or cached admin bundle still lands somewhere
@@ -312,65 +333,120 @@ async function handleInquiry(request, env) {
 async function handleHealth(request, env) {
   if (request.method !== 'GET') return json(405, { ok: false, error: 'Method not allowed' }, { allow: 'GET' });
 
+  // Per-name, not per-group. "database: false" does not tell you whether the URL
+  // is missing, the key is missing, or one of them is spelled wrong — and a
+  // typo in a secret NAME looks exactly like never having set it.
+  const present = (name) => Boolean(env[name]);
+  const secrets = Object.fromEntries(
+    ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPER_ADMIN_EMAILS', 'RESEND_API_KEY', 'OWNER_EMAIL', 'FROM_EMAIL']
+      .map((name) => [name, present(name)])
+  );
+  const missing = Object.entries(secrets).filter(([, set]) => !set).map(([name]) => name);
+
   const configured = {
-    database: Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
-    email: Boolean(env.RESEND_API_KEY && env.OWNER_EMAIL && env.FROM_EMAIL),
+    database: secrets.SUPABASE_URL && secrets.SUPABASE_SERVICE_ROLE_KEY,
+    email: secrets.RESEND_API_KEY && secrets.OWNER_EMAIL && secrets.FROM_EMAIL,
     bootstrapAdmin: Boolean(env.SUPER_ADMIN_EMAILS || env.ADMIN_EMAILS),
     kvAuthLimits: Boolean(env.AUTH_LIMITS),
     kvCatalogCache: Boolean(env.CATALOG_CACHE),
     kvDashboardCache: Boolean(env.DASHBOARD_CACHE)
   };
 
-  // Configured and reachable are different failures with different fixes, so
-  // actually touch the database rather than trusting that a URL was set.
-  let database = 'not-configured';
-  let auth = 'not-configured';
-  if (configured.database) {
-    const probe = await db(env).rest('site_settings', 'select=id&limit=1');
-    database = probe.error ? 'unreachable' : 'ok';
-    if (probe.error) console.error('health: table probe failed — ' + probe.error.code);
+  // "Rejected the call" covered far too much. A wrong key, a table that was
+  // never created and a function that was never created all surfaced as
+  // "unreachable", which sent us hunting for a credential problem that did not
+  // exist. Probe three separate things and name which one failed.
+  let credentials = 'not-configured';
+  let coreSchema = 'unknown';
+  let authSchema = 'unknown';
+  let lastCode = null;
 
-    // Reading a table and calling a function are different permissions and
-    // different migrations. Products can load perfectly while sign-in is dead
-    // because verify_password was never created — or was created and PostgREST
-    // has not reloaded its schema cache yet. Both look identical from outside,
-    // so probe the function itself.
-    //
-    // Safe to call with junk: verify_password runs a dummy comparison for an
-    // unknown email and returns ok:false. It does not lock anything out.
-    if (database === 'ok') {
+  if (configured.database) {
+    // `products` exists from the very first migration, so a failure here is
+    // about credentials or an empty database — never about a later migration.
+    const core = await db(env).rest('products', 'select=id&limit=1');
+    credentials = classifyProbe(core.error);
+    coreSchema = core.error ? classifyProbe(core.error) : 'ok';
+    if (core.error) lastCode = core.error.code;
+
+    if (credentials === 'ok') {
+      // Everything below depends on migrations that may have rolled back
+      // together when one of them failed.
+      const settings = await db(env).rest('site_settings', 'select=id&limit=1');
       const rpc = await db(env).rpc('verify_password', { p_email: 'health-probe@invalid.test', p_password: '' });
-      if (!rpc.error) auth = 'ok';
-      else {
-        // PGRST202 is PostgREST for "no such function".
-        const missing = rpc.error.code === 'PGRST202' ||
-          /could not find|does not exist/i.test(rpc.error.message || '');
-        auth = missing ? 'missing-function' : 'unreachable';
-        console.error('health: verify_password probe failed — ' + rpc.error.code + ' ' + (rpc.error.message || ''));
-      }
+      authSchema = rpc.error ? classifyProbe(rpc.error) : 'ok';
+      if (rpc.error) lastCode = rpc.error.code;
+      if (settings.error) console.error('health: site_settings probe — ' + settings.error.code);
+      if (rpc.error) console.error('health: verify_password probe — ' + rpc.error.code + ' ' + (rpc.error.message || ''));
+      var settingsSchema = settings.error ? classifyProbe(settings.error) : 'ok';
     }
   }
 
-  const ready = database === 'ok' && auth === 'ok' && configured.bootstrapAdmin;
+  // Kept for the older shape callers already read.
+  const database = credentials === 'ok' ? 'ok' : credentials === 'not-configured' ? 'not-configured' : 'unreachable';
+  const auth = authSchema === 'unknown' ? 'not-configured' : authSchema;
+
+  // The storefront falls back to a hardcoded catalog when the database is
+  // unreachable, so products rendering is not evidence of anything. Readiness
+  // is decided here, not by whether the homepage looks populated.
+  const ready = credentials === 'ok' && authSchema === 'ok' && configured.bootstrapAdmin;
   return json(ready ? 200 : 503, {
     ok: ready,
     data: {
       ready,
       database,
       auth,
+      probes: {
+        credentials,
+        coreSchema,
+        settingsSchema: typeof settingsSchema === 'undefined' ? 'unknown' : settingsSchema,
+        authSchema
+      },
+      lastCode,
       configured,
+      // Names only, never values.
+      secrets,
+      missing,
       // Whatever is wrong, say what to do about it. This endpoint exists
       // because every failure so far looked the same from the browser.
-      hint: hintFor({ database, auth, configured })
+      hint: hintFor({ credentials, coreSchema, authSchema, configured, missing })
     }
   }, { 'cache-control': 'no-store' });
 }
 
-function hintFor({ database, auth, configured }) {
-  if (!configured.database) return 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY as secrets on this Worker.';
-  if (database === 'unreachable') return 'Credentials are set but Supabase rejected the call. Check you used the sb_secret_ key, not sb_publishable_.';
-  if (auth === 'missing-function') return 'verify_password does not exist in this database. Run `supabase db push` against this project, then reload the schema cache in Supabase (Settings → API → Reload).';
-  if (auth === 'unreachable') return 'verify_password exists but errored. Check pgcrypto is installed in the extensions schema.';
+/**
+ * Turn a PostgREST failure into something actionable.
+ *
+ * PGRST205 = no such table, PGRST202 = no such function. Both arrive as a 404
+ * and both mean "the migration did not run", which is a completely different
+ * fix from a rejected key.
+ */
+function classifyProbe(error) {
+  if (!error) return 'ok';
+  const code = String(error.code || '');
+  const message = String(error.message || '');
+  if (code === '401' || code === '403') return 'rejected-key';
+  if (code === 'PGRST205' || /find the table/i.test(message)) return 'missing-table';
+  if (code === 'PGRST202' || /find the function/i.test(message)) return 'missing-function';
+  if (code === 'NETWORK' || code === 'TimeoutError' || code === 'AbortError') return 'unreachable';
+  return 'error-' + (code || 'unknown');
+}
+
+function hintFor({ credentials, coreSchema, authSchema, configured, missing = [] }) {
+  if (!configured.database) {
+    // Name the Worker as well as the variables. Setting a secret while
+    // wrangler.toml points at a different name silently configures a second,
+    // empty Worker and leaves the live one exactly like this.
+    return 'This Worker has no ' + missing.filter((n) => n.startsWith('SUPABASE')).join(' or ') +
+      '. Set them on the Worker actually serving this hostname — check `wrangler secret list` and that wrangler.toml `name` matches it.';
+  }
+  if (credentials === 'rejected-key') return 'Supabase rejected the key. Use the sb_secret_ service role key, not sb_publishable_.';
+  if (credentials === 'unreachable') return 'Could not reach Supabase at all. Check SUPABASE_URL is the project URL with no trailing path.';
+  if (coreSchema === 'missing-table') return 'The key works but this database has no tables. Run `supabase db push` — you may be pointed at a different Supabase project than the one you migrated.';
+  if (credentials !== 'ok') return 'Supabase returned an unexpected error. See lastCode and the Worker logs (`wrangler tail`).';
+  if (authSchema === 'missing-function') return 'verify_password does not exist. The auth migration never landed — run `supabase db push`, then Supabase → Settings → API → Reload schema cache.';
+  if (authSchema === 'missing-table') return 'The auth migration is partly applied. Run `supabase db push` and check it completes without error.';
+  if (authSchema !== 'ok') return 'verify_password exists but errored. Check pgcrypto is installed in the extensions schema.';
   if (!configured.bootstrapAdmin) return 'Set SUPER_ADMIN_EMAILS so at least one account can be granted admin.';
   if (!configured.email) return 'Ready to sign in. Email is unset, so enquiries and password resets will not send.';
   return 'Ready.';

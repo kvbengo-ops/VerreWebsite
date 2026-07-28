@@ -6,6 +6,10 @@ import { body, json, result } from './http.js';
 import { purgeReadCaches } from '../db/client.js';
 import { listAccounts, saveAccount } from '../db/accounts.js';
 import { listSubscribers } from '../db/subscribers.js';
+import {
+  listOptionGroups, saveOptionGroup, saveOption, retireOption,
+  listCustomOrders, getCustomOrder, setCustomQuote, setCustomShipping
+} from '../db/custom.js';
 import { setThemeOverride } from '../db/settings.js';
 import { currentTheme, isKnownTheme } from './theme.js';
 import { ALL_THEMES } from '../themes.js';
@@ -163,6 +167,60 @@ export async function adminApi(request, env, user) {
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
     return result(await closeSession(env,parts[1],parsed.data));
   }
+  /* ---- custom commissions ---------------------------------------- */
+  // Reading and quoting is `sales` — the same capability that already covers
+  // web orders, so a General Admin can answer a commission without also being
+  // handed the product catalog. Editing the wizard's option tables is `catalog`:
+  // it changes what the public storefront offers and what it says things cost.
+  if (parts[0] === 'custom') {
+    if (parts[1] === 'options' && parts.length === 2 && method === 'GET') {
+      if (!can(user,'catalog')) return denied();
+      return result(await listOptionGroups(env));
+    }
+    if (parts[1] === 'groups' && parts.length === 2 && method === 'POST') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOptionGroup(env,parsed.data,user.email),201);
+    }
+    if (parts[1] === 'groups' && parts[2] && method === 'PATCH') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOptionGroup(env,{...parsed.data,id:parts[2]},user.email));
+    }
+    if (parts[1] === 'options' && parts.length === 2 && method === 'POST') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOption(env,parsed.data,user.email),201);
+    }
+    if (parts[1] === 'options' && parts[2] && method === 'PATCH') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOption(env,{...parsed.data,id:parts[2]},user.email));
+    }
+    if (parts[1] === 'options' && parts[2] && method === 'DELETE') {
+      if (!can(user,'catalog')) return denied();
+      return result(await retireOption(env,parts[2],user.email));
+    }
+    if (parts[1] === 'orders' && parts.length === 2 && method === 'GET') {
+      if (!can(user,'sales')) return denied();
+      return result(await listCustomOrders(env,Object.fromEntries(url.searchParams)));
+    }
+    if (parts[1] === 'orders' && parts[2] && parts.length === 3 && method === 'GET') {
+      if (!can(user,'sales')) return denied();
+      return result(await getCustomOrder(env,parts[2]));
+    }
+    if (parts[1] === 'orders' && parts[3] === 'quote' && method === 'POST') {
+      if (!can(user,'sales')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await setCustomQuote(env,parts[2],parsed.data,user.email));
+    }
+    if (parts[1] === 'orders' && parts[3] === 'shipping' && method === 'POST') {
+      if (!can(user,'sales')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await setCustomShipping(env,parts[2],parsed.data,user.email));
+    }
+  }
+
   return json(404,{ok:false,error:'Admin route not found'});
 }
 

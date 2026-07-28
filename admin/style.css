@@ -235,6 +235,10 @@ tr.out{color:var(--muted);box-shadow:inset 4px 0 0 var(--faint)}
 .status{display:inline-flex;padding:4px 10px;border-radius:var(--r-pill);background:var(--pink-pale);color:var(--ink-soft);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
 .status.active,.status.paid,.status.fulfilled{background:#DDF5E6;color:#22603A}
 .status.inquiry,.status.quoted{background:#FFF0C7;color:#765400}
+/* Waiting on the customer is amber like a quote; on the bench is a doing
+   colour, so a glance down the column separates "chase them" from "chase me". */
+.status.awaiting_payment{background:#FFE3C7;color:#7A4A00}
+.status.in_production{background:#DCEBFA;color:#20475C}
 .status.draft{background:#EDE6EA;color:var(--muted)}
 .status.archived,.status.cancelled{background:#F0E2E6;color:var(--faint)}
 

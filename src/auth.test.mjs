@@ -223,36 +223,63 @@ assert.equal(healthBody.data.database, 'not-configured');
 assert.equal(healthBody.data.configured.database, false);
 assert.equal(healthBody.data.configured.email, false);
 assert.match(healthBody.data.hint, /SUPABASE_URL/, 'health must say what to do, not just what is wrong');
+// Per-name, so a misspelled secret NAME is distinguishable from an unset one.
+assert.deepEqual(healthBody.data.secrets.SUPABASE_URL, false);
+assert.ok(healthBody.data.missing.includes('SUPABASE_SERVICE_ROLE_KEY'));
+assert.match(healthBody.data.hint, /wrangler secret list/,
+  'setting a secret against the wrong Worker name is the likeliest cause, so name that check');
 
-// The failure that actually happened in production: tables read fine, so the
-// credentials are right and products load — but verify_password was never
-// created, so sign-in alone is dead. A health check that only probes a table
-// reports "ok" through this and is worse than useless.
-const missingFn = {
+// Every distinguishable Supabase failure, because an earlier version collapsed
+// all of them into "unreachable" and told the operator to check their key — for
+// a database that had no tables. Wrong advice is worse than none.
+const dbEnvHealth = {
   ...bare,
   SUPABASE_URL: 'https://db.test',
   SUPABASE_SERVICE_ROLE_KEY: 'k',
   SUPER_ADMIN_EMAILS: 'kyle@example.com'
 };
 const realFetchHealth = globalThis.fetch;
-globalThis.fetch = async (url) => {
+const probeWith = async (responder) => {
+  globalThis.fetch = responder;
+  const res = await worker.fetch(new Request('https://verre.test/api/health'), dbEnvHealth);
+  const parsed = await res.json();
+  globalThis.fetch = realFetchHealth;
+  return parsed.data;
+};
+const okJson = (payload) => new Response(JSON.stringify(payload), { headers: { 'content-type': 'application/json' } });
+const errJson = (status, payload) => new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
+
+// 1. Key rejected.
+const rejected = await probeWith(async () => errJson(401, { message: 'Invalid API key' }));
+assert.equal(rejected.probes.credentials, 'rejected-key');
+assert.match(rejected.hint, /sb_secret_/, 'a rejected key is the one case where the key advice is right');
+
+// 2. Key fine, database empty — no migrations at all.
+const empty = await probeWith(async () => errJson(404, { code: 'PGRST205', message: 'Could not find the table public.products' }));
+assert.equal(empty.probes.coreSchema, 'missing-table');
+assert.match(empty.hint, /db push/i, 'an empty database must not be blamed on the key');
+assert.doesNotMatch(empty.hint, /sb_secret_/, 'and must not send you hunting for a credential problem');
+
+// 3. The real shape of the failure here: tables exist, verify_password does not
+//    because the auth migration rolled back with a later one.
+const noAuthFn = await probeWith(async (url) => {
   const path = new URL(url).pathname;
   if (path.endsWith('/rpc/verify_password')) {
-    return new Response(
-      JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.verify_password' }),
-      { status: 404, headers: { 'content-type': 'application/json' } }
-    );
+    return errJson(404, { code: 'PGRST202', message: 'Could not find the function public.verify_password' });
   }
-  return new Response(JSON.stringify([{ id: true }]), { headers: { 'content-type': 'application/json' } });
-};
-const partial = await worker.fetch(new Request('https://verre.test/api/health'), missingFn);
-const partialBody = await partial.json();
-globalThis.fetch = realFetchHealth;
+  return okJson([{ id: 1 }]);
+});
+assert.equal(noAuthFn.probes.credentials, 'ok');
+assert.equal(noAuthFn.probes.coreSchema, 'ok');
+assert.equal(noAuthFn.probes.authSchema, 'missing-function');
+assert.equal(noAuthFn.ready, false);
+assert.match(noAuthFn.hint, /reload schema cache/i, 'the schema cache is half of this fix and easy to miss');
 
-assert.equal(partial.status, 503, 'a database that cannot authenticate is not ready');
-assert.equal(partialBody.data.database, 'ok', 'tables are readable');
-assert.equal(partialBody.data.auth, 'missing-function', 'but the sign-in function is absent, and it says so');
-assert.match(partialBody.data.hint, /db push/i, 'and names the fix');
+// 4. Everything working.
+const healthy = await probeWith(async () => okJson([{ id: 1 }]));
+assert.equal(healthy.ready, true, 'credentials, schema and auth all ok means ready');
+assert.equal(healthy.probes.authSchema, 'ok');
+assert.match(healthy.hint, /email is unset/i, 'and it still flags that email will not send');
 
 // Booleans only. A public endpoint that echoes a URL or a key fragment would be
 // a far worse problem than the one it was added to solve.

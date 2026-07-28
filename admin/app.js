@@ -4,13 +4,17 @@ const main=$('#main'), modal=$('#modal'), modalBody=$('#modal-body');
 const money=(c=0)=>'₱'+(Number(c)/100).toLocaleString('en-PH',{minimumFractionDigits:2});
 const date=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(v));
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state={products:[],orders:[],movements:[],sessions:[],accounts:[],me:null,dirty:false};
+let state={products:[],orders:[],movements:[],sessions:[],accounts:[],custom:[],optionGroups:[],me:null,dirty:false};
 const roleLabels={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'};
 const routeRoles={
   dashboard:['super_admin'],
   products:['super_admin'],
   inventory:['super_admin','general_admin'],
   orders:['super_admin','general_admin'],
+  // Quoting a commission is answering a customer, which General Admin already
+  // does for web orders. Editing the option tables is a catalog change and is
+  // gated separately inside the page, not by the route.
+  custom:['super_admin','general_admin'],
   sessions:['super_admin'],
   accounts:['super_admin'],
   themes:['super_admin']
@@ -95,6 +99,7 @@ const PAGES={
   products:{eyebrow:'Catalog',title:'Products',copy:'Search, publish, archive, and keep every public slug stable.',skeleton:()=>skTable(7),load:()=>products()},
   inventory:{eyebrow:'Stock',title:'Inventory',copy:'Every movement is a ledger entry. Nothing edits a count directly.',skeleton:()=>skTable(7),load:()=>inventory()},
   orders:{eyebrow:'Sales',title:'Orders',copy:'Web inquiries and POS sales in one place.',skeleton:()=>skTable(6),load:()=>orders()},
+  custom:{eyebrow:'Commissions',title:'Custom orders',copy:'Briefs waiting on a quote, and the steps the wizard asks.',skeleton:()=>skTable(6),load:()=>customPage()},
   sessions:{eyebrow:'Markets',title:'Sessions',copy:'Opening float, counted cash, and the variance between them.',skeleton:()=>skTable(5),load:()=>sessions()},
   accounts:{eyebrow:'Access',title:'Accounts',copy:'Who can sign in, and what each of them may do.',skeleton:()=>skTable(4),load:()=>accounts()},
   themes:{eyebrow:'Marketing',title:'Seasons',copy:'Dress the homepage for the time of year. Runs on a calendar unless you say otherwise.',skeleton:()=>skCards(3),load:()=>themes()}
@@ -300,11 +305,249 @@ function stocktakeForm(){openModal(`<h2>Physical stocktake</h2><p>Enter what you
 
 async function orders(){
   state.orders=await api('orders');
-  setBody(`<div class="toolbar"><input id="order-search" type="search" placeholder="Ref, name, email"><select id="order-status"><option value="">All statuses</option>${['inquiry','quoted','paid','fulfilled','cancelled'].map(x=>`<option>${x}</option>`).join('')}</select></div><div id="orders-table"></div>`);
+  setBody(`<div class="toolbar"><input id="order-search" type="search" placeholder="Ref, name, email"><select id="order-status"><option value="">All statuses</option>${['inquiry','quoted','awaiting_payment','paid','in_production','fulfilled','cancelled'].map(x=>`<option>${x}</option>`).join('')}</select></div><div id="orders-table"></div>`);
   $('#order-search').oninput=$('#order-status').onchange=drawOrders;drawOrders();
 }
 function drawOrders(){const q=$('#order-search').value.toLowerCase(),s=$('#order-status').value;const rows=state.orders.filter(o=>(!q||(o.ref+' '+o.customer_name+' '+o.customer_email).toLowerCase().includes(q))&&(!s||o.status===s));$('#orders-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Customer</th><th>Total</th><th>Channel</th><th>Status</th><th>Created</th></tr></thead><tbody>${rows.map(o=>`<tr class="${o.is_oversell?'low':''}" data-order="${o.id}" tabindex="0"><td><strong>${esc(o.ref)}</strong>${o.is_oversell?'<br><small>Needs attention — sold twice</small>':''}</td><td>${esc(o.customer_name||'Walk-in')}<br><small>${esc(o.customer_email||'')}</small></td><td>${money(o.total_cents)}</td><td>${o.channel}</td><td><span class="status ${o.status}">${o.status}</span></td><td>${date(o.created_at)}</td></tr>`).join('')}</tbody></table></div>`:(state.orders.length?emptyState('✦','Nothing matches','No order matches that search or status filter.'):emptyState('✦','No orders yet','Web inquiries and POS sales will both land here.'));$$('[data-order]').forEach(r=>{r.onclick=()=>orderDetail(r.dataset.order);r.onkeydown=e=>{if(e.key==='Enter')r.click()}})}
-async function orderDetail(id){const o=await api('orders/'+id);openModal(`<p class="eyebrow">${esc(o.channel)} order</p><h2>${esc(o.ref)}</h2>${o.is_oversell?'<div class="alert">Needs attention — sold twice. Contact the customer to refund or remake.</div>':''}<p><strong>${esc(o.customer_name||'Walk-in')}</strong><br>${esc(o.customer_email||'')} ${esc(o.customer_phone||'')}</p><div class="card">${(o.order_items||[]).map(i=>`<p>${i.qty} × ${esc(i.product_name)} <strong style="float:right">${money(i.line_total_cents)}</strong></p>`).join('')}<hr><p>Total <strong style="float:right">${money(o.total_cents)}</strong></p></div><div class="form-actions"><a class="button secondary" href="mailto:${encodeURIComponent(o.customer_email||'')}?subject=${encodeURIComponent('Verre order '+o.ref)}">Email customer</a>${['inquiry','quoted','paid','fulfilled','cancelled'].map(s=>`<button data-status="${s}" ${s===o.status?'disabled':''}>${s}</button>`).join('')}</div>`);$$('[data-status]').forEach(b=>b.onclick=async()=>{const note=b.dataset.status==='cancelled'?prompt('Cancellation note:')||'Cancelled by admin':'';try{await api(`orders/${id}/status`,{method:'POST',body:JSON.stringify({status:b.dataset.status,payment_method:b.dataset.status==='paid'?'gcash':null,note})});closeModal();toast('Order updated');orders()}catch(e){toast(e.message,true)}})}
+async function orderDetail(id){const o=await api('orders/'+id);openModal(`<p class="eyebrow">${esc(o.channel)} order</p><h2>${esc(o.ref)}</h2>${o.is_oversell?'<div class="alert">Needs attention — sold twice. Contact the customer to refund or remake.</div>':''}<p><strong>${esc(o.customer_name||'Walk-in')}</strong><br>${esc(o.customer_email||'')} ${esc(o.customer_phone||'')}</p><div class="card">${(o.order_items||[]).map(i=>`<p>${i.qty} × ${esc(i.product_name)} <strong style="float:right">${money(i.line_total_cents)}</strong></p>`).join('')}<hr><p>Total <strong style="float:right">${money(o.total_cents)}</strong></p></div><div class="form-actions"><a class="button secondary" href="mailto:${encodeURIComponent(o.customer_email||'')}?subject=${encodeURIComponent('Verre order '+o.ref)}">Email customer</a>${['inquiry','quoted','awaiting_payment','paid','in_production','fulfilled','cancelled'].map(s=>`<button data-status="${s}" ${s===o.status?'disabled':''}>${s.replace('_',' ')}</button>`).join('')}</div>`);$$('[data-status]').forEach(b=>b.onclick=async()=>{const note=b.dataset.status==='cancelled'?prompt('Cancellation note:')||'Cancelled by admin':'';try{await api(`orders/${id}/status`,{method:'POST',body:JSON.stringify({status:b.dataset.status,payment_method:b.dataset.status==='paid'?'gcash':null,note})});closeModal();toast('Order updated');orders()}catch(e){toast(e.message,true)}})}
+
+/* ------------------------------------------------------------------ */
+/* custom commissions                                                  */
+/* ------------------------------------------------------------------ */
+
+const CUSTOM_STAGES=['inquiry','quoted','awaiting_payment','paid','in_production','fulfilled'];
+const canEditOptions=()=>state.me?.role==='super_admin';
+
+async function customPage(){
+  // Two tabs, one route. The briefs are the daily job; the options behind the
+  // wizard are edited rarely, and giving them their own nav entry would put a
+  // link Kyle uses monthly above one he uses every morning.
+  setBody(`<div class="toolbar">
+      <button id="tab-briefs" class="primary">Briefs</button>
+      ${canEditOptions()?'<button id="tab-options">Wizard steps</button>':''}
+    </div><div id="custom-body"></div>`);
+  $('#tab-briefs').onclick=()=>{$('#tab-briefs').className='primary';const o=$('#tab-options');if(o)o.className='';customBriefs()};
+  if(canEditOptions())$('#tab-options').onclick=()=>{$('#tab-options').className='primary';$('#tab-briefs').className='';customOptions()};
+  await customBriefs();
+}
+
+async function customBriefs(){
+  state.custom=await api('custom/orders');
+  const body=$('#custom-body');
+  if(!state.custom.length){
+    body.innerHTML=emptyState('✦','No commissions yet','Requests from the storefront wizard land here, oldest first.');
+    return;
+  }
+  // Sorted by "needs Kyle" rather than by date: an unanswered brief is the only
+  // thing on this page with a clock running against it.
+  const waiting=state.custom.filter(o=>o.status==='inquiry');
+  const rest=state.custom.filter(o=>o.status!=='inquiry');
+  const row=(o)=>`<tr data-custom="${o.id}" tabindex="0">
+      <td><strong>${esc(o.ref)}</strong></td>
+      <td>${esc(o.customer_name||'')}<br><small>${esc(o.customer_email||'')}</small></td>
+      <td>${(o.custom_order_selections||[]).length} answers${(o.custom_order_images||[]).length?`<br><small>${o.custom_order_images.length} photo(s)</small>`:''}</td>
+      <td>${o.quoted_cents!=null?money(o.quoted_cents):`<small>est. ${money(o.estimate_cents||0)}</small>`}</td>
+      <td><span class="status ${o.status}">${o.status.replace('_',' ')}</span></td>
+      <td>${date(o.created_at)}</td>
+    </tr>`;
+  body.innerHTML=`${waiting.length?`<div class="card attention"><h2>${waiting.length} brief${waiting.length>1?'s':''} waiting on a quote</h2><p>Customers were told 2–3 days.</p></div>`:''}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Ref</th><th>Customer</th><th>Brief</th><th>Price</th><th>Status</th><th>Received</th></tr></thead>
+      <tbody>${waiting.concat(rest).map(row).join('')}</tbody>
+    </table></div>`;
+  $$('[data-custom]').forEach(r=>{
+    r.onclick=()=>customDetail(r.dataset.custom);
+    r.onkeydown=e=>{if(e.key==='Enter')r.click()};
+  });
+}
+
+async function customDetail(id){
+  const o=await api('custom/orders/'+id);
+  const spec=(o.selections||[]).map(s=>`<p><small>${esc(s.group_label)}</small><br><strong>${esc(s.option_label||s.text_value||'—')}</strong>${s.price_delta_cents?` <span style="float:right">${money(s.price_delta_cents)}</span>`:''}</p>`).join('<hr>');
+  const photos=(o.images||[]).filter(i=>i.url).map(i=>`<a href="${esc(i.url)}" target="_blank" rel="noopener"><img src="${esc(i.url)}" alt="Reference photo" style="width:88px;height:88px;object-fit:cover;border-radius:12px;border:3px solid #fff"></a>`).join('');
+  const address=[o.ship_line1,o.ship_line2,o.ship_city,o.ship_province,o.ship_postcode].filter(Boolean).map(esc).join(', ');
+  // Only the transitions the database will actually accept. Rendering every
+  // status and letting the RPC reject five of them turns a one-click job into
+  // guess-and-toast.
+  const at=CUSTOM_STAGES.indexOf(o.status);
+  const nextStages=at>=0?CUSTOM_STAGES.slice(at+1,at+3):[];
+
+  openModal(`<p class="eyebrow">Custom commission</p><h2>${esc(o.ref)}</h2>
+    <p><strong>${esc(o.customer_name||'')}</strong><br>${esc(o.customer_email||'')} ${esc(o.customer_phone||'')}
+    ${address?`<br><small>${esc(o.fulfillment||'')} · ${address}</small>`:`<br><small>${esc(o.fulfillment||'')}</small>`}</p>
+    ${photos?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px">${photos}</div>`:''}
+    <div class="card">${spec}
+      <hr><p>Wizard estimate <strong style="float:right">${money(o.estimate_cents||0)}</strong></p>
+      ${o.quoted_cents!=null?`<p>Your quote <strong style="float:right">${money(o.quoted_cents)}</strong></p>`:''}
+      ${o.deposit_cents?`<p><small>Deposit ${money(o.deposit_cents)}</small></p>`:''}
+    </div>
+    ${o.note?`<p><small>They added:</small><br>${esc(o.note)}</p>`:''}
+    <div class="form-actions">
+      <a class="button secondary" href="mailto:${encodeURIComponent(o.customer_email||'')}?subject=${encodeURIComponent('Verre commission '+o.ref)}">Email customer</a>
+      ${o.status==='inquiry'||o.status==='quoted'?`<button id="quote-btn" class="primary">${o.quoted_cents!=null?'Revise quote':'Send quote'}</button>`:''}
+      ${o.status==='paid'||o.status==='in_production'?'<button id="ship-btn">Add tracking</button>':''}
+      ${nextStages.map(s=>`<button data-custom-status="${s}">Mark ${s.replace('_',' ')}</button>`).join('')}
+      ${o.status!=='cancelled'&&o.status!=='fulfilled'?'<button data-custom-status="cancelled">Cancel</button>':''}
+    </div>`);
+
+  if($('#quote-btn'))$('#quote-btn').onclick=()=>quoteForm(o);
+  if($('#ship-btn'))$('#ship-btn').onclick=()=>shippingForm(o);
+  $$('[data-custom-status]').forEach(b=>b.onclick=async()=>{
+    const status=b.dataset.customStatus;
+    const note=status==='cancelled'?(prompt('Cancellation note:')||'Cancelled by admin'):'';
+    if(status==='cancelled'&&!confirm('Cancel this commission?'))return;
+    try{
+      await api(`orders/${id}/status`,{method:'POST',body:JSON.stringify({status,payment_method:status==='paid'?'gcash':null,note})});
+      closeModal();toast('Commission updated');customBriefs();
+    }catch(e){toast(e.message,true)}
+  });
+}
+
+function quoteForm(o){
+  openModal(`<h2>Quote ${esc(o.ref)}</h2>
+    <p class="sub">The wizard estimated ${money(o.estimate_cents||0)}. That was a ballpark shown to the customer — this is the number they pay.</p>
+    <form id="quote-form" class="form-grid">
+      ${field('quoted','Your price','',true)}
+      ${field('deposit','Deposit to start (optional)','')}
+      ${area('note','Note to include with the quote')}
+      <div class="span-2 form-actions"><button class="primary">Save quote</button></div>
+    </form>`);
+  $('#quote-form').onsubmit=async e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const quoted=parsePeso(d.quoted);
+    if(quoted==null)return toast('Enter a valid amount',true);
+    const deposit=d.deposit?parsePeso(d.deposit):0;
+    if(deposit==null)return toast('Enter a valid deposit, or leave it blank',true);
+    if(deposit>quoted)return toast('The deposit cannot be more than the quote',true);
+    try{
+      await api(`custom/orders/${o.id}/quote`,{method:'POST',body:JSON.stringify({quoted_cents:quoted,deposit_cents:deposit,note:d.note})});
+      closeModal();toast('Quote saved — email it to them next');customBriefs();
+    }catch(err){toast(err.message,true)}
+  };
+}
+
+function shippingForm(o){
+  openModal(`<h2>Tracking for ${esc(o.ref)}</h2>
+    <p class="sub">This appears on the customer's tracking page as soon as you save it.</p>
+    <form id="ship-form" class="form-grid">
+      ${field('carrier','Courier',o.ship_carrier||'',true)}
+      ${field('tracking','Tracking number',o.ship_tracking||'',true)}
+      <div class="span-2 form-actions"><button class="primary">Save tracking</button></div>
+    </form>`);
+  $('#ship-form').onsubmit=async e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    try{
+      await api(`custom/orders/${o.id}/shipping`,{method:'POST',body:JSON.stringify({carrier:d.carrier,tracking:d.tracking})});
+      closeModal();toast('Tracking saved');customBriefs();
+    }catch(err){toast(err.message,true)}
+  };
+}
+
+/* ---- the wizard's own options ------------------------------------ */
+
+async function customOptions(){
+  state.optionGroups=await api('custom/options');
+  const groups=[...state.optionGroups].sort((a,b)=>a.step-b.step);
+  const allOptions=groups.flatMap(g=>(g.custom_options||[]).map(o=>({...o,groupKey:g.key})));
+  const parentName=(id)=>{const o=allOptions.find(x=>x.id===id);return o?o.label:''};
+
+  $('#custom-body').innerHTML=`<p class="sub">These are the steps the storefront wizard walks through, in order. Changes go live within a minute.</p>
+    <div class="toolbar"><button id="add-group">Add a step</button></div>
+    ${groups.map(g=>`<div class="card">
+      <h2>${g.step}. ${esc(g.label)} ${g.is_active?'':'<small>(hidden)</small>'}</h2>
+      <p class="sub">${esc(g.helper||'')} <small>${g.input_kind==='text'?'free text':'pick one'}${g.required?' · required':' · optional'}</small></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Choice</th><th>Adds</th><th>Lead time</th><th>Only after</th><th>Live</th><th></th></tr></thead>
+        <tbody>${(g.custom_options||[]).sort((a,b)=>a.sort_order-b.sort_order).map(o=>`<tr>
+          <td><strong>${esc(o.label)}</strong><br><small>${esc(o.description||'')}</small></td>
+          <td>${o.price_delta_cents?money(o.price_delta_cents):'—'}</td>
+          <td>${o.lead_time_days?o.lead_time_days+' days':'—'}</td>
+          <td>${o.parent_option_id?esc(parentName(o.parent_option_id)):'always'}</td>
+          <td>${o.is_active?'✓':'—'}</td>
+          <td><button data-edit-option="${o.id}">Edit</button> <button data-retire-option="${o.id}">Remove</button></td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+      <div class="form-actions"><button data-edit-group="${g.id}">Edit step</button><button data-add-option="${g.id}" class="primary">Add a choice</button></div>
+    </div>`).join('')}`;
+
+  $('#add-group').onclick=()=>groupForm();
+  $$('[data-edit-group]').forEach(b=>b.onclick=()=>groupForm(groups.find(g=>g.id===b.dataset.editGroup)));
+  $$('[data-add-option]').forEach(b=>b.onclick=()=>optionForm({group_id:b.dataset.addOption},groups,allOptions));
+  $$('[data-edit-option]').forEach(b=>b.onclick=()=>optionForm(allOptions.find(o=>o.id===b.dataset.editOption),groups,allOptions));
+  $$('[data-retire-option]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Remove this choice? If anyone has already picked it, it is hidden rather than deleted so old quotes keep their wording.'))return;
+    try{await api('custom/options/'+b.dataset.retireOption,{method:'DELETE'});toast('Choice removed');customOptions()}catch(e){toast(e.message,true)}
+  });
+}
+
+function groupForm(g={step:(state.optionGroups.length||0)+1,input_kind:'single',required:true,is_active:true}){
+  const editing=Boolean(g.id);
+  openModal(`<h2>${editing?'Edit step':'New step'}</h2>
+    <form id="group-form" class="form-grid">
+      ${field('key','Key (lowercase, no spaces)',g.key||'',true,editing)}
+      ${field('label','Question shown to the customer',g.label||'',true)}
+      ${field('helper','Helper line under it',g.helper||'')}
+      ${field('step','Position',g.step??1,true,false,'number')}
+      <label>Kind<select name="input_kind">${['single','text'].map(k=>`<option ${g.input_kind===k?'selected':''}>${k}</option>`).join('')}</select></label>
+      <label>Required<select name="required"><option value="yes" ${g.required!==false?'selected':''}>yes</option><option value="no" ${g.required===false?'selected':''}>no</option></select></label>
+      <label>Live<select name="is_active"><option value="yes" ${g.is_active!==false?'selected':''}>yes</option><option value="no" ${g.is_active===false?'selected':''}>no</option></select></label>
+      <div class="span-2 form-actions"><button class="primary">Save step</button></div>
+    </form>`);
+  // The key is what selections snapshot and what the browser sends back, so an
+  // existing one is not editable — renaming it would orphan every brief that
+  // already used it.
+  $('#group-form').onsubmit=async e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const payload={key:editing?g.key:d.key,label:d.label,helper:d.helper,step:Number(d.step),
+      input_kind:d.input_kind,required:d.required==='yes',is_active:d.is_active==='yes'};
+    try{
+      await api(editing?'custom/groups/'+g.id:'custom/groups',{method:editing?'PATCH':'POST',body:JSON.stringify(payload)});
+      closeModal();toast('Step saved');customOptions();
+    }catch(err){toast(err.message,true)}
+  };
+}
+
+function optionForm(o={},groups=[],allOptions=[]){
+  const editing=Boolean(o.id);
+  const group=groups.find(g=>g.id===o.group_id);
+  // A parent can only come from an earlier step. Offering a later one builds a
+  // dependency that can never be satisfied, because the answer arrives after
+  // the question that needed it.
+  const candidates=allOptions.filter(x=>{
+    const owner=groups.find(g=>g.id===x.group_id);
+    return owner&&group&&owner.step<group.step;
+  });
+  openModal(`<h2>${editing?'Edit choice':'New choice'}</h2>
+    <form id="option-form" class="form-grid">
+      ${field('key','Key (lowercase, no spaces)',o.key||'',true,editing)}
+      ${field('label','What the customer sees',o.label||'',true)}
+      ${area('description','One line of detail',o.description||'')}
+      ${field('price','Adds to the estimate',o.price_delta_cents?String(o.price_delta_cents/100):'0')}
+      ${field('lead_time_days','Extra days to make',o.lead_time_days??'',false,false,'number')}
+      ${field('swatch','Card colour',o.swatch||'#FFE0EE')}
+      ${field('sort_order','Position',o.sort_order??0,false,false,'number')}
+      <label>Only shown after<select name="parent_option_id"><option value="">always shown</option>${candidates.map(c=>`<option value="${c.id}" ${o.parent_option_id===c.id?'selected':''}>${esc(c.label)}</option>`).join('')}</select></label>
+      <label>Live<select name="is_active"><option value="yes" ${o.is_active!==false?'selected':''}>yes</option><option value="no" ${o.is_active===false?'selected':''}>no</option></select></label>
+      <div class="span-2 form-actions"><button class="primary">Save choice</button></div>
+    </form>`);
+  $('#option-form').onsubmit=async e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const price=parsePeso(d.price||'0');
+    if(price==null)return toast('Enter a valid amount, or 0',true);
+    const payload={group_id:o.group_id,key:editing?o.key:d.key,label:d.label,description:d.description,
+      price_delta_cents:price,lead_time_days:d.lead_time_days===''?null:Number(d.lead_time_days),
+      swatch:d.swatch,sort_order:Number(d.sort_order)||0,
+      parent_option_id:d.parent_option_id||null,is_active:d.is_active==='yes'};
+    try{
+      await api(editing?'custom/options/'+o.id:'custom/options',{method:editing?'PATCH':'POST',body:JSON.stringify(payload)});
+      closeModal();toast('Choice saved');customOptions();
+    }catch(err){toast(err.message,true)}
+  };
+}
 
 async function sessions(){
   state.sessions=await api('sessions');

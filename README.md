@@ -49,6 +49,14 @@ Supabase Postgres is the source of truth for the storefront, admin console, and
 offline POS. The Worker-only fallback in `src/db/fallback.js` keeps the public
 catalog readable if Supabase is temporarily unavailable.
 
+`npm test` now **executes** every migration against Postgres compiled to
+WebAssembly (PGlite — no Docker, no server) and then exercises the RPCs against
+the result. Parsing SQL only proves it is well-formed; a SQL function body is
+validated by Postgres at `CREATE` time, so a mistake like ordering by a subquery
+column as though it were a table alias is invisible to a parser, invisible on
+review, and fatal to `db push`. The check skips itself if the devDependency is
+absent, so a fresh clone still tests green without it.
+
 ```text
 npx supabase start        # local stack (needs Docker Desktop)
 npx supabase db reset     # drop, re-run every migration, then load seed.sql
@@ -96,6 +104,77 @@ credential of any kind belongs in browser-delivered code.
 
 Product images live in the private `product-images` bucket at
 `products/{product_id}/{uuid}.webp`, served through signed URLs.
+
+## Custom commissions
+
+A commission is not a checkout. The piece does not exist yet, so nobody — the
+customer or Kyle — knows what it costs until he has read the brief. The
+storefront wizard collects a *spec*; the price arrives afterwards, by email.
+
+The customer walks four steps under **Custom order** on the homepage (base →
+size → design → brief and reference photos), reviews a summary alongside their
+contact and shipping details, and submits once. They get a tracking link; Kyle
+gets the brief in `/admin` → **Custom orders**.
+
+### Three numbers that are not the same number
+
+| Column | Means |
+|---|---|
+| `estimate_cents` | What the wizard showed, summed from option `price_delta_cents`. A ballpark. |
+| `quoted_cents` | What Kyle actually charges, set in admin. |
+| `total_cents` | **Stays 0 until quoted.** An estimate is not revenue and must never reach the dashboard as if it were. |
+
+The wizard displays prices, so the browser knows them — and is therefore not
+trusted with them. `create_custom_request` re-reads every delta from
+`custom_options` and ignores anything the client sent, the same rule the catalog
+cart already follows. `src/custom.test.mjs` asserts that only keys and free text
+survive validation.
+
+### Status pipeline
+
+```text
+inquiry → quoted → awaiting_payment → paid → in_production → fulfilled
+```
+
+`awaiting_payment` and `in_production` were added for commissions. Without them a
+piece sits in `quoted` from the moment a price is sent until money arrives, and
+the dashboard cannot tell "waiting on the customer" from "Kyle hasn't replied
+yet". Catalog orders keep their original `inquiry → quoted → paid → fulfilled`
+path, and `set_order_status` still accepts it unchanged.
+
+A commission has no `order_items`, so marking one paid writes no stock movement.
+That is deliberate: nothing came off a shelf.
+
+### Tracking, and why it needs a token
+
+`/order/{ref}?t={track_token}` is the customer's status page. Unlike `/r/{ref}`,
+it requires a 128-bit token generated at submit and delivered only in the
+confirmation email. A `ref` is four characters of a 32-symbol alphabet — about a
+million combinations, which is a weekend of guessing — and a receipt showing
+items is a different thing from an order status showing a name and where a piece
+is headed. `public_order_track` is also built up from scratch rather than
+`orders` minus a few columns, so a column added later cannot leak by default.
+
+### The options are data, not code
+
+`/admin` → **Custom orders** → **Wizard steps** (Super Admin only) edits
+`custom_option_groups` and `custom_options`. Adding a size or a finish needs no
+deploy. Notes:
+
+- An option's `key` is immutable once created — selections snapshot it.
+- `parent_option_id` makes a choice conditional on an earlier one, so the sizes
+  offered for a glass panel are not the ones offered for stickers. One level
+  only; a deeper tree is a rules engine nobody can explain six months later.
+- Removing a choice that someone has already picked **deactivates** it rather
+  than deleting it, so old quotes keep their wording.
+- Selections snapshot `group_label`, `option_label` and `price_delta_cents`.
+  Raising a price next month never rewrites a quote sent last month.
+
+Reference photos go to the private `custom-references` bucket at
+`custom/{order_id}/{uuid}.ext`, uploaded straight from the browser through a
+signed URL — streaming an 8MB phone photo through the Worker would exceed
+Cloudflare's free-plan CPU and memory budget. They are attached *after* the
+order row exists, so a failed photo can never cost the brief.
 
 ## Admin and POS
 

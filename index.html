@@ -449,7 +449,7 @@ const CONNECT_TABS = [
     ink: '#3A2430', body: '#7A5C6B',
     badge: 'Commissions open',
     title: 'Want something painted just for you?',
-    copy: "Pets, portraits, band logos, wedding gifts — tell me what you're picturing and I'll send a quote within 2–3 days."
+    copy: "Pets, portraits, band logos, wedding gifts. Answer a few questions and I'll send you a real quote within 2–3 days — nothing is charged until you say yes."
   },
   {
     id: 'contact', label: 'Say hello',
@@ -493,6 +493,43 @@ async function postInquiry(payload) {
   }
 }
 
+/**
+ * Same contract as postInquiry, but returns the whole payload rather than just
+ * a ref. The commission endpoint answers with a tracking token and an estimate
+ * as well, and dropping those on the floor would mean asking for them again.
+ */
+async function postJson(url, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    let body = null;
+    try { body = await response.json(); } catch {}
+    if (response.ok && body && body.ok) return { ok: true, data: body };
+    return {
+      ok: false,
+      error: (body && body.error) || 'That did not go through. Please try again in a moment.',
+      ...(body && body.field ? { field: body.field } : {})
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.name === 'AbortError'
+        ? 'That took too long. Please check your connection and try again.'
+        : 'I could not reach the studio. Please check your connection and try again.'
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const money = (cents) => '₱' + Number(cents / 100).toLocaleString('en-PH');
+
 const inputStyle = {
   width: '100%', border: '3px solid #FFE0EE', borderRadius: 16, padding: '13px 16px',
   fontSize: 14, color: '#3A2430', background: '#FFFBFD', outline: 'none'
@@ -526,7 +563,20 @@ class Component extends DCLogic {
     customFormError: '',
     customErrorField: '',
     customFormRef: '',
-    customDraft: { name: '', email: '', message: '', hp: '' },
+    customTrackUrl: '',
+    customPhotoState: '',
+    // The commission wizard. Steps come from the database so Kyle can add a
+    // size or a finish without a deploy; the browser only ever holds keys.
+    wizardSteps: [],
+    wizardState: 'loading',        // loading | ready | unavailable
+    wizardIndex: 0,                // 0..visibleSteps.length — the last one is Review
+    wizardChoice: {},              // { groupKey: optionKey }
+    wizardText: {},                // { groupKey: 'free text' }
+    wizardPhotos: [],              // File objects, uploaded only after submit
+    customDraft: {
+      name: '', email: '', phone: '', fulfillment: 'ship', message: '', hp: '',
+      ship_line1: '', ship_line2: '', ship_city: '', ship_province: '', ship_postcode: ''
+    },
     contactFormState: 'idle',
     contactFormError: '',
     contactErrorField: '',
@@ -560,6 +610,8 @@ class Component extends DCLogic {
     this._onHash();
 
     this.loadCatalog();
+    this.restoreWizardDraft();
+    this.loadWizard();
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       const els = Array.from(document.querySelectorAll('[data-reveal]'));
@@ -839,22 +891,279 @@ class Component extends DCLogic {
     return null;
   }
 
+  /* ---------------------------------------------------------------- */
+  /* commission wizard                                                 */
+  /* ---------------------------------------------------------------- */
+
+  async loadWizard() {
+    try {
+      const response = await fetch('/api/custom/wizard');
+      if (!response.ok) throw new Error('wizard request failed');
+      const body = await response.json();
+      const steps = (body.steps || []).filter((step) => step && step.key);
+      // A restored draft can name an option Kyle retired in the meantime.
+      // Keeping it would let the wizard look complete, then fail on submit with
+      // "that choice is no longer available" — after the person had filled in
+      // their address. Drop it now so the step simply reads as unanswered.
+      const live = new Set(steps.flatMap((step) => (step.options || []).map((o) => step.key + ' ' + o.key)));
+      const choice = {};
+      for (const [groupKey, optionKey] of Object.entries(this.state.wizardChoice)) {
+        if (live.has(groupKey + ' ' + optionKey)) choice[groupKey] = optionKey;
+      }
+      // No steps configured is not an error state to shout about, but it is
+      // also not something to render an empty wizard for — fall back to the
+      // plain "tell me what you want" note, which still reaches Kyle.
+      this.setState({
+        wizardSteps: steps,
+        wizardChoice: choice,
+        wizardState: steps.length ? 'ready' : 'unavailable'
+      });
+    } catch {
+      this.setState({ wizardState: 'unavailable' });
+    }
+  }
+
+  /**
+   * Steps that apply given what has been picked so far.
+   *
+   * A step whose every option depends on a choice nobody made is not "empty",
+   * it is not part of this path — the sizes for a glass panel have nothing to
+   * say to someone commissioning stickers. Dropping it here keeps the progress
+   * bar honest: "step 2 of 4" must count the steps this person will actually see.
+   */
+  wizardVisible() {
+    const chosen = this.state.wizardChoice;
+    return (this.state.wizardSteps || []).reduce((visible, step) => {
+      if (step.input_kind === 'text') { visible.push({ ...step, options: [] }); return visible; }
+      const options = (step.options || []).filter((option) =>
+        !option.parent_key || chosen[option.parent_group_key] === option.parent_key);
+      if (options.length) visible.push({ ...step, options });
+      return visible;
+    }, []);
+  }
+
+  wizardChoose(groupKey, optionKey) {
+    this.setState((state) => {
+      const choice = { ...state.wizardChoice, [groupKey]: optionKey };
+      // Changing the base invalidates the size that was only offered because of
+      // it. Leaving it selected but hidden is how a submit ends up carrying an
+      // A3 panel on a sticker order.
+      for (const step of state.wizardSteps) {
+        const option = (step.options || []).find((o) => o.key === choice[step.key]);
+        if (option && option.parent_group_key === groupKey && option.parent_key !== optionKey) {
+          delete choice[step.key];
+        }
+      }
+      return { wizardChoice: choice, customFormError: '' };
+    }, () => this.saveWizardDraft());
+  }
+
+  wizardSetText(groupKey, value) {
+    this.setState((state) => ({ wizardText: { ...state.wizardText, [groupKey]: value }, customFormError: '' }),
+      () => this.saveWizardDraft());
+  }
+
+  // Prices shown here are display only. The Worker re-reads every delta from
+  // the option rows on submit, so editing this in a console changes the number
+  // on screen and nothing that reaches Kyle.
+  wizardEstimate() {
+    return this.wizardVisible().reduce((total, step) => {
+      const option = (step.options || []).find((o) => o.key === this.state.wizardChoice[step.key]);
+      return total + (option ? option.price_delta_cents || 0 : 0);
+    }, 0);
+  }
+
+  wizardLeadTime() {
+    return this.wizardVisible().reduce((days, step) => {
+      const option = (step.options || []).find((o) => o.key === this.state.wizardChoice[step.key]);
+      return Math.max(days, option && option.lead_time_days ? option.lead_time_days : 0);
+    }, 0);
+  }
+
+  wizardStepReady(step) {
+    if (!step) return true;
+    if (step.input_kind === 'text') {
+      return !step.required || Boolean((this.state.wizardText[step.key] || '').trim());
+    }
+    return !step.required || Boolean(this.state.wizardChoice[step.key]);
+  }
+
+  wizardGo(delta) {
+    const steps = this.wizardVisible();
+    const next = Math.min(Math.max(this.state.wizardIndex + delta, 0), steps.length);
+    if (delta > 0 && !this.wizardStepReady(steps[this.state.wizardIndex])) {
+      this.setState({ customFormError: 'Please pick one to carry on.' });
+      return;
+    }
+    this.setState({ wizardIndex: next, customFormError: '' }, () => {
+      // Moving between steps replaces everything on screen with no scroll, so
+      // without this a screen reader and a returning eye both land on stale
+      // context. Focus the new heading instead of the top of the document.
+      const heading = document.getElementById('wizard-heading');
+      if (heading) heading.focus();
+      this.saveWizardDraft();
+    });
+  }
+
+  /* draft persistence ------------------------------------------------ */
+  // A four-step form on a phone is one stray back-swipe away from gone. Photos
+  // are File handles and cannot be serialised, so they are deliberately not
+  // restored — the review step says so rather than silently dropping them.
+
+  saveWizardDraft() {
+    try {
+      localStorage.setItem('verre:custom-draft', JSON.stringify({
+        at: Date.now(),
+        choice: this.state.wizardChoice,
+        text: this.state.wizardText,
+        details: { ...this.state.customDraft, hp: '' }
+      }));
+    } catch {}
+  }
+
+  restoreWizardDraft() {
+    try {
+      const raw = localStorage.getItem('verre:custom-draft');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      // A month-old brief is not a draft, it is a ghost. Expire it rather than
+      // resurrecting choices someone has long forgotten making.
+      if (!saved || Date.now() - (saved.at || 0) > 30 * 86400000) {
+        localStorage.removeItem('verre:custom-draft');
+        return;
+      }
+      this.setState((state) => ({
+        wizardChoice: saved.choice || {},
+        wizardText: saved.text || {},
+        customDraft: { ...state.customDraft, ...(saved.details || {}), hp: '' }
+      }));
+    } catch {}
+  }
+
+  clearWizardDraft() {
+    try { localStorage.removeItem('verre:custom-draft'); } catch {}
+  }
+
+  /* photos ----------------------------------------------------------- */
+
+  wizardAddPhotos(fileList) {
+    const incoming = Array.from(fileList || []);
+    const room = 5 - this.state.wizardPhotos.length;
+    const tooBig = incoming.find((file) => file.size > 8 * 1024 * 1024);
+    if (tooBig) {
+      this.setState({ customFormError: 'Photos need to be under 8MB each. ' + tooBig.name + ' is bigger than that.' });
+      return;
+    }
+    this.setState((state) => ({
+      wizardPhotos: state.wizardPhotos.concat(incoming.slice(0, Math.max(room, 0))),
+      customFormError: room < incoming.length ? 'Five reference photos is the limit.' : ''
+    }));
+  }
+
+  wizardRemovePhoto(index) {
+    this.setState((state) => ({ wizardPhotos: state.wizardPhotos.filter((_, i) => i !== index) }));
+  }
+
+  /**
+   * Uploaded after the order exists, never before.
+   *
+   * The signed URL is scoped to one path under this order, and ref + token is
+   * what authorises it — so there is nothing to upload to until the row is
+   * written. It also means a failed photo cannot cost the brief: the
+   * commission is already saved and Kyle can ask for the picture by email.
+   */
+  async uploadReferencePhotos(ref, token) {
+    const photos = this.state.wizardPhotos;
+    if (!photos.length || !token) return;
+    for (const [index, file] of photos.entries()) {
+      this.setState({ customPhotoState: 'Sending photo ' + (index + 1) + ' of ' + photos.length + '…' });
+      try {
+        const signed = await fetch('/api/custom/upload', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ref, token, content_type: file.type })
+        }).then((r) => r.json());
+        if (!signed.ok) throw new Error(signed.error);
+        const put = await fetch(signed.data.signedUrl, {
+          method: 'PUT', headers: { 'content-type': file.type }, body: file
+        });
+        if (!put.ok) throw new Error('upload failed');
+        await fetch('/api/custom/upload', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ref, token, action: 'attach', path: signed.data.path, position: index })
+        });
+      } catch {
+        this.setState({ customPhotoState: "Your request is saved, but I couldn't attach every photo. Reply to the confirmation email and send them across." });
+        return;
+      }
+    }
+    this.setState({ customPhotoState: '' });
+  }
+
+  validateWizardDetails() {
+    const draft = this.state.customDraft;
+    const needsAddress = draft.fulfillment === 'ship' || draft.fulfillment === 'delivery';
+    if (!draft.name.trim()) return { field: 'name', error: 'Please tell me your name.' };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) return { field: 'email', error: 'Please enter a valid email address.' };
+    if (needsAddress && !draft.ship_line1.trim()) return { field: 'ship_line1', error: 'Please add a street address.' };
+    if (needsAddress && !draft.ship_city.trim()) return { field: 'ship_city', error: 'Please add a city or municipality.' };
+    if (draft.fulfillment === 'ship' && !draft.ship_province.trim()) return { field: 'ship_province', error: 'Please add a province.' };
+    return null;
+  }
+
   async submitCustom(event) {
     event.preventDefault();
     if (this.state.customFormState === 'submitting') return;
-    const invalid = this.validateDraft(this.state.customDraft, 'custom', true);
+
+    const invalid = this.validateWizardDetails();
     if (invalid) {
       this.setState({ customFormState: 'error', customFormError: invalid.error, customErrorField: invalid.field });
+      setTimeout(() => {
+        const el = document.querySelector('#custom [name="' + invalid.field + '"]');
+        if (el) el.focus();
+      }, 0);
       return;
     }
+
+    const steps = this.wizardVisible();
+    const unfinished = steps.find((step) => !this.wizardStepReady(step));
+    if (unfinished) {
+      this.setState({
+        wizardIndex: steps.indexOf(unfinished),
+        customFormState: 'error',
+        customFormError: '"' + unfinished.label + '" still needs an answer.'
+      });
+      return;
+    }
+
     this.setState({ customFormState: 'submitting', customFormError: '', customErrorField: '' });
     const draft = this.state.customDraft;
-    const result = await postInquiry({ type: 'custom', name: draft.name, email: draft.email, message: draft.message, hp: draft.hp });
-    if (result.ok) this.setState({ customFormState: 'success', customFormRef: result.ref });
-    else {
+    const selections = steps.map((step) => ({
+      group_key: step.key,
+      option_key: this.state.wizardChoice[step.key] || null,
+      text_value: (this.state.wizardText[step.key] || '').trim() || null
+    })).filter((entry) => entry.option_key || entry.text_value);
+
+    const result = await postJson('/api/custom/request', {
+      name: draft.name, email: draft.email, phone: draft.phone,
+      fulfillment: draft.fulfillment, message: draft.message, hp: draft.hp,
+      ship_line1: draft.ship_line1, ship_line2: draft.ship_line2, ship_city: draft.ship_city,
+      ship_province: draft.ship_province, ship_postcode: draft.ship_postcode,
+      selections
+    });
+
+    if (!result.ok) {
       this.setState({ customFormState: 'error', customFormError: result.error, customErrorField: result.field || '' });
       if (result.field) setTimeout(() => { const el = document.querySelector('#custom [name="' + result.field + '"]'); if (el) el.focus(); }, 0);
+      return;
     }
+
+    this.clearWizardDraft();
+    this.setState({
+      customFormState: 'success',
+      customFormRef: result.data.ref,
+      customTrackUrl: result.data.track_url || ''
+    });
+    await this.uploadReferencePhotos(result.data.ref, result.data.token);
   }
 
   async submitContact(event) {
@@ -983,23 +1292,382 @@ class Component extends DCLogic {
   }
 
   renderCustomForm() {
-    if (this.state.customFormState === 'success') {
-      return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '34px 10px' } }, [
-        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 44 } }, '✦'),
-        h('h3', { key: 'title', style: { margin: '8px 0 6px', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 26, color: '#EF4056' } }, 'Yay — request sent!'),
-        h('p', { key: 'copy', style: { margin: 0, fontSize: 14, color: '#7A5C6B' } }, "I'll reply within 2–3 days. Your reference is "),
-        h('strong', { key: 'ref', style: { color: '#3A2430' } }, this.state.customFormRef)
-      ]);
+    if (this.state.customFormState === 'success') return this.renderCustomSuccess();
+    if (this.state.wizardState === 'loading') {
+      return h('p', { role: 'status', style: { textAlign: 'center', color: '#7A5C6B', fontSize: 14, padding: '30px 0' } },
+        'Getting the options ready…');
     }
+    // No configured steps must never mean no way to commission something.
+    if (this.state.wizardState === 'unavailable') return this.renderCustomFallback();
+
+    const steps = this.wizardVisible();
+    const onReview = this.state.wizardIndex >= steps.length;
+    const step = steps[this.state.wizardIndex];
+
+    return h('div', { style: { display: 'grid', gap: 20 } }, [
+      this.renderWizardProgress(steps, onReview),
+      onReview ? this.renderWizardReview(steps) : this.renderWizardStep(step, steps)
+    ]);
+  }
+
+  renderWizardProgress(steps, onReview) {
+    const total = steps.length + 1;
+    const at = Math.min(this.state.wizardIndex, steps.length);
+    return h('div', { key: 'progress', style: { display: 'grid', gap: 10 } }, [
+      h('div', { key: 'bar', 'aria-hidden': true, style: { display: 'flex', gap: 6 } },
+        Array.from({ length: total }, (_, index) => h('span', {
+          key: index,
+          style: {
+            flex: 1, height: 7, borderRadius: 999,
+            background: index <= at ? 'linear-gradient(90deg,#FFB6D9,#F157A8)' : '#FFE0EE',
+            transition: 'background .3s'
+          }
+        }))),
+      h('p', {
+        key: 'label',
+        style: { margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: '#B98AA0', textAlign: 'center' }
+      }, 'Step ' + (at + 1) + ' of ' + total + (onReview ? ' · Review' : ''))
+    ]);
+  }
+
+  renderWizardStep(step, steps) {
+    if (!step) return null;
+    const chosen = this.state.wizardChoice[step.key];
+    const ready = this.wizardStepReady(step);
+
+    const body = step.input_kind === 'text'
+      ? h('div', { key: 'text', style: { display: 'grid', gap: 12 } }, [
+          h('label', { key: 'label', htmlFor: 'wizard-' + step.key, style: hiddenFieldStyle }, step.label),
+          h('textarea', {
+            key: 'input',
+            id: 'wizard-' + step.key,
+            name: step.key,
+            rows: 5,
+            maxLength: 2000,
+            placeholder: 'My cat Biscuit — orange tabby, one ear folded. For my mum\'s birthday in October.',
+            value: this.state.wizardText[step.key] || '',
+            onChange: (event) => this.wizardSetText(step.key, event.target.value),
+            style: { ...inputStyle, resize: 'vertical', fontFamily: "'Poppins',sans-serif" }
+          }),
+          this.renderPhotoPicker()
+        ])
+      : h('div', {
+          key: 'options',
+          role: 'radiogroup',
+          'aria-labelledby': 'wizard-heading',
+          style: { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))' }
+        }, step.options.map((option) => {
+          const active = chosen === option.key;
+          return h('button', {
+            key: option.key,
+            type: 'button',
+            role: 'radio',
+            'aria-checked': active ? 'true' : 'false',
+            onClick: () => this.wizardChoose(step.key, option.key),
+            style: {
+              textAlign: 'left', cursor: 'pointer', fontFamily: "'Poppins',sans-serif",
+              border: active ? '3px solid #F157A8' : '3px solid #fff',
+              background: active ? '#fff' : (option.swatch || '#FFF6F0'),
+              borderRadius: 22, padding: '16px 18px',
+              boxShadow: active ? '0 7px 0 rgba(239,64,86,.24)' : '0 4px 0 rgba(160,40,90,.10)',
+              transform: active ? 'translateY(-2px)' : 'none',
+              transition: 'transform .2s cubic-bezier(.2,.9,.3,1.4), box-shadow .2s, border-color .2s'
+            }
+          }, [
+            h('span', { key: 'label', style: { display: 'block', fontWeight: 700, fontSize: 14.5, color: '#3A2430' } }, option.label),
+            option.description
+              ? h('span', { key: 'desc', style: { display: 'block', marginTop: 4, fontSize: 12.5, lineHeight: 1.5, color: '#7A5C6B' } }, option.description)
+              : null,
+            // Zero is worth saying out loud. "+₱0" reads as "this one is
+            // included", where silence reads as "they forgot to price it".
+            h('span', {
+              key: 'price',
+              style: {
+                display: 'inline-block', marginTop: 10, fontSize: 12, fontWeight: 700,
+                color: '#EF4056', background: '#fff', border: '2px dashed #FFB6D9',
+                borderRadius: 8, padding: '3px 9px'
+              }
+            }, option.price_delta_cents ? '+ ' + money(option.price_delta_cents) : 'Included')
+          ]);
+        }));
+
+    return h('div', { key: 'step-' + step.key, style: { display: 'grid', gap: 16 } }, [
+      h('div', { key: 'head', style: { textAlign: 'center' } }, [
+        h('h4', {
+          key: 'title', id: 'wizard-heading', tabIndex: -1,
+          style: { margin: 0, fontSize: 19, fontWeight: 700, color: '#3A2430', outline: 'none' }
+        }, step.label),
+        step.helper
+          ? h('p', { key: 'helper', style: { margin: '6px 0 0', fontSize: 13, color: '#7A5C6B' } }, step.helper)
+          : null
+      ]),
+      body,
+      this.renderWizardNav(steps, ready)
+    ]);
+  }
+
+  renderPhotoPicker() {
+    const photos = this.state.wizardPhotos;
+    return h('div', { key: 'photos', style: { display: 'grid', gap: 10 } }, [
+      h('label', {
+        key: 'add',
+        htmlFor: 'wizard-photos',
+        style: {
+          display: 'block', textAlign: 'center', cursor: 'pointer', border: '3px dashed #FFB6D9',
+          borderRadius: 18, padding: '16px 14px', background: '#FFFBFD', fontSize: 13, color: '#7A5C6B'
+        }
+      }, [
+        h('strong', { key: 'title', style: { display: 'block', color: '#3A2430', fontSize: 14 } }, '📎 Add reference photos'),
+        h('span', { key: 'hint' }, photos.length ? photos.length + ' of 5 added' : 'Optional, but a photo tells me more than a paragraph. Up to 5, 8MB each.')
+      ]),
+      h('input', {
+        key: 'input', id: 'wizard-photos', type: 'file', accept: 'image/jpeg,image/png,image/webp',
+        multiple: true, style: hiddenFieldStyle,
+        onChange: (event) => { this.wizardAddPhotos(event.target.files); event.target.value = ''; }
+      }),
+      photos.length
+        ? h('ul', { key: 'list', style: { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 } },
+            photos.map((file, index) => h('li', {
+              key: file.name + index,
+              style: { display: 'flex', alignItems: 'center', gap: 10, background: '#FFF6F0', borderRadius: 12, padding: '8px 12px', fontSize: 12.5, color: '#3A2430' }
+            }, [
+              h('span', { key: 'name', style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, file.name),
+              h('button', {
+                key: 'remove', type: 'button',
+                'aria-label': 'Remove ' + file.name,
+                onClick: () => this.wizardRemovePhoto(index),
+                style: { border: 0, background: 'none', color: '#EF4056', fontWeight: 700, cursor: 'pointer', fontSize: 13 }
+              }, '×')
+            ])))
+        : null
+    ]);
+  }
+
+  renderWizardNav(steps, ready) {
+    const first = this.state.wizardIndex === 0;
+    return h('div', { key: 'nav', style: { display: 'grid', gap: 10 } }, [
+      this.state.customFormError
+        ? h('p', { key: 'error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError)
+        : null,
+      h('div', { key: 'buttons', style: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' } }, [
+        first ? null : h('button', {
+          key: 'back', type: 'button', onClick: () => this.wizardGo(-1),
+          style: {
+            border: '3px solid #fff', background: '#fff', color: '#7A5C6B', fontWeight: 700,
+            fontSize: 14, padding: '13px 24px', borderRadius: 999, cursor: 'pointer',
+            boxShadow: '0 4px 0 rgba(160,40,90,.12)', fontFamily: "'Poppins',sans-serif"
+          }
+        }, '← Back'),
+        h('button', {
+          key: 'next', type: 'button', onClick: () => this.wizardGo(1), disabled: !ready,
+          style: {
+            ...primaryButtonStyle, fontFamily: "'Poppins',sans-serif",
+            opacity: ready ? 1 : .5, cursor: ready ? 'pointer' : 'not-allowed'
+          }
+        }, this.state.wizardIndex === steps.length - 1 ? 'Review my order' : 'Next →')
+      ]),
+      this.renderEstimateStrip()
+    ]);
+  }
+
+  // Deliberately worded as a range and never as a total. Calling it a price on
+  // a piece nobody has made yet is a promise Kyle has to either honour or walk
+  // back, and walking it back is how a commission turns into an argument.
+  renderEstimateStrip() {
+    const estimate = this.wizardEstimate();
+    if (!estimate) return null;
+    const lead = this.wizardLeadTime();
+    return h('p', {
+      key: 'estimate',
+      style: { margin: 0, textAlign: 'center', fontSize: 12.5, color: '#7A5C6B' }
+    }, [
+      h('strong', { key: 'amount', style: { color: '#EF4056', fontSize: 14 } }, 'Roughly ' + money(estimate)),
+      h('span', { key: 'note' }, ' · an estimate, not a quote' + (lead ? ' · about ' + lead + ' days to make' : ''))
+    ]);
+  }
+
+  renderWizardReview(steps) {
     const busy = this.state.customFormState === 'submitting';
-    return h('form', { onSubmit: (event) => this.submitCustom(event), noValidate: true, style: { display: 'grid', gap: 14 } }, [
+    const draft = this.state.customDraft;
+    const estimate = this.wizardEstimate();
+    const needsAddress = draft.fulfillment === 'ship' || draft.fulfillment === 'delivery';
+
+    const summary = steps.map((step, index) => {
+      const option = (step.options || []).find((o) => o.key === this.state.wizardChoice[step.key]);
+      const text = (this.state.wizardText[step.key] || '').trim();
+      return h('li', {
+        key: step.key,
+        style: { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 0', borderBottom: '2px solid #FFE0EE' }
+      }, [
+        h('span', { key: 'label', style: { flex: '0 0 34%', fontSize: 12, color: '#B98AA0', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' } }, step.label),
+        h('span', { key: 'value', style: { flex: 1, fontSize: 13.5, color: '#3A2430', whiteSpace: 'pre-wrap' } }, option ? option.label : text || '—'),
+        h('button', {
+          key: 'edit', type: 'button',
+          onClick: () => this.setState({ wizardIndex: index, customFormError: '' }),
+          'aria-label': 'Change ' + step.label,
+          style: { border: 0, background: 'none', color: '#F157A8', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: "'Poppins',sans-serif" }
+        }, 'Change')
+      ]);
+    });
+
+    return h('form', {
+      key: 'review', onSubmit: (event) => this.submitCustom(event), noValidate: true,
+      style: { display: 'grid', gap: 18 }
+    }, [
+      h('h4', {
+        key: 'title', id: 'wizard-heading', tabIndex: -1,
+        style: { margin: 0, textAlign: 'center', fontSize: 19, fontWeight: 700, color: '#3A2430', outline: 'none' }
+      }, 'Does this look right?'),
+
+      h('ul', { key: 'summary', style: { listStyle: 'none', margin: 0, padding: 0, background: '#fff', borderRadius: 20, padding: '4px 18px' } }, summary),
+
+      this.state.wizardPhotos.length
+        ? h('p', { key: 'photos', style: { margin: 0, textAlign: 'center', fontSize: 12.5, color: '#7A5C6B' } },
+            this.state.wizardPhotos.length + ' reference photo' + (this.state.wizardPhotos.length > 1 ? 's' : '') + ' attached')
+        : null,
+
+      estimate
+        ? h('p', { key: 'estimate', style: { margin: 0, textAlign: 'center', fontSize: 13.5, color: '#7A5C6B' } }, [
+            h('strong', { key: 'v', style: { color: '#EF4056', fontSize: 16 } }, 'Roughly ' + money(estimate)),
+            h('span', { key: 'n', style: { display: 'block', marginTop: 2, fontSize: 12 } },
+              "I read every brief myself and send the real quote within 2–3 days. Nothing is charged until you say yes.")
+          ])
+        : null,
+
+      h('div', { key: 'who', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' } }, [
+        this.field('custom', 'customDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
+        this.field('custom', 'customDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' })
+      ]),
+      this.field('custom', 'customDraft', 'phone', 'Phone (optional)', { placeholder: '0917 000 0000', autoComplete: 'tel', required: false }),
+
+      h('fieldset', { key: 'how', style: { border: 0, margin: 0, padding: 0, display: 'grid', gap: 8 } }, [
+        h('legend', { key: 'legend', style: { ...labelStyle, marginBottom: 4 } }, 'How should it reach you?'),
+        h('div', { key: 'radios', style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+          [['pickup', 'Pickup in Cebu'], ['delivery', 'Cebu delivery'], ['ship', 'Ship nationwide']].map(([value, label]) => {
+            const active = draft.fulfillment === value;
+            return h('label', {
+              key: value,
+              style: {
+                flex: '1 1 130px', textAlign: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                border: active ? '3px solid #F157A8' : '3px solid #fff', borderRadius: 999,
+                padding: '10px 14px', background: '#fff', color: active ? '#EF4056' : '#7A5C6B',
+                boxShadow: active ? '0 4px 0 rgba(239,64,86,.2)' : '0 3px 0 rgba(160,40,90,.08)'
+              }
+            }, [
+              h('input', {
+                key: 'input', type: 'radio', name: 'fulfillment', value, checked: active,
+                onChange: () => this.setDraft('customDraft', 'fulfillment', value),
+                style: hiddenFieldStyle
+              }),
+              label
+            ]);
+          }))
+      ]),
+
+      // Only asked for when something has to travel. A pickup order that
+      // demands a province is a form arguing with the person filling it in.
+      needsAddress
+        ? h('div', { key: 'address', style: { display: 'grid', gap: 14 } }, [
+            this.field('custom', 'customDraft', 'ship_line1', 'Street address', { placeholder: '12 Mango Ave', autoComplete: 'address-line1' }),
+            this.field('custom', 'customDraft', 'ship_line2', 'Unit, barangay (optional)', { placeholder: 'Brgy. Kamputhaw', autoComplete: 'address-line2', required: false }),
+            h('div', { key: 'row', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' } }, [
+              this.field('custom', 'customDraft', 'ship_city', 'City / municipality', { placeholder: 'Cebu City', autoComplete: 'address-level2' }),
+              draft.fulfillment === 'ship'
+                ? this.field('custom', 'customDraft', 'ship_province', 'Province', { placeholder: 'Cebu', autoComplete: 'address-level1' })
+                : null,
+              this.field('custom', 'customDraft', 'ship_postcode', 'Postcode', { placeholder: '6000', autoComplete: 'postal-code', required: false })
+            ])
+          ])
+        : null,
+
+      this.field('custom', 'customDraft', 'message', 'Anything else? (optional)', {
+        placeholder: 'Needed before 14 October, if that is possible.', rows: 3, maxLength: 2000, textarea: true, required: false
+      }),
+      this.honeypot('customDraft'),
+
+      this.state.customFormError
+        ? h('p', { key: 'error', id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError)
+        : null,
+
+      h('div', { key: 'buttons', style: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' } }, [
+        h('button', {
+          key: 'back', type: 'button', onClick: () => this.wizardGo(-1), disabled: busy,
+          style: {
+            border: '3px solid #fff', background: '#fff', color: '#7A5C6B', fontWeight: 700,
+            fontSize: 14, padding: '13px 24px', borderRadius: 999, cursor: 'pointer',
+            boxShadow: '0 4px 0 rgba(160,40,90,.12)', fontFamily: "'Poppins',sans-serif"
+          }
+        }, '← Back'),
+        h('button', {
+          key: 'submit', type: 'submit', disabled: busy,
+          style: { ...primaryButtonStyle, fontFamily: "'Poppins',sans-serif", opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' }
+        }, busy ? 'Sending…' : 'Send my request')
+      ])
+    ]);
+  }
+
+  renderCustomSuccess() {
+    return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '30px 10px' } }, [
+      h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 44 } }, '✦'),
+      h('h3', { key: 'title', style: { margin: '8px 0 6px', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 26, color: '#EF4056' } }, 'Got it — thank you!'),
+      h('p', { key: 'copy', style: { margin: '0 0 6px', fontSize: 14, color: '#7A5C6B' } },
+        "I'll read your brief and send a real quote within 2–3 days."),
+      h('p', { key: 'ref', style: { margin: '0 0 18px', fontSize: 14, color: '#3A2430' } }, [
+        'Your reference is ',
+        h('strong', { key: 'v' }, this.state.customFormRef)
+      ]),
+      this.state.customPhotoState
+        ? h('p', { key: 'photo', style: { margin: '0 0 14px', fontSize: 12.5, color: '#7A5C6B' } }, this.state.customPhotoState)
+        : null,
+      // The tracking link is the whole point of the status pipeline: without it
+      // the customer's only way to ask "where is my piece?" is to email Kyle,
+      // and he becomes the status API.
+      this.state.customTrackUrl
+        ? h('a', {
+            key: 'track', href: this.state.customTrackUrl,
+            style: {
+              display: 'inline-block', border: '3px solid #fff',
+              background: 'linear-gradient(140deg,#FFB6D9,#F157A8)', color: '#fff',
+              fontWeight: 700, fontSize: 14, padding: '13px 26px', borderRadius: 999,
+              textDecoration: 'none', boxShadow: '0 6px 0 rgba(239,64,86,.28)'
+            }
+          }, 'Track your order')
+        : null,
+      h('p', { key: 'hint', style: { margin: '14px 0 0', fontSize: 12, color: '#B98AA0' } },
+        "The same link is in your confirmation email — it's the only way back to this page.")
+    ]);
+  }
+
+  // Shown when the wizard's options cannot be loaded. A commission request is
+  // worth more than a tidy form, so this stays a working way to reach Kyle
+  // rather than an apology.
+  renderCustomFallback() {
+    const busy = this.state.customFormState === 'submitting';
+    return h('form', {
+      onSubmit: async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        const invalid = this.validateDraft(this.state.customDraft, 'custom', true);
+        if (invalid) {
+          this.setState({ customFormState: 'error', customFormError: invalid.error, customErrorField: invalid.field });
+          return;
+        }
+        this.setState({ customFormState: 'submitting', customFormError: '' });
+        const draft = this.state.customDraft;
+        const sent = await postInquiry({ type: 'custom', name: draft.name, email: draft.email, message: draft.message, hp: draft.hp });
+        if (sent.ok) this.setState({ customFormState: 'success', customFormRef: sent.ref });
+        else this.setState({ customFormState: 'error', customFormError: sent.error, customErrorField: sent.field || '' });
+      },
+      noValidate: true,
+      style: { display: 'grid', gap: 14 }
+    }, [
       h('div', { key: 'row', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' } }, [
         this.field('custom', 'customDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
         this.field('custom', 'customDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' })
       ]),
       this.field('custom', 'customDraft', 'message', 'Your request', { placeholder: 'A little glass painting of my cat, Biscuit ✦', rows: 4, maxLength: 2000, textarea: true }),
       this.honeypot('customDraft'),
-      this.state.customFormError ? h('p', { id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError) : null,
+      this.state.customFormError ? h('p', { key: 'error', id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError) : null,
       h('button', { key: 'button', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, justifySelf: 'center', marginTop: 6, opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending…' : 'Send my request')
     ]);
   }
@@ -1132,7 +1800,10 @@ class Component extends DCLogic {
         }, tab.title),
         h('p', { key: 'copy', style: { margin: '0 0 24px', fontSize: 14.5, lineHeight: 1.7, color: tab.body } }, tab.copy)
       ]),
-      h('div', { key: 'form', style: { maxWidth: 520, margin: '0 auto' } }, body)
+      // The commission wizard lays option cards out in a grid and needs the
+      // room; the other two panels are single-column forms that get harder to
+      // read as they get wider.
+      h('div', { key: 'form', style: { maxWidth: tab.id === 'custom' ? 680 : 520, margin: '0 auto' } }, body)
     ]);
   }
 
