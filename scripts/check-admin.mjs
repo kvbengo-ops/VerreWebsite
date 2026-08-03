@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 const root=resolve(import.meta.dirname,'..');
 const migrations=(await readdir(resolve(root,'supabase','migrations'))).filter(name=>name.endsWith('.sql')).sort();
 const sql=(await Promise.all(migrations.map(name=>readFile(resolve(root,'supabase','migrations',name),'utf8')))).join('\n');
-const tables=['products','product_images','pos_sessions','orders','order_items','stock_movements','admin_audit_log','admin_accounts'];
+const tables=['products','product_images','pos_sessions','orders','order_items','stock_movements','admin_audit_log','admin_accounts','site_markets'];
 for(const table of tables)assert.match(sql,new RegExp(`alter table ${table} enable row level security`),table+' must have RLS');
 assert.doesNotMatch(sql,/\bcreate\s+policy\b/i,'deny-all RLS must not have permissive policies');
 for(const fn of ['record_sale','adjust_stock','create_inquiry','set_order_status','void_pos_sale','dashboard_snapshot','set_admin_account','delete_admin_account']){
@@ -67,13 +67,17 @@ assert.ok(!workerFirstPaths.includes('/login'),'/login must not be gated');
 // with no body — both silent.
 const adminApp=await readFile(resolve(root,'admin','app.js'),'utf8');
 const adminHtml=await readFile(resolve(root,'admin','index.html'),'utf8');
-for(const route of ['dashboard','products','inventory','orders','sessions','accounts','themes']){
+for(const route of ['dashboard','products','inventory','orders','sessions','accounts','markets','themes']){
   assert.ok(adminHtml.includes('data-route="'+route+'"'),route+' needs a nav link');
   assert.ok(new RegExp('^\\s*'+route+':','m').test(adminApp),route+' needs a routeRoles and PAGES entry');
 }
 assert.match(adminApp,/data-inventory-archive/, 'inventory needs an archive action');
 assert.match(adminApp,/data-inventory-delete/, 'inventory needs a permanent-delete action');
 assert.match(adminApp,/capabilities\?\.includes\('catalog'\)/, 'destructive inventory actions must only render for catalog managers');
+for(const action of ['data-market-edit','data-market-delete','data-market-up','data-market-down']){
+  assert.ok(adminApp.includes(action),'market CMS needs '+action);
+}
+assert.ok(html.includes('window.__VERRE_MARKETS__'),'the storefront must accept server-managed market dates');
 
 for(const file of ['admin/app.js','pos/app.js']){
   const clientAuth=await readFile(resolve(root,file),'utf8');

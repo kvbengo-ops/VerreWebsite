@@ -2134,7 +2134,7 @@ class Component extends DCLogic {
         { name: 'CR8 Cebu', address: '3F Ayala Central Bloc, Cebu Business Park', hours: 'Open daily · 11am – 9pm', dot: '#F157A8' },
         { name: 'Art Treats PH', address: '2F Talamban Times Square, Talamban', hours: 'Tue – Sun · 10am – 8pm', dot: '#7ED3F2' }
       ],
-      markets: [
+      markets: Array.isArray(window.__VERRE_MARKETS__) ? window.__VERRE_MARKETS__ : [
         { day: '09', month: 'Aug', name: 'Sugbo Artist Alley', place: 'Robinsons Galleria Cebu', bg: '#F157A8' },
         { day: '23', month: 'Aug', name: 'Handmade Sunday', place: 'The Outpost, Lahug', bg: '#7ED3F2' },
         { day: '06', month: 'Sep', name: 'Cebu Craft Fair', place: 'Ayala Central Bloc Atrium', bg: '#FFD166' },

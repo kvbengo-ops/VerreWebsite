@@ -1,5 +1,6 @@
 import { resolveTheme, themeById } from '../themes.js';
 import { getThemeOverride } from '../db/settings.js';
+import { listPublicMarkets } from '../db/markets.js';
 
 /**
  * Serve the storefront with its theme already decided.
@@ -36,12 +37,14 @@ export async function themedPage(request, env) {
   if (!response.ok) return response;
 
   const url = new URL(request.url);
+  const now = new Date();
+  const marketsPromise = listPublicMarkets(env, now);
   // ?theme=<id> previews a season without switching it on for anyone else.
   // Purely decorative, so there is nothing to protect here — and being
   // shareable is the point, it is how you show someone a season before it runs.
   const preview = url.searchParams.get('theme');
   const override = preview || await cachedOverride(env);
-  const { theme, source, warning } = resolveTheme(override, new Date());
+  const { theme, source, warning } = resolveTheme(override, now);
   if (warning) console.warn('theme: ' + warning);
 
   const payload = {
@@ -56,10 +59,12 @@ export async function themedPage(request, env) {
     source: preview ? 'preview' : source
   };
 
+  const markets = (await marketsPromise).data || [];
   const html = await response.text();
   // JSON inside a script element: `<` must not be able to close it early.
   const json = JSON.stringify(payload).replace(/</g, '\\u003c');
-  const tag = '<script>window.__VERRE_THEME__=' + json + ';</script>';
+  const marketsJson = JSON.stringify(markets).replace(/</g, '\\u003c');
+  const tag = '<script>window.__VERRE_THEME__=' + json + ';window.__VERRE_MARKETS__=' + marketsJson + ';</script>';
   const themed = html.includes('</head>')
     ? html.replace('</head>', tag + '</head>')
     : tag + html;

@@ -15,6 +15,7 @@ import { currentTheme, isKnownTheme } from './theme.js';
 import { ALL_THEMES } from '../themes.js';
 import { can } from '../roles.js';
 import { sendAccountInvite } from './invite.js';
+import { listMarkets, saveMarket, deleteMarket, reorderMarkets } from '../db/markets.js';
 
 async function mutation(env, value, success = 200) {
   if (!value.error) await purgeReadCaches(env);
@@ -75,6 +76,25 @@ export async function adminApi(request, env, user) {
     from:url.searchParams.get('from'),
     refresh:url.searchParams.get('refresh') === '1'
     }));
+  }
+  if (parts[0] === 'markets') {
+    if (!can(user,'catalog')) return denied();
+    if (parts.length === 1 && method === 'GET') return result(await listMarkets(env));
+    if (parts.length === 1 && method === 'POST') {
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return mutation(env,await saveMarket(env,parsed.data,user.email),201);
+    }
+    if (parts.length === 2 && parts[1] === 'reorder' && method === 'POST') {
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return mutation(env,await reorderMarkets(env,parsed.data.ids,user.email));
+    }
+    if (parts.length === 2 && method === 'PATCH') {
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return mutation(env,await saveMarket(env,{...parsed.data,id:parts[1]},user.email));
+    }
+    if (parts.length === 2 && method === 'DELETE') {
+      return mutation(env,await deleteMarket(env,parts[1],user.email));
+    }
   }
   if (parts[0] === 'products' && parts.length === 1 && method === 'GET') {
     if (!can(user,'catalog') && !can(user,'inventory')) return denied();

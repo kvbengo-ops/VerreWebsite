@@ -3,8 +3,9 @@ const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const main=$('#main'), modal=$('#modal'), modalBody=$('#modal-body');
 const money=(c=0)=>'₱'+(Number(c)/100).toLocaleString('en-PH',{minimumFractionDigits:2});
 const date=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(v));
+const dateOnly=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(String(v).slice(0,10)+'T00:00:00Z'));
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state={products:[],orders:[],movements:[],sessions:[],accounts:[],custom:[],optionGroups:[],me:null,dirty:false};
+let state={products:[],orders:[],movements:[],sessions:[],accounts:[],markets:[],custom:[],optionGroups:[],me:null,dirty:false};
 const roleLabels={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'};
 const routeRoles={
   dashboard:['super_admin'],
@@ -17,6 +18,7 @@ const routeRoles={
   custom:['super_admin','general_admin'],
   sessions:['super_admin'],
   accounts:['super_admin'],
+  markets:['super_admin'],
   themes:['super_admin']
 };
 function signIn(){
@@ -102,6 +104,7 @@ const PAGES={
   custom:{eyebrow:'Commissions',title:'Custom orders',copy:'Briefs waiting on a quote, and the steps the wizard asks.',skeleton:()=>skTable(6),load:()=>customPage()},
   sessions:{eyebrow:'Markets',title:'Sessions',copy:'Opening float, counted cash, and the variance between them.',skeleton:()=>skTable(5),load:()=>sessions()},
   accounts:{eyebrow:'Access',title:'Accounts',copy:'Who can sign in, and what each of them may do.',skeleton:()=>skTable(4),load:()=>accounts()},
+  markets:{eyebrow:'Storefront',title:'Upcoming markets',copy:'Manage the market dates shown under Stockists & Markets on the homepage.',skeleton:()=>skTable(5),load:()=>markets()},
   themes:{eyebrow:'Marketing',title:'Seasons',copy:'Dress the homepage for the time of year. Runs on a calendar unless you say otherwise.',skeleton:()=>skCards(3),load:()=>themes()}
 };
 
@@ -631,6 +634,64 @@ function accountForm(account={role:'cashier',active:true}){
     }catch(error){$('#account-error').textContent=error.message}
   };
 }
+async function markets(){
+  state.markets=await api('markets');
+  setBody(`<div class="toolbar"><button id="new-market" class="primary">Add market</button><a class="button secondary" href="/#stockists" target="_blank" rel="noopener">Open storefront ↗</a></div><div id="markets-table"></div>`);
+  $('#new-market').onclick=()=>marketForm();
+  drawMarkets();
+}
+function drawMarkets(){
+  const rows=state.markets;
+  $('#markets-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Market</th><th>Venue</th><th>Card color</th><th>Storefront</th><th></th></tr></thead><tbody>${rows.map((market,index)=>`<tr class="${market.is_published?'':'out'}"><td><strong>${dateOnly(market.event_date)}</strong></td><td>${esc(market.name)}</td><td>${esc(market.venue)}</td><td><span aria-label="${esc(market.color)}" title="${esc(market.color)}" style="display:inline-block;width:28px;height:28px;border-radius:9px;border:2px solid #fff;box-shadow:0 2px 8px rgba(58,36,48,.18);background:${esc(market.color)}"></span></td><td><span class="status ${market.is_published?'active':'archived'}">${market.is_published?'published':'hidden'}</span></td><td><div class="row-actions"><button data-market-up="${market.id}" ${index===0?'disabled':''} aria-label="Move ${esc(market.name)} up">↑</button><button data-market-down="${market.id}" ${index===rows.length-1?'disabled':''} aria-label="Move ${esc(market.name)} down">↓</button><button data-market-edit="${market.id}">Edit</button><button class="danger" data-market-delete="${market.id}">Delete</button></div></td></tr>`).join('')}</tbody></table></div>`:emptyState('✦','No market dates yet','Add a market and publish it when you are ready for it to appear on the homepage.');
+  $$('[data-market-edit]').forEach(button=>button.onclick=()=>marketForm(rows.find(market=>market.id===button.dataset.marketEdit)));
+  $$('[data-market-delete]').forEach(button=>button.onclick=()=>removeMarket(rows.find(market=>market.id===button.dataset.marketDelete)));
+  $$('[data-market-up]').forEach(button=>button.onclick=()=>moveMarket(rows.findIndex(market=>market.id===button.dataset.marketUp),-1));
+  $$('[data-market-down]').forEach(button=>button.onclick=()=>moveMarket(rows.findIndex(market=>market.id===button.dataset.marketDown),1));
+}
+function marketForm(market={color:'#F157A8',is_published:true}){
+  const defaultDate=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  openModal(`<p class="eyebrow">${market.id?'Edit market':'New market'}</p><h2>${esc(market.name||'Add an upcoming date')}</h2>
+    <form id="market-form" class="form-grid" novalidate>
+      ${field('event_date','Date',String(market.event_date||defaultDate).slice(0,10),true,false,'date')}
+      ${field('color','Card color',market.color||'#F157A8',true,false,'color')}
+      ${field('name','Market name',market.name||'',true)}
+      ${field('venue','Venue',market.venue||'',true)}
+      <label class="span-2"><span>Show on the storefront</span><input name="is_published" type="checkbox" ${market.is_published!==false?'checked':''}></label>
+      <p class="error span-2" id="market-error" role="status"></p>
+      <div class="span-2 form-actions"><button type="button" class="secondary" id="cancel-market">Cancel</button><button class="primary">Save market</button></div>
+    </form>`);
+  const form=$('#market-form');
+  form.addEventListener('input',()=>state.dirty=true);
+  $('#cancel-market').onclick=()=>{if(!state.dirty||confirm('Discard unsaved changes?'))closeModal()};
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    const data=Object.fromEntries(new FormData(form));
+    data.name=data.name.trim();data.venue=data.venue.trim();data.is_published=form.elements.is_published.checked;
+    data.sort_order=market.sort_order??state.markets.length;
+    if(!data.event_date)return $('#market-error').textContent='Choose a date.';
+    if(!data.name)return $('#market-error').textContent='Market name is required.';
+    if(!data.venue)return $('#market-error').textContent='Venue is required.';
+    try{
+      await api('markets'+(market.id?'/'+market.id:''),{method:market.id?'PATCH':'POST',body:JSON.stringify(data)});
+      state.dirty=false;closeModal();toast('Market saved');markets();
+    }catch(error){$('#market-error').textContent=error.message}
+  };
+}
+async function moveMarket(index,delta){
+  const destination=index+delta;
+  if(index<0||destination<0||destination>=state.markets.length)return;
+  const previous=[...state.markets];
+  [state.markets[index],state.markets[destination]]=[state.markets[destination],state.markets[index]];
+  drawMarkets();
+  try{await api('markets/reorder',{method:'POST',body:JSON.stringify({ids:state.markets.map(market=>market.id)})});toast('Market order saved')}
+  catch(error){state.markets=previous;drawMarkets();toast(error.message,true)}
+}
+async function removeMarket(market){
+  if(!market||!confirm(`Permanently delete ${market.name}? This removes it from the storefront and cannot be undone.`))return;
+  try{await api('markets/'+market.id,{method:'DELETE'});toast('Market deleted');markets()}
+  catch(error){toast(error.message,true)}
+}
+
 const MONTHS=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const windowLabel=(w)=>w?`${w.from[1]} ${MONTHS[w.from[0]]} – ${w.to[1]} ${MONTHS[w.to[0]]}`:'Whenever nothing else is running';
 

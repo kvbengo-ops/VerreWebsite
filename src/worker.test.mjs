@@ -325,6 +325,7 @@ const home = await worker.fetch(new Request('https://verre.test/'), themeEnv);
 const homeHtml = await home.text();
 assert.equal(home.status, 200, 'the storefront renders even when the settings read fails');
 assert.match(homeHtml, /window\.__VERRE_THEME__=\{[\s\S]*<\/head>/, 'the theme is injected before </head>');
+assert.match(homeHtml, /window\.__VERRE_MARKETS__=\[/, 'published upcoming markets are injected with the theme');
 assert.ok(home.headers.get('x-verre-theme'), 'the resolved theme is reported in a header');
 assert.equal(home.headers.get('content-length'), null, 'stale content-length must not survive the rewrite');
 
