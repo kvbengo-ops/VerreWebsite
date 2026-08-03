@@ -15,6 +15,7 @@ import {
   accountByEmailForAuth
 } from '../db/sessions.js';
 import { CAPABILITIES } from '../roles.js';
+import { emailButton, emailShell, escapeEmailHtml } from '../email.js';
 
 const MIN_PASSWORD = 12;
 
@@ -281,8 +282,9 @@ async function requestReset(request, env, url) {
 
 async function sendResetEmail(env, account, link) {
   const minutes = Math.round(RESET_TTL_MS / 60000);
+  const name = account.display_name || 'there';
   const text = [
-    'Hi ' + (account.display_name || '') + ',',
+    'Hi ' + name + ',',
     '',
     'Here is your link to set a new Verre password:',
     link,
@@ -292,6 +294,20 @@ async function sendResetEmail(env, account, link) {
     '',
     '— Verre'
   ].join('\n');
+  const html = emailShell({
+    preheader: 'Your secure Verre password-reset link.',
+    eyebrow: 'Verre workroom',
+    title: 'Set a new password',
+    intro: 'Hi ' + escapeEmailHtml(name) + ' — use the button below to choose a new password.',
+    body:
+      '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFF8F3;border-radius:16px;margin:0 0 20px"><tr><td style="padding:18px">' +
+      '<strong style="display:block;margin-bottom:5px">A one-time link</strong>' +
+      '<span style="color:#6F5662">For your security, this link works once and expires in ' + minutes + ' minutes.</span>' +
+      '</td></tr></table>' +
+      '<p style="color:#7A5C6B;font-size:13px;margin:0;text-align:center">Didn’t ask for this? You can safely ignore this email—nothing has changed.</p>',
+    action: emailButton('Choose a new password', link),
+    footer: 'Security email from the Verre workroom.'
+  });
   try {
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -304,7 +320,8 @@ async function sendResetEmail(env, account, link) {
         from: env.FROM_EMAIL,
         to: account.email,
         subject: 'Reset your Verre password',
-        text
+        text,
+        html
       }),
       signal: AbortSignal.timeout(8000)
     });
@@ -377,4 +394,4 @@ async function changePassword(request, env, url, identity) {
     { 'set-cookie': sessionCookie(created.data.token, url) });
 }
 
-export const _test = { readCookie, sessionCookie, clearCookie, passwordProblem, GENERIC_LOGIN_ERROR };
+export const _test = { readCookie, sessionCookie, clearCookie, passwordProblem, sendResetEmail, GENERIC_LOGIN_ERROR };

@@ -10,6 +10,7 @@ import { addSubscriber, removeSubscriber } from './db/subscribers.js';
 import { db } from './db/client.js';
 import { themedPage } from './api/theme.js';
 import { can, resolveUser } from './roles.js';
+import { emailButton, emailMessage, emailReference, emailShell, escapeEmailHtml as esc } from './email.js';
 
 const MAX_BODY = 16 * 1024;
 const RESEND_TIMEOUT_MS = 8000;
@@ -608,9 +609,6 @@ function makeRef() {
 /* email bodies                                                        */
 /* ------------------------------------------------------------------ */
 
-const esc = (s) =>
-  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
 const LABEL = { order: 'Order request', custom: 'Custom order', contact: 'Message' };
 const peso = (n) => '₱' + Number(n).toLocaleString('en-PH');
 
@@ -648,29 +646,31 @@ function compose(d, ref) {
     .filter((l) => l !== null)
     .join('\n');
 
-  const ownerHtml =
-    '<div style="font-family:system-ui,sans-serif;color:#3A2430;line-height:1.55">' +
-    '<h2 style="margin:0 0 4px">' + esc(LABEL[d.type]) + '</h2>' +
-    '<p style="margin:0 0 16px;color:#7A5C6B">Ref <strong>' + esc(ref) + '</strong></p>' +
-    '<p style="margin:0 0 16px">' +
-    '<strong>' + esc(d.name) + '</strong><br>' +
-    '<a href="mailto:' + esc(d.email) + '">' + esc(d.email) + '</a>' +
-    (d.phone ? '<br>' + esc(d.phone) : '') +
-    (d.type === 'order' ? '<br>' + esc(FULFILLMENT[d.fulfillment]) : '') +
-    '</p>' +
+  const ownerBody =
+    '<table class="email-detail" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFF8F3;border-radius:16px;margin:0 0 22px">' +
+    '<tr><td style="color:#9A6D82;padding:16px 18px 4px;width:34%">Customer</td><td style="padding:16px 18px 4px;text-align:right"><strong>' + esc(d.name) + '</strong></td></tr>' +
+    '<tr><td style="color:#9A6D82;padding:4px 18px">Email</td><td style="padding:4px 18px;text-align:right"><a href="mailto:' + esc(d.email) + '" style="color:#F157A8">' + esc(d.email) + '</a></td></tr>' +
+    (d.phone ? '<tr><td style="color:#9A6D82;padding:4px 18px">Phone</td><td style="padding:4px 18px;text-align:right">' + esc(d.phone) + '</td></tr>' : '') +
+    (d.type === 'order' ? '<tr><td style="color:#9A6D82;padding:4px 18px 16px">Delivery</td><td style="padding:4px 18px 16px;text-align:right">' + esc(FULFILLMENT[d.fulfillment]) + '</td></tr>' : '') +
+    '</table>' +
     (d.type === 'order'
-      ? '<table style="border-collapse:collapse;margin:0 0 16px">' +
-        rows +
-        '<tr><td style="padding:8px 12px 0 0;border-top:1px solid #FFE0EE"><strong>Subtotal</strong></td>' +
-        '<td style="border-top:1px solid #FFE0EE"></td>' +
-        '<td style="padding:8px 0 0;text-align:right;border-top:1px solid #FFE0EE"><strong>' +
-        esc(peso(d.subtotal)) +
-        '</strong></td></tr></table>' +
-        '<p style="margin:0 0 16px;color:#7A5C6B">Shipping is quoted separately.</p>'
+      ? '<h2 style="font-family:Georgia,serif;font-size:20px;margin:0 0 8px">What they picked</h2>' +
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 0 10px">' + rows +
+        '<tr><td style="padding:12px 12px 0 0;border-top:1px solid #FFD9EA"><strong>Subtotal</strong></td><td style="border-top:1px solid #FFD9EA"></td>' +
+        '<td style="padding:12px 0 0;text-align:right;border-top:1px solid #FFD9EA"><strong>' + esc(peso(d.subtotal)) + '</strong></td></tr></table>' +
+        '<p style="color:#7A5C6B;font-size:12px;margin:0 0 18px">Shipping is quoted separately.</p>'
       : '') +
-    (d.message ? '<p style="margin:0 0 16px;white-space:pre-wrap">' + esc(d.message) + '</p>' : '') +
-    '<p style="margin:0;color:#7A5C6B">Reply to this email to answer ' + esc(d.name) + ' directly.</p>' +
-    '</div>';
+    emailMessage(d.message) + emailReference(ref);
+
+  const ownerHtml = emailShell({
+    preheader: d.name + ' sent a new ' + LABEL[d.type].toLowerCase() + '.',
+    eyebrow: 'Studio notification',
+    title: 'New ' + LABEL[d.type].toLowerCase(),
+    intro: esc(d.name) + ' just reached out through the Verre website.',
+    body: ownerBody,
+    action: emailButton('Reply to ' + d.name, 'mailto:' + d.email),
+    footer: 'Private studio notification · Reply goes directly to the customer.'
+  });
 
   const opener =
     d.type === 'order'
@@ -699,30 +699,28 @@ function compose(d, ref) {
     .filter((l) => l !== null)
     .join('\n');
 
-  const customerHtml =
-    '<div style="font-family:system-ui,sans-serif;color:#3A2430;line-height:1.6;max-width:520px">' +
-    '<p style="margin:0 0 16px">Hi ' + esc(d.name) + ',</p>' +
-    '<p style="margin:0 0 16px">' + esc(opener) + '</p>' +
+  const customerBody =
+    '<p style="margin:0 0 20px">' + esc(opener) + '</p>' +
     (d.type === 'order'
-      ? '<table style="border-collapse:collapse;margin:0 0 12px">' +
-        rows +
-        '<tr><td style="padding:8px 12px 0 0;border-top:1px solid #FFE0EE"><strong>Subtotal</strong></td>' +
-        '<td style="border-top:1px solid #FFE0EE"></td>' +
-        '<td style="padding:8px 0 0;text-align:right;border-top:1px solid #FFE0EE"><strong>' +
-        esc(peso(d.subtotal)) +
-        '</strong></td></tr></table>' +
-        '<p style="margin:0 0 16px;color:#7A5C6B">' + esc(FULFILLMENT[d.fulfillment]) + ' · shipping quoted separately</p>'
+      ? '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 0 12px">' + rows +
+        '<tr><td style="padding:12px 12px 0 0;border-top:1px solid #FFD9EA"><strong>Subtotal</strong></td><td style="border-top:1px solid #FFD9EA"></td>' +
+        '<td style="padding:12px 0 0;text-align:right;border-top:1px solid #FFD9EA"><strong>' + esc(peso(d.subtotal)) + '</strong></td></tr></table>' +
+        '<p style="color:#7A5C6B;font-size:12px;margin:0 0 18px">' + esc(FULFILLMENT[d.fulfillment]) + ' · shipping quoted separately</p>'
       : '') +
-    (d.message
-      ? '<blockquote style="margin:0 0 16px;padding:8px 14px;border-left:3px solid #FFB6D9;color:#7A5C6B;white-space:pre-wrap">' +
-        esc(d.message) +
-        '</blockquote>'
-      : '') +
-    "<p style=\"margin:0 0 16px\">I'll reply within 2–3 days with a quote and payment details (GCash or bank transfer).</p>" +
-    '<p style="margin:0 0 16px">Your reference is <strong>' + esc(ref) + '</strong> — keep it handy if you need to follow up.</p>' +
-    '<p style="margin:0 0 16px;color:#7A5C6B">Everything is made by hand, one at a time. Thank you for waiting on it.</p>' +
-    '<p style="margin:0">— Verre</p>' +
-    '</div>';
+    emailMessage(d.message) +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFF8F3;border-radius:16px;margin:22px 0"><tr><td style="padding:18px">' +
+    '<strong style="display:block;margin-bottom:5px">What happens next?</strong><span style="color:#6F5662">I’ll reply within 2–3 days with a quote and payment details. Nothing is charged until you say yes.</span>' +
+    '</td></tr></table>' + emailReference(ref) +
+    '<p style="color:#7A5C6B;font-size:13px;margin:18px 0 0;text-align:center">Everything is made by hand, one piece at a time. Thank you for waiting on it.</p>';
+
+  const customerHtml = emailShell({
+    preheader: 'Your Verre request is safely in the studio queue.',
+    eyebrow: 'Made by hand',
+    title: d.type === 'order' ? 'We’ve got your order request' : 'Your note reached the studio',
+    intro: 'Hi ' + esc(d.name) + ' — thank you for choosing something made slowly and with care.',
+    body: customerBody,
+    footer: 'You received this because you sent a request through the Verre website.'
+  });
 
   return { ownerText, ownerHtml, customerText, customerHtml };
 }

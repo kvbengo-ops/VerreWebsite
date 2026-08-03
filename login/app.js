@@ -11,6 +11,7 @@ const safeReturn = (raw) => {
 const params = new URLSearchParams(location.search);
 const returnTo = safeReturn(params.get('return_to'));
 const resetToken = params.get('token');
+const isInvite = params.get('invite') === '1';
 
 function show(name) {
   for (const view of ['login', 'forgot', 'reset']) {
@@ -133,7 +134,7 @@ $('#form-reset').addEventListener('submit', async (event) => {
   const restore = submitting(form, 'Saving…');
   try {
     await post('reset', { token: resetToken, password });
-    alertBox('#reset-alert', 'Password updated. Taking you to sign in…', true);
+    alertBox('#reset-alert', (isInvite ? 'Password created.' : 'Password updated.') + ' Taking you to sign in…', true);
     setTimeout(() => location.assign('/login'), 1400);
   } catch (error) {
     restore();
@@ -143,6 +144,11 @@ $('#form-reset').addEventListener('submit', async (event) => {
 
 // /login/reset?token=… lands straight on the new-password form.
 if (resetToken && location.pathname.startsWith('/login/reset')) {
+  if (isInvite) {
+    $('#reset-title').textContent = 'Create your password';
+    $('#reset-copy').textContent = 'You’re joining the Verre workroom. Choose a long, private password.';
+    $('#reset-submit').textContent = 'Create password';
+  }
   show('reset');
 } else {
   show('login');

@@ -55,6 +55,8 @@ const unsafePriced = await resolveOrder({}, unsafe.items);
 const mail = compose({ ...unsafe, ...unsafePriced }, 'VR-TEST');
 assert.ok(!mail.ownerHtml.includes('<script>'));
 assert.ok(mail.ownerHtml.includes('&lt;script&gt;'));
+assert.ok(mail.ownerHtml.startsWith('<!doctype html>'), 'owner mail uses the complete branded email shell');
+assert.ok(mail.customerHtml.includes('Verre handmade crafts'), 'customer mail carries the Verre identity');
 assert.ok(mail.customerText.includes('VR-TEST'));
 
 // 5 through, 6th blocked

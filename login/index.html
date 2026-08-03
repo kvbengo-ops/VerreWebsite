@@ -84,8 +84,8 @@
 
   <!-- Choose a new password (arrives via emailed link) -->
   <section id="view-reset" hidden>
-    <h1>Set a new password</h1>
-    <p class="sub">Pick something long. Length beats punctuation.</p>
+    <h1 id="reset-title">Set a new password</h1>
+    <p class="sub" id="reset-copy">Pick something long. Length beats punctuation.</p>
     <div class="alert" id="reset-alert" role="alert" hidden></div>
     <form id="form-reset" novalidate>
       <label>New password
@@ -95,7 +95,7 @@
       <label>Confirm
         <input type="password" name="confirm" autocomplete="new-password" required minlength="12">
       </label>
-      <button type="submit">Save password</button>
+      <button type="submit" id="reset-submit">Save password</button>
     </form>
     <p class="links"><a href="/login">Back to sign in</a></p>
   </section>

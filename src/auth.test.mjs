@@ -152,6 +152,23 @@ assert.deepEqual(await known.json(),await missing.json(),'reset responses are id
 
 globalThis.fetch=realFetch;
 
+// Password resets use the same complete branded email, while retaining a
+// plaintext fallback for inboxes that do not render HTML.
+let resetMail;
+globalThis.fetch=async (_url, options={}) => {
+  resetMail=JSON.parse(options.body);
+  return new Response('{}',{status:200});
+};
+await authApiTest.sendResetEmail(
+  {RESEND_API_KEY:'re_test',FROM_EMAIL:'Verre <hello@mail.verre.test>'},
+  stub.account,
+  'https://verre.test/login/reset?token=safe-token'
+);
+assert.ok(resetMail.html.startsWith('<!doctype html>'),'reset mail uses the complete branded email shell');
+assert.ok(resetMail.html.includes('Choose a new password'),'reset mail has a clear action');
+assert.ok(resetMail.text.includes('https://verre.test/login/reset?token=safe-token'),'reset mail retains its plaintext link');
+globalThis.fetch=realFetch;
+
 /* ------------------------------------------------------------------ */
 /* browser vs fetch, and open redirects                                */
 /* ------------------------------------------------------------------ */
@@ -290,4 +307,3 @@ for (const secret of ['supabase.co', 'sb_secret', 're_', 'http']) {
 assert.equal((await worker.fetch(new Request('https://verre.test/api/health', { method: 'POST' }), bare)).status, 405);
 
 console.log('ok — Access signature, password login, session cookies, enumeration parity, redirect safety, unconfigured deploys');
-

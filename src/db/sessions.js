@@ -72,6 +72,15 @@ export const revokeOtherSessions = (env, accountId, keepTokenHash) =>
   );
 
 export async function createReset(env, accountId) {
+  // A resend replaces every older unused link. Without this, the first email
+  // would remain a live credential even after an administrator deliberately
+  // issued a newer invitation or the user requested another reset.
+  const replaced = await db(env).rest(
+    'password_resets',
+    `account_id=eq.${encode(accountId)}&used_at=is.null`,
+    { method: 'PATCH', body: JSON.stringify({ used_at: new Date().toISOString() }) }
+  );
+  if (replaced.error) return replaced;
   const token = newToken();
   const result = await db(env).rest('password_resets', '', {
     method: 'POST',

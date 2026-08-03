@@ -4,6 +4,7 @@ import {
 } from '../db/custom.js';
 import { db } from '../db/client.js';
 import { json } from './http.js';
+import { emailButton, emailReference, emailShell } from '../email.js';
 
 /* ------------------------------------------------------------------ */
 /* shape                                                               */
@@ -356,21 +357,32 @@ export function composeCustom(parsed, order, ref, trackUrl) {
     '', 'Open /admin → Custom to quote it. Reply to this email to answer ' + parsed.name + ' directly.'
   ].filter((l) => l !== null).join('\n');
 
-  const ownerHtml =
-    '<div style="font-family:system-ui,sans-serif;color:#3A2430;line-height:1.55">' +
-    '<h2 style="margin:0 0 4px">Custom request</h2>' +
-    '<p style="margin:0 0 16px;color:#7A5C6B">Ref <strong>' + escapeHtml(ref) + '</strong></p>' +
-    '<p style="margin:0 0 16px"><strong>' + escapeHtml(parsed.name) + '</strong><br>' +
-    '<a href="mailto:' + escapeHtml(parsed.email) + '">' + escapeHtml(parsed.email) + '</a>' +
-    (parsed.phone ? '<br>' + escapeHtml(parsed.phone) : '') +
-    '<br>' + escapeHtml(FULFILLMENT[parsed.fulfillment]) +
-    (address ? '<br>' + escapeHtml(address) : '') + '</p>' +
-    '<table style="border-collapse:collapse;margin:0 0 16px">' + rows + '</table>' +
+  const ownerBody =
+    '<table class="email-detail" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFF8F3;border-radius:16px;margin:0 0 22px">' +
+    '<tr><td style="color:#9A6D82;padding:16px 18px 4px;width:34%">Customer</td><td style="padding:16px 18px 4px;text-align:right"><strong>' + escapeHtml(parsed.name) + '</strong></td></tr>' +
+    '<tr><td style="color:#9A6D82;padding:4px 18px">Email</td><td style="padding:4px 18px;text-align:right"><a href="mailto:' + escapeHtml(parsed.email) + '" style="color:#F157A8">' + escapeHtml(parsed.email) + '</a></td></tr>' +
+    (parsed.phone ? '<tr><td style="color:#9A6D82;padding:4px 18px">Phone</td><td style="padding:4px 18px;text-align:right">' + escapeHtml(parsed.phone) + '</td></tr>' : '') +
+    '<tr><td style="color:#9A6D82;padding:4px 18px' + (address ? '' : ' 16px') + '">Delivery</td><td style="padding:4px 18px' + (address ? '' : ' 16px') + ';text-align:right">' + escapeHtml(FULFILLMENT[parsed.fulfillment]) + '</td></tr>' +
+    (address ? '<tr><td style="color:#9A6D82;padding:4px 18px 16px;vertical-align:top">Address</td><td style="padding:4px 18px 16px;text-align:right">' + escapeHtml(address) + '</td></tr>' : '') +
+    '</table>' +
+    '<h2 style="font-family:Georgia,serif;font-size:20px;margin:0 0 8px">The brief</h2>' +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 0 18px">' + rows + '</table>' +
     (estimate != null
-      ? '<p style="margin:0 0 16px;color:#7A5C6B">Form estimate <strong>' + escapeHtml(peso(estimate)) +
-        '</strong> — not a quote. Set the real price in /admin → Custom.</p>'
+      ? '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFF8F3;border-radius:16px;margin:0 0 20px"><tr><td style="padding:18px">' +
+        '<strong style="display:block;margin-bottom:5px">Form estimate · ' + escapeHtml(peso(estimate)) + '</strong>' +
+        '<span style="color:#6F5662">This is a ballpark, not the final quote. Set the real price in the studio dashboard.</span></td></tr></table>'
       : '') +
-    '<p style="margin:0;color:#7A5C6B">Reply to this email to answer ' + escapeHtml(parsed.name) + ' directly.</p></div>';
+    emailReference(ref);
+
+  const ownerHtml = emailShell({
+    preheader: parsed.name + ' sent a custom request.',
+    eyebrow: 'Studio notification',
+    title: 'New custom request',
+    intro: escapeHtml(parsed.name) + ' finished the commission brief.',
+    body: ownerBody,
+    action: emailButton('Open the studio dashboard', new URL('/admin', trackUrl).toString()),
+    footer: 'Private studio notification · Reply goes directly to the customer.'
+  });
 
   const customerText = [
     'Hi ' + parsed.name + ',', '',
@@ -385,21 +397,26 @@ export function composeCustom(parsed, order, ref, trackUrl) {
     'Everything is made by hand, one at a time. Thank you for waiting on it.', '', '— Verre'
   ].join('\n');
 
-  const customerHtml =
-    '<div style="font-family:system-ui,sans-serif;color:#3A2430;line-height:1.6;max-width:520px">' +
-    '<p style="margin:0 0 16px">Hi ' + escapeHtml(parsed.name) + ',</p>' +
-    "<p style=\"margin:0 0 16px\">Thank you — I've got your custom request. Here is what you sent me:</p>" +
-    '<table style="border-collapse:collapse;margin:0 0 16px">' + rows + '</table>' +
+  const customerBody =
+    '<p style="margin:0 0 18px">Here is the brief that reached the studio:</p>' +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;margin:0 0 18px">' + rows + '</table>' +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFF8F3;border-radius:16px;margin:20px 0"><tr><td style="padding:18px">' +
     (estimate != null
-      ? '<p style="margin:0 0 16px">The form estimated <strong>' + escapeHtml(peso(estimate)) +
-        '</strong>. That is a ballpark, not the price — I read every brief myself and will send you a real quote within 2–3 days.</p>'
-      : "<p style=\"margin:0 0 16px\">I'll read it properly and send you a quote within 2–3 days.</p>") +
-    '<p style="margin:0 0 8px"><a href="' + escapeHtml(trackUrl) +
-    '" style="display:inline-block;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 26px;border-radius:999px">Track your order</a></p>' +
-    '<p style="margin:0 0 16px;color:#7A5C6B;font-size:13px">Keep that link — it is the only way to see where your piece is up to.</p>' +
-    '<p style="margin:0 0 16px">Your reference is <strong>' + escapeHtml(ref) + '</strong>.</p>' +
-    '<p style="margin:0 0 16px;color:#7A5C6B">Everything is made by hand, one at a time. Thank you for waiting on it.</p>' +
-    '<p style="margin:0">— Verre</p></div>';
+      ? '<strong style="display:block;margin-bottom:5px">Ballpark estimate · ' + escapeHtml(peso(estimate)) + '</strong><span style="color:#6F5662">This is not the final price. I read every brief myself and will send your real quote within 2–3 days.</span>'
+      : '<strong style="display:block;margin-bottom:5px">What happens next?</strong><span style="color:#6F5662">I’ll read your brief properly and send your quote within 2–3 days.</span>') +
+    '</td></tr></table>' +
+    emailReference(ref) +
+    '<p style="color:#7A5C6B;font-size:13px;margin:18px 0 0;text-align:center">Keep your private tracking link handy—it is the easiest way to see where your piece is up to.</p>';
+
+  const customerHtml = emailShell({
+    preheader: 'Your custom Verre request is safely in the studio queue.',
+    eyebrow: 'Commission received',
+    title: 'Your idea is in the studio',
+    intro: 'Hi ' + escapeHtml(parsed.name) + ' — thank you for trusting me with something made just for you.',
+    body: customerBody,
+    action: emailButton('Track your request', trackUrl),
+    footer: 'You received this because you sent a custom request through the Verre website.'
+  });
 
   return { ownerText, ownerHtml, customerText, customerHtml };
 }

@@ -117,6 +117,8 @@ const mail = composeCustom(parsed, {
 assert.ok(mail.customerText.includes('VR-7K2M'), 'the customer needs their reference');
 assert.ok(mail.customerText.includes('/order/VR-7K2M?t='), 'the customer needs their tracking link');
 assert.ok(mail.customerHtml.includes('/order/VR-7K2M?t='), 'the HTML mail needs the tracking link too');
+assert.ok(mail.customerHtml.startsWith('<!doctype html>'), 'custom requests use the complete branded email shell');
+assert.ok(mail.customerHtml.includes('Track your request'), 'the private tracking action is clear');
 // Calling an estimate a price is a promise Kyle then has to honour or retract.
 assert.ok(/not the price|ballpark/.test(mail.customerText),
   'the estimate must be described as an estimate, never as the price');

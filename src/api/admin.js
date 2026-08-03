@@ -4,7 +4,7 @@ import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeS
 import { dashboard } from '../db/stats.js';
 import { body, json, result } from './http.js';
 import { purgeReadCaches } from '../db/client.js';
-import { listAccounts, saveAccount } from '../db/accounts.js';
+import { findAccountById, listAccounts, saveAccount } from '../db/accounts.js';
 import { listSubscribers } from '../db/subscribers.js';
 import {
   listOptionGroups, saveOptionGroup, saveOption, retireOption,
@@ -14,6 +14,7 @@ import { setThemeOverride } from '../db/settings.js';
 import { currentTheme, isKnownTheme } from './theme.js';
 import { ALL_THEMES } from '../themes.js';
 import { can } from '../roles.js';
+import { sendAccountInvite } from './invite.js';
 
 async function mutation(env, value, success = 200) {
   if (!value.error) await purgeReadCaches(env);
@@ -37,7 +38,22 @@ export async function adminApi(request, env, user) {
     if (parts.length === 1 && method === 'GET') return result(await listAccounts(env));
     if (parts.length === 1 && method === 'POST') {
       const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
-      return result(await saveAccount(env,parsed.data,user.email),201);
+      const saved=await saveAccount(env,parsed.data,user.email);
+      if(saved.error)return result(saved);
+      if(saved.data?.active===false){
+        return json(201,{ok:true,data:{...saved.data,invite_sent:false,invite_warning:'The inactive account was saved without sending an invitation.'}});
+      }
+      const invitation=await sendAccountInvite(env,saved.data,url.origin,user);
+      return json(201,{ok:true,data:{...saved.data,invite_sent:invitation.sent,...(!invitation.sent&&{invite_warning:invitation.error})}});
+    }
+    if (parts.length === 3 && parts[2] === 'invite' && method === 'POST') {
+      const found=await findAccountById(env,parts[1]);
+      if(found.error)return result(found);
+      if(!found.data)return json(404,{ok:false,error:'Account not found'});
+      const invitation=await sendAccountInvite(env,found.data,url.origin,user);
+      return invitation.sent
+        ? json(200,{ok:true,data:{invite_sent:true}})
+        : json(invitation.status||502,{ok:false,error:invitation.error||'The invitation could not be sent.'});
     }
     if (parts.length === 2 && method === 'PATCH') {
       const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});

@@ -569,19 +569,26 @@ async function accounts(){
   drawAccounts();
 }
 function drawAccounts(){
-  $('#accounts-table').innerHTML=state.accounts.length?`<div class="table-wrap"><table><thead><tr><th>Person</th><th>Email</th><th>Role</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${state.accounts.map(account=>`<tr class="${account.active?'':'out'}"><td><strong>${esc(account.display_name)}</strong></td><td>${esc(account.email)}</td><td><span class="role-badge">${esc(roleLabels[account.role]||account.role)}</span></td><td><span class="status ${account.active?'active':'archived'}">${account.active?'active':'inactive'}</span></td><td>${date(account.updated_at)}</td><td><button data-edit-account="${account.id}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:emptyState('✦','No staff accounts yet','You are signed in from the bootstrap list. Add an account here to manage access from the database instead.');
+  $('#accounts-table').innerHTML=state.accounts.length?`<div class="table-wrap"><table><thead><tr><th>Person</th><th>Email</th><th>Role</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${state.accounts.map(account=>{const pending=account.active&&!account.password_set_at;return `<tr class="${account.active?'':'out'}"><td><strong>${esc(account.display_name)}</strong></td><td>${esc(account.email)}</td><td><span class="role-badge">${esc(roleLabels[account.role]||account.role)}</span></td><td><span class="status ${!account.active?'archived':pending?'inquiry':'active'}">${!account.active?'inactive':pending?'invite pending':'active'}</span></td><td>${date(account.updated_at)}</td><td><div class="row-actions"><button data-edit-account="${account.id}">Edit</button>${pending?`<button data-invite-account="${account.id}">Resend invite</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:emptyState('✦','No staff accounts yet','You are signed in from the bootstrap list. Add an account here to manage access from the database instead.');
   $$('[data-edit-account]').forEach(button=>button.onclick=()=>accountForm(state.accounts.find(account=>account.id===button.dataset.editAccount)));
+  $$('[data-invite-account]').forEach(button=>button.onclick=async()=>{
+    const account=state.accounts.find(item=>item.id===button.dataset.inviteAccount);
+    if(!account||!confirm(`Send a new password-creation link to ${account.email}?`))return;
+    button.disabled=true;button.textContent='Sending…';
+    try{await api(`accounts/${account.id}/invite`,{method:'POST'});toast(`Invitation sent to ${account.email}`)}
+    catch(error){toast(error.message,true);button.disabled=false;button.textContent='Resend invite'}
+  });
 }
 function accountForm(account={role:'cashier',active:true}){
   openModal(`<p class="eyebrow">${account.id?'Edit account':'New staff account'}</p><h2>${esc(account.display_name||'Invite by email')}</h2>
-    <p>The person must also be allowed by your Cloudflare Access policy. Verre does not create or store a password.</p>
+    <p>${account.id?(account.password_set_at?'Update this person’s role or access. Their existing password will keep working.':'This person has not created a password yet. You can resend their invitation from the accounts list.'):'Saving an active account immediately emails a secure, one-time link for the person to create their password.'}</p>
     <form id="account-form" class="form-grid" novalidate>
       ${field('display_name','Display name',account.display_name||'',true)}
       ${field('email','Sign-in email',account.email||'',true,false,'email')}
       <label>Role<select name="role"><option value="super_admin">Super Admin — everything</option><option value="general_admin">General Admin — sales, inventory, POS</option><option value="cashier">Cashier — POS only</option></select></label>
       <label><span>Account active</span><input name="active" type="checkbox" ${account.active!==false?'checked':''}></label>
       <p class="error span-2" id="account-error" role="status"></p>
-      <div class="span-2 form-actions"><button type="button" class="secondary" id="cancel-account">Cancel</button><button class="primary">Save account</button></div>
+      <div class="span-2 form-actions"><button type="button" class="secondary" id="cancel-account">Cancel</button><button class="primary">${account.id?'Save account':'Send invitation'}</button></div>
     </form>`);
   const form=$('#account-form');form.role.value=account.role||'cashier';
   form.addEventListener('input',()=>state.dirty=true);
@@ -594,8 +601,12 @@ function accountForm(account={role:'cashier',active:true}){
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))return $('#account-error').textContent='Enter a valid email address.';
     if(account.active&& !data.active && !confirm(`Deactivate ${account.display_name}? They will lose access on their next request.`))return;
     try{
-      await api('accounts'+(account.id?'/'+account.id:''),{method:account.id?'PATCH':'POST',body:JSON.stringify(data)});
-      state.dirty=false;closeModal();toast('Account permissions saved');accounts();
+      const saved=await api('accounts'+(account.id?'/'+account.id:''),{method:account.id?'PATCH':'POST',body:JSON.stringify(data)});
+      state.dirty=false;closeModal();
+      if(account.id)toast('Account permissions saved');
+      else if(saved.invite_sent)toast(`Invitation sent to ${data.email}`);
+      else toast(saved.invite_warning||'Account saved, but the invitation could not be sent.',true);
+      accounts();
     }catch(error){$('#account-error').textContent=error.message}
   };
 }
