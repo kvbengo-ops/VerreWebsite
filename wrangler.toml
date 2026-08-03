@@ -20,6 +20,11 @@ compatibility_date = "2025-05-01"
 # index it.
 workers_dev = true
 
+# Runtime values managed in the Cloudflare dashboard must survive CI deploys.
+# Without this, `wrangler deploy` replaces dashboard plaintext variables with
+# only the values declared below, leaving production without Supabase access.
+keep_vars = true
+
 # Non-secret configuration. Anything here is committed to git, so nothing that
 # grants access belongs in this block — SUPABASE_SERVICE_ROLE_KEY and
 # RESEND_API_KEY go through `wrangler secret put`, never here.
