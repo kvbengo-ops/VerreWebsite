@@ -1,8 +1,8 @@
 # Must match the deployed Worker exactly — it is the subdomain in
-# verreweb.kvb-engo.workers.dev. `wrangler secret put` and `wrangler deploy`
+# verrewebsite.kvb-engo.workers.dev. `wrangler secret put` and `wrangler deploy`
 # both target this name, so a mismatch quietly creates a second, empty Worker
 # and puts your secrets on it while the live one stays unconfigured.
-name = "verreweb"
+name = "verrewebsite"
 main = "dist/server/index.js"
 compatibility_date = "2025-05-01"
 
