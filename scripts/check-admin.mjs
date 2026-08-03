@@ -71,6 +71,9 @@ for(const route of ['dashboard','products','inventory','orders','sessions','acco
   assert.ok(adminHtml.includes('data-route="'+route+'"'),route+' needs a nav link');
   assert.ok(new RegExp('^\\s*'+route+':','m').test(adminApp),route+' needs a routeRoles and PAGES entry');
 }
+assert.match(adminApp,/data-inventory-archive/, 'inventory needs an archive action');
+assert.match(adminApp,/data-inventory-delete/, 'inventory needs a permanent-delete action');
+assert.match(adminApp,/capabilities\?\.includes\('catalog'\)/, 'destructive inventory actions must only render for catalog managers');
 
 for(const file of ['admin/app.js','pos/app.js']){
   const clientAuth=await readFile(resolve(root,file),'utf8');

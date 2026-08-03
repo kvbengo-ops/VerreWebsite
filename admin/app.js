@@ -206,7 +206,7 @@ function drawProducts(){
   const q=$('#search').value.toLowerCase(),cat=$('#category').value,status=$('#status').value,sort=$('#sort').value;
   const rows=state.products.filter(p=>(!q||(p.name+' '+p.slug).toLowerCase().includes(q))&&(!cat||p.category===cat)&&(!status||p.status===status))
     .sort((a,b)=>sort==='stock'?a.stock_on_hand-b.stock_on_hand:a.name.localeCompare(b.name));
-  $('#products-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td>${esc(p.category)}</td><td>${money(p.price_cents)}</td><td>${p.stock_on_hand}</td><td><span class="status ${p.status}">${p.status}</span></td><td><div class="row-actions"><button data-edit="${p.id}">Edit</button><button class="secondary" data-archive="${p.id}">Archive</button></div></td></tr>`).join('')}</tbody></table></div>`:(state.products.length?emptyState('✦','Nothing matches','Try clearing the search box or widening the category and status filters.'):emptyState('✦','No products yet','Add your first handmade piece and it will appear on the storefront once published.'));
+  $('#products-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td>${esc(p.category)}</td><td>${money(p.price_cents)}</td><td>${p.stock_on_hand}</td><td><span class="status ${p.status}">${p.status}</span></td><td><div class="row-actions"><button data-edit="${p.id}">Edit</button>${p.status==='archived'?'':`<button class="secondary" data-archive="${p.id}">Archive</button>`}</div></td></tr>`).join('')}</tbody></table></div>`:(state.products.length?emptyState('✦','Nothing matches','Try clearing the search box or widening the category and status filters.'):emptyState('✦','No products yet','Add your first handmade piece and it will appear on the storefront once published.'));
   $$('[data-edit]').forEach(b=>b.onclick=()=>productForm(state.products.find(p=>p.id===b.dataset.edit)));
   $$('[data-archive]').forEach(b=>b.onclick=()=>archive(b.dataset.archive));
 }
@@ -230,7 +230,7 @@ function productForm(p={}){
     <div class="span-2 preview"><h3>Card preview</h3><div class="preview-card" id="preview"></div></div>
     ${p.id?`<section class="span-2 card" id="image-panel"><h3>Product photos</h3><p>Drag photos to reorder them; the first is primary.</p><div class="image-list">${(p.images||[]).map(image=>`<figure draggable="true" data-image-id="${image.id}"><img class="thumb" src="${esc(image.url||'')}" alt="${esc(image.alt)}"><figcaption>${esc(image.alt)}</figcaption><button type="button" data-delete-image="${image.id}">Delete</button></figure>`).join('')||'<p>No product photos yet. The atlas remains as a fallback.</p>'}</div><div id="image-drop" class="drop-zone"><label>Required alt text<input id="image-alt" placeholder="Describe what is visible"></label><label>Choose photos<input id="image-files" type="file" accept="image/*" multiple></label><p>Drop photos here or choose files. Originals over 10 MB are rejected; uploads become WebP at max 1600 px.</p></div></section>`:''}
     <p class="error span-2" id="product-error" role="status"></p>
-    <div class="span-2 form-actions">${p.id?'<button type="button" class="danger" id="delete-product">Hard delete</button>':''}<button type="button" class="secondary" id="cancel-product">Cancel</button><button class="primary">Save product</button></div>
+    <div class="span-2 form-actions">${p.id?'<button type="button" class="danger" id="delete-product">Delete permanently</button>':''}<button type="button" class="secondary" id="cancel-product">Cancel</button><button class="primary">Save product</button></div>
   </form>`);
   const form=$('#product-form');form.category.value=p.category||'glass';form.status.value=p.status||'draft';
   if(locked)form.slug.title='This slug has been public and cannot change.';
@@ -251,7 +251,7 @@ function productForm(p={}){
       figure.ondragover=e=>e.preventDefault();
       figure.ondrop=async e=>{e.preventDefault();if(!dragging||dragging===figure)return;figure.before(dragging);const ids=$$('[data-image-id]').map(node=>node.dataset.imageId);try{await api('images/reorder',{method:'POST',body:JSON.stringify({product_id:p.id,ids})});toast('Photo order saved')}catch(error){toast(error.message,true)}};
     });
-    $('#delete-product').onclick=async()=>{if(prompt(`Type ${p.slug} to permanently delete this draft with no order history:`)!==p.slug)return;try{await api('products/'+p.id,{method:'DELETE'});state.dirty=false;closeModal();toast('Product permanently deleted');products()}catch(error){toast(error.message,true)}};
+    $('#delete-product').onclick=()=>deleteProduct(p,products,true);
   }
   form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),price=parsePeso(fd.get('price'));let error='';
     const slug=locked?p.slug:fd.get('slug');
@@ -286,15 +286,27 @@ async function resizeWebp(file){
 }
 const field=(name,label,value='',required=false,disabled=false,type='text')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${disabled?'disabled':''}></label>`;
 const area=(name,label,value='')=>`<label class="span-2">${label}<textarea name="${name}" rows="3">${esc(value||'')}</textarea></label>`;
-async function archive(id){if(!confirm('Archive this product? It will leave the public shop but keep its order history.'))return;try{await api(`products/${id}/archive`,{method:'POST'});toast('Product archived');products()}catch(e){toast(e.message,true)}}
+async function archive(id,refresh=products){if(!confirm('Archive this product? It will leave the public shop but keep its order history.'))return;try{await api(`products/${id}/archive`,{method:'POST'});toast('Product archived');await refresh()}catch(e){toast(e.message,true)}}
+async function deleteProduct(product,refresh=products,closeAfter=false){
+  const typed=prompt(`Permanently delete ${product.name}? Type ${product.slug} to confirm. Products with order history must be archived instead.`);
+  if(typed!==product.slug)return;
+  try{
+    await api('products/'+product.id,{method:'DELETE'});
+    if(closeAfter){state.dirty=false;closeModal()}
+    toast('Product permanently deleted');await refresh();
+  }catch(error){toast(error.message,true)}
+}
 
 async function inventory(){
   [state.products,state.movements]=await Promise.all([api('products'),api('inventory/movements')]);
+  const canManageCatalog=state.me.capabilities?.includes('catalog');
   setBody(`<div class="toolbar"><button id="stocktake" class="primary">Count everything</button><a class="button secondary" href="/api/admin/inventory/movements?format=csv">Export CSV</a><select id="reason-filter"><option value="">All reasons</option>${['made','sale_pos','sale_web','return','damaged','gifted','stocktake','oversell_correction','initial'].map(x=>`<option>${x}</option>`).join('')}</select></div>
-  <div class="table-wrap"><table><thead><tr><th>Product</th><th>On hand</th><th>Quick adjust</th><th>Threshold</th></tr></thead><tbody>${state.products.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong></td><td>${p.stock_on_hand}</td><td><div class="stock-step"><button aria-label="Remove one ${esc(p.name)}" data-adjust="${p.id}" data-delta="-1">−</button><button aria-label="Add one ${esc(p.name)}" data-adjust="${p.id}" data-delta="1">+</button><button class="secondary" data-full-adjust="${p.id}">Details</button></div></td><td>${p.one_of_a_kind?'One-off':p.low_stock_at}</td></tr>`).join('')}</tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>Product</th><th>Status</th><th>On hand</th><th>Quick adjust</th><th>Threshold</th>${canManageCatalog?'<th>Actions</th>':''}</tr></thead><tbody>${state.products.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td><span class="status ${p.status}">${p.status}</span></td><td>${p.stock_on_hand}</td><td><div class="stock-step"><button aria-label="Remove one ${esc(p.name)}" data-adjust="${p.id}" data-delta="-1">−</button><button aria-label="Add one ${esc(p.name)}" data-adjust="${p.id}" data-delta="1">+</button><button class="secondary" data-full-adjust="${p.id}">Details</button></div></td><td>${p.one_of_a_kind?'One-off':p.low_stock_at}</td>${canManageCatalog?`<td><div class="row-actions">${p.status==='archived'?'<span class="status archived">archived</span>':`<button class="secondary" data-inventory-archive="${p.id}">Archive</button>`}<button class="danger" data-inventory-delete="${p.id}">Delete</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>
   <section class="card" style="margin-top:24px"><h2>Movement history</h2><div id="movements">${movementList(state.movements)}</div></section>`);
   $$('[data-adjust]').forEach(b=>b.onclick=()=>adjust(b.dataset.adjust,Number(b.dataset.delta),Number(b.dataset.delta)>0?'made':'damaged','Quick adjustment'));
   $$('[data-full-adjust]').forEach(b=>b.onclick=()=>adjustForm(b.dataset.fullAdjust));
+  $$('[data-inventory-archive]').forEach(b=>b.onclick=()=>archive(b.dataset.inventoryArchive,inventory));
+  $$('[data-inventory-delete]').forEach(b=>b.onclick=()=>deleteProduct(state.products.find(p=>p.id===b.dataset.inventoryDelete),inventory));
   $('#reason-filter').onchange=async e=>{$('#movements').innerHTML=movementList(await api('inventory/movements?reason='+encodeURIComponent(e.target.value)))};
   $('#stocktake').onclick=stocktakeForm;
 }

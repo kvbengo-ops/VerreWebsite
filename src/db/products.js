@@ -59,11 +59,22 @@ export async function archiveProduct(env, id, actor) {
 }
 
 export async function hardDeleteProduct(env, id, actor) {
-  const history = await db(env).rest('order_items', `select=id&product_id=eq.${encode(id)}&limit=1`);
+  const client = db(env);
+  const history = await client.rest('order_items', `select=id&product_id=eq.${encode(id)}&limit=1`);
   if (history.error) return history;
   if (history.data.length) return { data: null, error: { message: 'Archive products that have order history', code: 'HAS_HISTORY' } };
-  const result = await db(env).rest('products', `id=eq.${encode(id)}`, { method: 'DELETE' });
-  if (!result.error) await audit(env, actor, 'product.delete', id, {});
+  const images = await client.rest('product_images', `select=storage_path&product_id=eq.${encode(id)}`);
+  if (images.error) return images;
+  const result = await client.rest('products', `id=eq.${encode(id)}`, { method: 'DELETE' });
+  if (!result.error) {
+    // Product-image rows cascade with the product. Remove their private blobs
+    // afterward; a cleanup failure must not resurrect the already-deleted row.
+    for (const image of images.data || []) {
+      const removed = await client.storage('object/product-images/' + image.storage_path, { method: 'DELETE' });
+      if (removed.error) console.error('product delete: image cleanup failed — ' + removed.error.code);
+    }
+    await audit(env, actor, 'product.delete', id, { images_removed: (images.data || []).length });
+  }
   return result;
 }
 
