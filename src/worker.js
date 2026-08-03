@@ -737,7 +737,8 @@ async function sendEmail(env, payload) {
       method: 'POST',
       headers: {
         authorization: 'Bearer ' + env.RESEND_API_KEY,
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'user-agent': 'verrewebsite/1.0'
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(RESEND_TIMEOUT_MS)

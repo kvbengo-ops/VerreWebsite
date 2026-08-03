@@ -295,7 +295,11 @@ async function sendResetEmail(env, account, link) {
   try {
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { authorization: 'Bearer ' + env.RESEND_API_KEY, 'content-type': 'application/json' },
+      headers: {
+        authorization: 'Bearer ' + env.RESEND_API_KEY,
+        'content-type': 'application/json',
+        'user-agent': 'verrewebsite/1.0'
+      },
       body: JSON.stringify({
         from: env.FROM_EMAIL,
         to: account.email,
