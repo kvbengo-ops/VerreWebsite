@@ -42,3 +42,11 @@ export async function saveAccount(env, account, actor) {
   });
   return result.error ? result : { data: safeAccount(result.data), error: null };
 }
+
+export async function deleteAccount(env, id, actor) {
+  const result = await db(env).rpc('delete_admin_account', {
+    p_id: id,
+    p_actor: actor
+  });
+  return result.error ? result : { data: safeAccount(result.data), error: null };
+}

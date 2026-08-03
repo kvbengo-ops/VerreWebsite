@@ -4,7 +4,7 @@ import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeS
 import { dashboard } from '../db/stats.js';
 import { body, json, result } from './http.js';
 import { purgeReadCaches } from '../db/client.js';
-import { findAccountById, listAccounts, saveAccount } from '../db/accounts.js';
+import { deleteAccount, findAccountById, listAccounts, saveAccount } from '../db/accounts.js';
 import { listSubscribers } from '../db/subscribers.js';
 import {
   listOptionGroups, saveOptionGroup, saveOption, retireOption,
@@ -58,6 +58,15 @@ export async function adminApi(request, env, user) {
     if (parts.length === 2 && method === 'PATCH') {
       const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
       return result(await saveAccount(env,{...parsed.data,id:parts[1]},user.email));
+    }
+    if (parts.length === 2 && method === 'DELETE') {
+      const found=await findAccountById(env,parts[1]);
+      if(found.error)return result(found);
+      if(!found.data)return json(404,{ok:false,error:'Account not found'});
+      if(found.data.email.toLowerCase()===user.email.toLowerCase()){
+        return json(400,{ok:false,error:'You cannot delete your own account.'});
+      }
+      return result(await deleteAccount(env,parts[1],user.email));
     }
   }
   if (path === 'dashboard' && method === 'GET') {

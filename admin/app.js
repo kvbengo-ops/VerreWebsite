@@ -588,11 +588,20 @@ function accountForm(account={role:'cashier',active:true}){
       <label>Role<select name="role"><option value="super_admin">Super Admin — everything</option><option value="general_admin">General Admin — sales, inventory, POS</option><option value="cashier">Cashier — POS only</option></select></label>
       <label><span>Account active</span><input name="active" type="checkbox" ${account.active!==false?'checked':''}></label>
       <p class="error span-2" id="account-error" role="status"></p>
-      <div class="span-2 form-actions"><button type="button" class="secondary" id="cancel-account">Cancel</button><button class="primary">${account.id?'Save account':'Send invitation'}</button></div>
+      <div class="span-2 form-actions">${account.id&&account.email!==state.me.email?'<button type="button" class="danger" id="delete-account">Delete account</button>':''}<button type="button" class="secondary" id="cancel-account">Cancel</button><button class="primary">${account.id?'Save account':'Send invitation'}</button></div>
     </form>`);
   const form=$('#account-form');form.role.value=account.role||'cashier';
   form.addEventListener('input',()=>state.dirty=true);
   $('#cancel-account').onclick=()=>{if(!state.dirty||confirm('Discard unsaved changes?'))closeModal()};
+  const deleteButton=$('#delete-account');
+  if(deleteButton)deleteButton.onclick=async()=>{
+    if(!confirm(`Permanently delete ${account.display_name}? They will be signed out immediately, and this cannot be undone.`))return;
+    deleteButton.disabled=true;deleteButton.textContent='Deleting…';
+    try{
+      await api('accounts/'+account.id,{method:'DELETE'});
+      state.dirty=false;closeModal();toast(`${account.display_name} was deleted`);accounts();
+    }catch(error){$('#account-error').textContent=error.message;deleteButton.disabled=false;deleteButton.textContent='Delete account'}
+  };
   form.onsubmit=async event=>{
     event.preventDefault();
     const data=Object.fromEntries(new FormData(form));

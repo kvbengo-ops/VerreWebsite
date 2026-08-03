@@ -8,7 +8,7 @@ const sql=(await Promise.all(migrations.map(name=>readFile(resolve(root,'supabas
 const tables=['products','product_images','pos_sessions','orders','order_items','stock_movements','admin_audit_log','admin_accounts'];
 for(const table of tables)assert.match(sql,new RegExp(`alter table ${table} enable row level security`),table+' must have RLS');
 assert.doesNotMatch(sql,/\bcreate\s+policy\b/i,'deny-all RLS must not have permissive policies');
-for(const fn of ['record_sale','adjust_stock','create_inquiry','set_order_status','void_pos_sale','dashboard_snapshot','set_admin_account']){
+for(const fn of ['record_sale','adjust_stock','create_inquiry','set_order_status','void_pos_sale','dashboard_snapshot','set_admin_account','delete_admin_account']){
   const start=sql.indexOf('create function '+fn);
   assert.ok(start>=0,fn+' migration is missing');
   const block=sql.slice(start,start+900);

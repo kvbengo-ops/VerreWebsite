@@ -159,4 +159,19 @@ assert.match(await refuses('insert into custom_options(group_id,parent_option_id
   [baseGroup.id, baseOption.id, 'loop', 'Loop'], 'an option depending on its own step'),
   /cannot depend on another option in its own group/i);
 
+/* ---- account deletion cannot lock out the workroom ---------------- */
+const ownerAccount = await one("insert into admin_accounts(email,display_name,role,created_by,updated_by) values('owner@verre.test','Owner','super_admin','test','test') returning id");
+const peerAccount = await one("insert into admin_accounts(email,display_name,role,created_by,updated_by) values('peer@verre.test','Peer','super_admin','test','test') returning id");
+const staffAccount = await one("insert into admin_accounts(email,display_name,role,created_by,updated_by) values('staff@verre.test','Staff','general_admin','test','test') returning id");
+assert.match(await refuses('select delete_admin_account($1,$2)', [ownerAccount.id, 'owner@verre.test'], 'deleting your own account'),
+  /cannot delete your own account/i);
+await one('select delete_admin_account($1,$2)', [staffAccount.id, 'owner@verre.test']);
+assert.equal((await one('select count(*)::int as n from admin_accounts where id=$1', [staffAccount.id])).n, 0,
+  'a deleted staff account must be gone');
+assert.equal((await one("select count(*)::int as n from admin_audit_log where action='account.delete' and entity_id=$1", [staffAccount.id])).n, 1,
+  'account deletion must leave an audit record');
+await one('select delete_admin_account($1,$2)', [peerAccount.id, 'owner@verre.test']);
+assert.match(await refuses('select delete_admin_account($1,$2)', [ownerAccount.id, 'bootstrap@verre.test'], 'deleting the final Super Admin'),
+  /keep at least one active database super admin/i);
+
 console.log('ok — every migration applies, and the commission RPCs behave against real Postgres');
