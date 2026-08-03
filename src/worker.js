@@ -105,10 +105,12 @@ export default {
     }
     // The reset link is a real URL people click from email, but it is the same
     // document as /login — the token in the query string is what selects the
-    // view. Serving the asset directly avoids shipping a duplicate page.
+    // view. Fetch the directory URL rather than /login/index.html: Cloudflare
+    // canonicalises explicit index files back to /login/, and returning that
+    // redirect to the browser loses /login/reset and opens the sign-in view.
     if (url.pathname === '/login/reset' || url.pathname === '/login/reset/') {
       const page = new URL(url);
-      page.pathname = '/login/index.html';
+      page.pathname = '/login/';
       return env.ASSETS.fetch(new Request(page, request));
     }
     // The shells need the same gate as their APIs. Guarding only /api/admin/*

@@ -181,9 +181,17 @@ for (const [raw, expected] of [['https://evil.com', '/'], ['//evil.com', '/'], [
 // The reset link is a real URL from an email, but it is the same document as
 // /login — the token in the query string selects the view.
 const resetSeen = [];
-const resetEnv = { ...shellEnv, ASSETS: { fetch: async (req) => { resetSeen.push(new URL(req.url).pathname); return new Response('page'); } } };
-await worker.fetch(new Request('https://verre.test/login/reset?token=abc'), resetEnv);
-assert.deepEqual(resetSeen, ['/login/index.html'], '/login/reset serves the login document');
+const resetEnv = { ...shellEnv, ASSETS: { fetch: async (req) => {
+  const assetUrl = new URL(req.url);
+  resetSeen.push(assetUrl.pathname + assetUrl.search);
+  // This is the redirect Cloudflare applies to an explicit index filename and
+  // the reason an invitation used to land on ordinary sign-in.
+  if (assetUrl.pathname === '/login/index.html') return Response.redirect(new URL('/login/', assetUrl), 307);
+  return new Response('page');
+} } };
+const resetPage = await worker.fetch(new Request('https://verre.test/login/reset?token=abc&invite=1'), resetEnv);
+assert.equal(resetPage.status, 200, 'an invitation must render rather than redirect to sign-in');
+assert.deepEqual(resetSeen, ['/login/?token=abc&invite=1'], '/login/reset serves the login document without losing its token');
 
 // /login itself must never be gated, or the sign-in page hides behind sign-in.
 assert.equal((await worker.fetch(new Request('https://verre.test/login'), shellEnv)).status, 200);
