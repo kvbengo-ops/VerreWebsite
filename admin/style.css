@@ -299,6 +299,33 @@ dialog::backdrop{background:rgba(58,36,48,.55);backdrop-filter:blur(3px)}
 .modal-close{position:sticky;z-index:3;float:right;top:var(--s3);margin:var(--s3);width:40px;height:40px;padding:0;font-size:20px;background:var(--pink-wash);color:var(--ink);box-shadow:none}
 .modal-close:hover{background:var(--pink);color:#fff}
 
+.danger-modal{width:min(520px,calc(100% - 24px));border-radius:var(--r-lg);box-shadow:0 7px 0 rgba(168,31,50,.18),0 26px 64px rgba(58,36,48,.32)}
+.danger-modal::backdrop{background:rgba(58,36,48,.68);backdrop-filter:blur(5px)}
+#delete-product-modal-body{padding:clamp(var(--s5),5vw,var(--s6))}
+.danger-confirm{display:grid;grid-template-columns:auto 1fr;gap:var(--s4)}
+.danger-confirm__mark{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:#FFE7EA;color:var(--red);font-size:24px;font-weight:800;border:1px solid #F3B9C1}
+.danger-confirm__heading{min-width:0}
+.danger-confirm__heading .eyebrow{color:var(--red);margin-bottom:var(--s1)}
+.danger-confirm__heading h2{margin:0 0 var(--s2);font:400 27px Shrikhand,cursive}
+.danger-confirm__heading>p:last-child{margin:0;color:var(--muted);font-size:13.5px}
+.danger-confirm__product,.danger-confirm__notice,.danger-confirm__field,.danger-confirm__error,.danger-confirm__actions{grid-column:1/-1}
+.danger-confirm__product{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);padding:var(--s4);border:1px solid var(--pink-pale);border-radius:var(--r-md);background:var(--field)}
+.danger-confirm__product>div:first-child{display:grid;min-width:0}
+.danger-confirm__product>div:first-child>span:first-child{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.danger-confirm__product strong{overflow-wrap:anywhere;font-size:15px}
+.danger-confirm__product code,.danger-confirm__field code{font:600 12px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ink-soft)}
+.danger-confirm__meta{display:flex;flex:none;align-items:flex-end;gap:var(--s1);color:var(--muted);font-size:12px;flex-direction:column}
+.danger-confirm__notice{padding:var(--s3) var(--s4);border-left:4px solid var(--red);border-radius:0 var(--r-sm) var(--r-sm) 0;background:#FFF5F6}
+.danger-confirm__notice strong{font-size:13px}
+.danger-confirm__notice p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.danger-confirm__field{gap:var(--s2);font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink)}
+.danger-confirm__field input{border-color:#EAB4BC;background:#fff;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.danger-confirm__field input:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(239,64,86,.12)}
+.danger-confirm__field small{color:var(--muted);font-weight:400}
+.danger-confirm__error{margin:calc(var(--s2) * -1) 0 0;min-height:20px}
+.danger-confirm__actions{display:flex;justify-content:flex-end;gap:var(--s2);padding-top:var(--s3);border-top:1px solid var(--pink-pale)}
+.danger-confirm__actions .danger{min-width:172px}
+
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4)}
 .span-2{grid-column:1/-1}
 .form-actions{display:flex;justify-content:flex-end;gap:var(--s2);margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--pink-pale)}
@@ -352,6 +379,15 @@ dialog::backdrop{background:rgba(58,36,48,.55);backdrop-filter:blur(3px)}
   .form-grid{grid-template-columns:1fr}
   .span-2{grid-column:auto}
   .role-grid{grid-template-columns:1fr}
+}
+
+@media(max-width:520px){
+  .danger-confirm{grid-template-columns:1fr}
+  .danger-confirm__mark{width:42px;height:42px;border-radius:13px}
+  .danger-confirm__heading,.danger-confirm__product,.danger-confirm__notice,.danger-confirm__field,.danger-confirm__error,.danger-confirm__actions{grid-column:1}
+  .danger-confirm__product{align-items:flex-start}
+  .danger-confirm__actions{flex-direction:column-reverse}
+  .danger-confirm__actions button{width:100%}
 }
 
 /* Every transform, shimmer and transition above is decoration. None of it

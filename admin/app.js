@@ -1,6 +1,7 @@
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const main=$('#main'), modal=$('#modal'), modalBody=$('#modal-body');
+const deleteProductModal=$('#delete-product-modal'),deleteProductModalBody=$('#delete-product-modal-body');
 const money=(c=0)=>'₱'+(Number(c)/100).toLocaleString('en-PH',{minimumFractionDigits:2});
 const date=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(v));
 const dateOnly=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(String(v).slice(0,10)+'T00:00:00Z'));
@@ -290,14 +291,60 @@ async function resizeWebp(file){
 const field=(name,label,value='',required=false,disabled=false,type='text')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${disabled?'disabled':''}></label>`;
 const area=(name,label,value='')=>`<label class="span-2">${label}<textarea name="${name}" rows="3">${esc(value||'')}</textarea></label>`;
 async function archive(id,refresh=products){if(!confirm('Archive this product? It will leave the public shop but keep its order history.'))return;try{await api(`products/${id}/archive`,{method:'POST'});toast('Product archived');await refresh()}catch(e){toast(e.message,true)}}
-async function deleteProduct(product,refresh=products,closeAfter=false){
-  const typed=prompt(`Permanently delete ${product.name}? Type ${product.slug} to confirm. Products with order history must be archived instead.`);
-  if(typed!==product.slug)return;
-  try{
-    await api('products/'+product.id,{method:'DELETE'});
-    if(closeAfter){state.dirty=false;closeModal()}
-    toast('Product permanently deleted');await refresh();
-  }catch(error){toast(error.message,true)}
+function deleteProduct(product,refresh=products,closeAfter=false){
+  if(!product)return toast('That product could not be found.',true);
+  deleteProductModalBody.innerHTML=`
+    <form id="delete-product-form" class="danger-confirm" novalidate>
+      <div class="danger-confirm__mark" aria-hidden="true">!</div>
+      <div class="danger-confirm__heading">
+        <p class="eyebrow">Permanent action</p>
+        <h2 id="delete-product-title">Delete this product?</h2>
+        <p id="delete-product-description">This removes the product from your catalog and inventory. It cannot be undone.</p>
+      </div>
+      <div class="danger-confirm__product">
+        <div><span>Product</span><strong>${esc(product.name)}</strong><code>${esc(product.slug)}</code></div>
+        <div class="danger-confirm__meta"><span class="status ${esc(product.status||'draft')}">${esc(product.status||'draft')}</span><span>${Number(product.stock_on_hand)||0} on hand</span></div>
+      </div>
+      <div class="danger-confirm__notice">
+        <strong>Before you continue</strong>
+        <p>Uploaded photos will also be removed. Products with sales or stock history may need to be archived instead.</p>
+      </div>
+      <label class="danger-confirm__field" for="confirm-product-slug">Type <code>${esc(product.slug)}</code> to confirm
+        <input id="confirm-product-slug" name="confirmation" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="delete-product-hint">
+        <small id="delete-product-hint">The delete button unlocks when the slug matches exactly.</small>
+      </label>
+      <p class="error danger-confirm__error" id="delete-product-error" role="status" aria-live="polite"></p>
+      <div class="danger-confirm__actions">
+        <button type="button" class="secondary" id="cancel-product-delete">Keep product</button>
+        <button type="submit" class="danger" id="confirm-product-delete" disabled>Delete permanently</button>
+      </div>
+    </form>`;
+  const form=$('#delete-product-form',deleteProductModalBody);
+  const input=$('#confirm-product-slug',deleteProductModalBody);
+  const cancelButton=$('#cancel-product-delete',deleteProductModalBody);
+  const deleteButton=$('#confirm-product-delete',deleteProductModalBody);
+  const errorMessage=$('#delete-product-error',deleteProductModalBody);
+  const closeConfirmation=()=>deleteProductModal.close();
+  deleteProductModal.onclose=()=>{deleteProductModalBody.innerHTML=''};
+  deleteProductModal.oncancel=event=>{if(input.disabled)event.preventDefault()};
+  input.oninput=()=>{deleteButton.disabled=input.value!==product.slug;errorMessage.textContent=''};
+  cancelButton.onclick=closeConfirmation;
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    if(input.value!==product.slug)return;
+    input.disabled=true;cancelButton.disabled=true;deleteButton.disabled=true;deleteButton.textContent='Deleting…';
+    try{
+      await api('products/'+product.id,{method:'DELETE'});
+      closeConfirmation();
+      if(closeAfter){state.dirty=false;closeModal()}
+      toast(`${product.name} was permanently deleted`);await refresh();
+    }catch(error){
+      errorMessage.textContent=error.message;
+      input.disabled=false;cancelButton.disabled=false;deleteButton.disabled=false;deleteButton.textContent='Delete permanently';input.focus();
+    }
+  };
+  deleteProductModal.showModal();
+  input.focus();
 }
 
 async function inventory(){

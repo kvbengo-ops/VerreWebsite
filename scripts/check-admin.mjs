@@ -74,6 +74,10 @@ for(const route of ['dashboard','products','inventory','orders','sessions','acco
 assert.match(adminApp,/data-inventory-archive/, 'inventory needs an archive action');
 assert.match(adminApp,/data-inventory-delete/, 'inventory needs a permanent-delete action');
 assert.match(adminApp,/capabilities\?\.includes\('catalog'\)/, 'destructive inventory actions must only render for catalog managers');
+assert.match(adminHtml,/id="delete-product-modal"/, 'product deletion needs an accessible in-app confirmation dialog');
+assert.match(adminApp,/id="confirm-product-slug"/, 'product deletion must require the exact slug');
+assert.match(adminApp,/Delete permanently<\/button>/, 'product deletion needs an explicit destructive action');
+assert.doesNotMatch(adminApp,/prompt\(`Permanently delete/, 'product deletion must not fall back to a browser prompt');
 for(const action of ['data-market-edit','data-market-delete','data-market-up','data-market-down']){
   assert.ok(adminApp.includes(action),'market CMS needs '+action);
 }
