@@ -232,7 +232,7 @@ function productForm(p={}){
     ${area('care','Care',p.care)}${field('lead_time','Lead time',p.lead_time)}
     ${field('bg_color','Card color',p.bg_color||'#FFE1EF')}${field('tape_color','Tape color',p.tape_color||'#FFD166')}
     <div class="span-2 preview"><h3>Card preview</h3><div class="preview-card" id="preview"></div></div>
-    ${p.id?`<section class="span-2 card" id="image-panel"><h3>Product photos</h3><p>Drag photos to reorder them; the first is primary.</p><div class="image-list">${(p.images||[]).map(image=>`<figure draggable="true" data-image-id="${image.id}"><img class="thumb" src="${esc(image.url||'')}" alt="${esc(image.alt)}"><figcaption>${esc(image.alt)}</figcaption><button type="button" data-delete-image="${image.id}">Delete</button></figure>`).join('')||'<p>No product photos yet. The atlas remains as a fallback.</p>'}</div><div id="image-drop" class="drop-zone"><label>Required alt text<input id="image-alt" placeholder="Describe what is visible"></label><label>Choose photos<input id="image-files" type="file" accept="image/*" multiple></label><p>Drop photos here or choose files. Originals over 10 MB are rejected; uploads become WebP at max 1600 px.</p><p id="image-upload-status" role="status" aria-live="polite"></p></div></section>`:''}
+    <section class="span-2 card" id="image-panel"><h3>Product photos</h3><p>${p.id?'Drag photos to reorder them; the first is primary.':'Choose photos now. They will upload after the product is saved.'}</p><div class="image-list">${(p.images||[]).map(image=>`<figure draggable="true" data-image-id="${image.id}"><img class="thumb" src="${esc(image.url||'')}" alt="${esc(image.alt)}"><figcaption>${esc(image.alt)}</figcaption><button type="button" data-delete-image="${image.id}">Delete</button></figure>`).join('')||'<p>No product photos selected yet. The atlas remains as a fallback.</p>'}</div><div id="image-drop" class="drop-zone"><label>Required alt text<input id="image-alt" placeholder="Describe what is visible"></label><label>Choose photos<input id="image-files" type="file" accept="image/*" multiple></label><p>Drop photos here or choose files. Originals over 10 MB are rejected; uploads become WebP at max 1600 px.</p><p id="image-upload-status" role="status" aria-live="polite"></p></div></section>
     <p class="error span-2" id="product-error" role="status"></p>
     <div class="span-2 form-actions">${p.id?'<button type="button" class="danger" id="delete-product">Delete permanently</button>':''}<button type="button" class="secondary" id="cancel-product">Cancel</button><button class="primary">Save product</button></div>
   </form>`);
@@ -241,13 +241,22 @@ function productForm(p={}){
   const sync=()=>{if(!p.id&&!form.slug.dataset.edited)form.slug.value=slugify(form.name.value);form.low_stock_at.closest('label').hidden=form.one_of_a_kind.checked;$('#preview').innerHTML=`<div style="height:120px;border-radius:8px;background:${esc(form.bg_color.value)}"></div><h3>${esc(form.name.value||'Product name')}</h3><small>${esc(form.tag.value||'Tag')}</small><p><strong>${money(parsePeso(form.price.value)||0)}</strong></p>`;state.dirty=true};
   form.slug.addEventListener('input',()=>form.slug.dataset.edited='1');form.addEventListener('input',sync);sync();state.dirty=false;
   $('#cancel-product').onclick=()=>{if(!state.dirty||confirm('Discard unsaved changes?'))closeModal()};
+  const drop=$('#image-drop'),input=$('#image-files'),uploadStatus=$('#image-upload-status');
+  let pendingFiles=[];
+  const choosePhotos=(files)=>{
+    const selected=[...files];
+    if(!selected.length)return;
+    if(p.id)return uploadImages(p,selected);
+    pendingFiles=selected;
+    uploadStatus.className='';
+    uploadStatus.textContent=selected.length===1?`${selected[0].name} will upload after save.`:`${selected.length} photos will upload after save.`;
+    state.dirty=true;
+  };
+  input.onchange=()=>choosePhotos(input.files);
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add('dragging')};
+  drop.ondragleave=()=>drop.classList.remove('dragging');
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove('dragging');choosePhotos(e.dataTransfer.files)};
   if(p.id){
-    const drop=$('#image-drop'),input=$('#image-files');
-    const upload=(files)=>uploadImages(p,[...files]);
-    input.onchange=()=>upload(input.files);
-    drop.ondragover=e=>{e.preventDefault();drop.classList.add('dragging')};
-    drop.ondragleave=()=>drop.classList.remove('dragging');
-    drop.ondrop=e=>{e.preventDefault();drop.classList.remove('dragging');upload(e.dataTransfer.files)};
     $$('[data-delete-image]').forEach(button=>button.onclick=async()=>{if(!confirm('Delete this photo from storage?'))return;try{await api('images/'+button.dataset.deleteImage,{method:'DELETE'});button.closest('figure').remove();toast('Photo deleted')}catch(error){toast(error.message,true)}});
     let dragging=null;
     $$('[data-image-id]').forEach(figure=>{
@@ -259,10 +268,18 @@ function productForm(p={}){
   }
   form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),price=parsePeso(fd.get('price'));let error='';
     const slug=locked?p.slug:fd.get('slug');
-    if(!fd.get('name').trim())error='Name is required.';else if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))error='Slug must be lowercase kebab-case.';else if(price==null)error='Enter a valid peso amount such as 850, 850.50, ₱850, or 1,250.';
+    if(!fd.get('name').trim())error='Name is required.';else if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))error='Slug must be lowercase kebab-case.';else if(price==null)error='Enter a valid peso amount such as 850, 850.50, ₱850, or 1,250.';else if(pendingFiles.length&&!$('#image-alt').value.trim())error='Describe the selected photo before saving.';
     if(error){$('#product-error').textContent=error;return}
     const body=Object.fromEntries(fd);body.slug=slug;body.price_cents=price;body.one_of_a_kind=form.one_of_a_kind.checked;body.low_stock_at=body.one_of_a_kind?0:Number(body.low_stock_at);body.sort_order=Number(body.sort_order);delete body.price;
-    try{await api('products'+(p.id?'/'+p.id:''),{method:p.id?'PATCH':'POST',body:JSON.stringify(body)});state.dirty=false;closeModal();toast('Product saved');products()}catch(err){$('#product-error').textContent=err.message}
+    try{
+      const saved=await api('products'+(p.id?'/'+p.id:''),{method:p.id?'PATCH':'POST',body:JSON.stringify(body)});
+      if(!p.id&&pendingFiles.length){
+        const uploaded=await uploadImages(saved,pendingFiles);
+        if(!uploaded){state.dirty=false;closeModal();toast('Product saved, but its photo was not uploaded. Edit the product to try again.',true);return products()}
+        return;
+      }
+      state.dirty=false;closeModal();toast('Product saved');products();
+    }catch(err){$('#product-error').textContent=err.message}
   };
 }
 async function uploadImages(product,files){
@@ -280,27 +297,24 @@ async function uploadImages(product,files){
     try{
       status.textContent='Preparing '+file.name+'…';
       const blob=await resizeWebp(file);
-      const signed=await api('images/sign',{method:'POST',body:JSON.stringify({product_id:product.id,filename:file.name})});
-      const formData=new FormData();
-      formData.append('cacheControl','3600');
-      formData.append('',blob,file.name.replace(/\.[^.]+$/, '')+'.webp');
       status.textContent='Uploading '+file.name+'…';
-      const upload=await fetch(signed.signedUrl,{method:'PUT',headers:{'x-upsert':'false'},body:formData});
+      const query=new URLSearchParams({product_id:product.id,filename:file.name,alt,position:String((product.images||[]).length+uploaded)});
+      const upload=await fetch('/api/admin/images/upload?'+query,{method:'POST',headers:{'content-type':'image/webp'},body:blob});
       if(!upload.ok){
-        let detail='Storage upload failed ('+upload.status+')';
+        let detail='Photo upload failed ('+upload.status+')';
         try{const body=await upload.json();detail=body.message||body.error||detail}catch{}
         throw new Error(detail);
       }
-      await api('images',{method:'POST',body:JSON.stringify({product_id:product.id,storage_path:signed.path,alt,position:(product.images||[]).length+uploaded})});
       uploaded++;
     }catch(error){failures.push(file.name+': '+error.message)}
   }
   drop.dataset.uploading='false';fileInput.disabled=false;fileInput.value='';
-  if(!uploaded){status.className='error';status.textContent=failures.join(' ');return}
+  if(!uploaded){status.className='error';status.textContent=failures.join(' ');return false}
   state.dirty=false;closeModal();
   toast(uploaded===1?'Photo uploaded':uploaded+' photos uploaded');
   if(failures.length)toast(failures.join(' '),true);
   products();
+  return true;
 }
 async function resizeWebp(file){
   const bitmap=await createImageBitmap(file),scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));

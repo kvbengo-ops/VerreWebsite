@@ -110,19 +110,40 @@ export async function removeProduct(env, id, actor) {
   return result.error ? result : { data: { removal: 'deleted', has_history: false }, error: null };
 }
 
-export async function signUpload(env, productId, filename) {
+function productImagePath(productId, filename) {
   const safe = String(filename || 'image.webp').replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
-  const path = `products/${productId}/${crypto.randomUUID()}-${safe.replace(/\.[^.]+$/, '')}.webp`;
-  const result = await db(env).storage('object/upload/sign/product-images/' + path, { method: 'POST', body: '{}' });
-  if (result.error) return result;
-  const value = result.data.url || result.data.signedURL || result.data.signedUrl;
-  if (!value) return { data: null, error: { message: 'Storage did not return an upload URL', code: 'BAD_UPLOAD_URL' } };
-  const storageBase = String(env.SUPABASE_URL).replace(/\/$/, '') + '/storage/v1';
-  const signedUrl = value.startsWith('http') ? value : storageBase + (value.startsWith('/') ? '' : '/') + value;
-  let token = result.data.token;
-  try { token ||= new URL(signedUrl).searchParams.get('token'); } catch {}
-  if (!token) return { data: null, error: { message: 'Storage did not return an upload token', code: 'BAD_UPLOAD_TOKEN' } };
-  return { data: { path, token, signedUrl }, error: null };
+  return `products/${productId}/${crypto.randomUUID()}-${safe.replace(/\.[^.]+$/, '')}.webp`;
+}
+
+export async function uploadProductImage(env, image, file, actor) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(image.product_id || '')) {
+    return { data: null, error: { message: 'Unable to identify the product for this photo', code: 'INVALID_PRODUCT_ID' } };
+  }
+  if (!image.alt?.trim()) return { data: null, error: { message: 'Alt text is required', code: 'ALT_REQUIRED' } };
+  if (!file?.byteLength) return { data: null, error: { message: 'The photo is empty', code: 'EMPTY_IMAGE' } };
+  if (file.byteLength > 6 * 1024 * 1024) return { data: null, error: { message: 'The prepared photo is over 6 MB', code: 'IMAGE_TOO_LARGE' } };
+
+  const client = db(env);
+  const path = productImagePath(image.product_id, image.filename);
+  const uploaded = await client.storage('object/product-images/' + path, {
+    method: 'POST',
+    headers: { 'content-type': 'image/webp', 'cache-control': 'max-age=3600', 'x-upsert': 'false' },
+    body: file,
+    timeoutMs: 30000
+  });
+  if (uploaded.error) return uploaded;
+
+  const saved = await saveImage(env, {
+    product_id: image.product_id,
+    storage_path: path,
+    alt: image.alt,
+    position: Number.isInteger(image.position) ? image.position : 0
+  }, actor);
+  if (saved.error) {
+    // Do not leave an untracked private blob if the metadata insert fails.
+    await client.storage('object/product-images/' + path, { method: 'DELETE' });
+  }
+  return saved;
 }
 
 export async function saveImage(env, image, actor) {

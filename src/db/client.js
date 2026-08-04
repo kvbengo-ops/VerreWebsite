@@ -8,15 +8,16 @@ export function db(env) {
   async function request(path, options = {}) {
     if (!configured) return { data: null, error: { message: 'Supabase is not configured', code: 'NOT_CONFIGURED' } };
     try {
+      const { timeoutMs = 10000, ...fetchOptions } = options;
       const response = await fetch(base + path, {
-        ...options,
+        ...fetchOptions,
         headers: {
           apikey: key,
           authorization: 'Bearer ' + key,
           'content-type': 'application/json',
           ...(options.headers || {})
         },
-        signal: options.signal || AbortSignal.timeout(10000)
+        signal: options.signal || AbortSignal.timeout(timeoutMs)
       });
       const text = await response.text();
       let data = null;

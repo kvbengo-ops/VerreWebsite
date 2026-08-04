@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { listProducts, listPublicProducts, removeProduct, signUpload } from './db/products.js';
+import { listProducts, listPublicProducts, removeProduct, uploadProductImage } from './db/products.js';
 
 const env = { SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
 const realFetch = globalThis.fetch;
@@ -87,18 +87,30 @@ assert.match(listUrls[0], /status=neq\.archived/, 'normal admin/inventory lists 
 assert.doesNotMatch(listUrls[1], /status=(?:neq|eq)\.archived/, 'product management can explicitly include archived products');
 assert.match(listUrls[2], /status=eq\.active/, 'the public catalog includes only active products');
 
-// Supabase's raw signing response carries the token in its relative URL. The
-// Worker must return a complete browser-safe URL and the parsed token.
-let signingPath='';
-globalThis.fetch=async (url)=>{
-  signingPath=new URL(url).pathname;
-  return response({url:'/object/upload/sign/product-images/products/p1/photo.webp?token=signed-token'});
+// Product photos travel through the authenticated Worker and are written with
+// the service role. This avoids a fragile cross-origin browser upload while
+// keeping the key out of the client.
+const uploadCalls=[];
+globalThis.fetch=async (url,options={})=>{
+  const path=new URL(url).pathname;
+  uploadCalls.push({path,method:options.method||'GET',headers:options.headers,body:options.body});
+  if(path.includes('/storage/v1/object/product-images/'))return response({Key:'product-images/products/p1/photo.webp'});
+  if(path.endsWith('/product_images'))return response([{id:'image-1',product_id:'p1'}]);
+  if(path.endsWith('/admin_audit_log'))return response({});
+  return response({});
 };
-const signed=await signUpload(env,'p1','My Product Photo.JPG');
-assert.equal(signed.error,null);
-assert.equal(signed.data.token,'signed-token');
-assert.equal(signed.data.signedUrl,'https://db.test/storage/v1/object/upload/sign/product-images/products/p1/photo.webp?token=signed-token');
-assert.match(signingPath,/\/storage\/v1\/object\/upload\/sign\/product-images\/products\/p1\/.+\.webp$/);
+const imageBytes=new Uint8Array([1,2,3]).buffer;
+const productId='11111111-1111-4111-8111-111111111111';
+const uploaded=await uploadProductImage(env,{product_id:productId,filename:'My Product Photo.JPG',alt:'Front view',position:2},imageBytes,'owner@verre.test');
+assert.equal(uploaded.error,null);
+const storageUpload=uploadCalls.find(call=>call.path.includes('/storage/v1/object/product-images/'));
+assert.equal(storageUpload.method,'POST');
+assert.equal(storageUpload.body,imageBytes,'the prepared WebP bytes reach Supabase unchanged');
+assert.equal(storageUpload.headers['content-type'],'image/webp');
+assert.match(storageUpload.path,/\/storage\/v1\/object\/product-images\/products\/11111111-1111-4111-8111-111111111111\/.+\.webp$/);
+const imageRow=uploadCalls.find(call=>call.path.endsWith('/product_images'));
+assert.equal(JSON.parse(imageRow.body).alt,'Front view');
+assert.equal(JSON.parse(imageRow.body).position,2);
 
 globalThis.fetch = realFetch;
 console.log('ok — product removal archives history, preserves photos, and only deletes history-free products');

@@ -1,4 +1,4 @@
-import { listProducts, saveProduct, archiveProduct, productRemovalPlan, removeProduct, signUpload, saveImage, deleteImage, reorderImages } from '../db/products.js';
+import { listProducts, saveProduct, archiveProduct, productRemovalPlan, removeProduct, uploadProductImage, deleteImage, reorderImages } from '../db/products.js';
 import { adjustStock, listMovements, stocktake } from '../db/stock.js';
 import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeSession } from '../db/orders.js';
 import { dashboard } from '../db/stats.js';
@@ -130,15 +130,18 @@ export async function adminApi(request, env, user) {
     if (!can(user,'catalog')) return denied();
     return mutation(env,await removeProduct(env,parts[1],user.email));
   }
-  if (path === 'images/sign' && method === 'POST') {
+  if (path === 'images/upload' && method === 'POST') {
     if (!can(user,'catalog')) return denied();
-    const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
-    return result(await signUpload(env,parsed.data.product_id,parsed.data.filename));
-  }
-  if (path === 'images' && method === 'POST') {
-    if (!can(user,'catalog')) return denied();
-    const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
-    return mutation(env,await saveImage(env,parsed.data,user.email),201);
+    const declared=Number(request.headers.get('content-length')||0);
+    if(declared>6*1024*1024)return json(413,{ok:false,error:'The prepared photo is over 6 MB'});
+    if(request.headers.get('content-type')!=='image/webp')return json(415,{ok:false,error:'Product photos must be WebP images'});
+    const file=await request.arrayBuffer();
+    return mutation(env,await uploadProductImage(env,{
+      product_id:url.searchParams.get('product_id'),
+      filename:url.searchParams.get('filename'),
+      alt:url.searchParams.get('alt'),
+      position:Number(url.searchParams.get('position')||0)
+    },file,user.email),201);
   }
   if (path === 'images/reorder' && method === 'POST') {
     if (!can(user,'catalog')) return denied();
