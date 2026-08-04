@@ -136,13 +136,29 @@ const commissionStock = await one('select count(*)::int as n from stock_movement
 assert.equal(commissionStock.n, 0, 'a made-to-order piece never came off a shelf, so it moves no stock');
 
 /* ---- the catalog path must be untouched by all of the above -------- */
+await db.query("update products set cost_cents=40000 where slug='peach-sky-glass-panel'");
 const { create_inquiry: web } = await one("select create_inquiry('VR-FFFF','order',$1::jsonb,$2::jsonb)",
   [JSON.stringify([{ id: 'peach-sky-glass-panel', qty: 1 }]), JSON.stringify({ name: 'Bea', email: 'b@e.co', fulfillment: 'pickup' })]);
+// Cost at payment, rather than inquiry time, is the actual cost of the sale.
+await db.query("update products set cost_cents=41000 where slug='peach-sky-glass-panel'");
 for (const status of ['quoted', 'paid', 'fulfilled']) {
   await one('select set_order_status($1,$2::order_status,null,$3,$4)', [web.id, status, 'kyle@verre.ph', '']);
 }
 const webStock = await one('select count(*)::int as n from stock_movements where order_id=$1', [web.id]);
 assert.ok(webStock.n > 0, 'a catalog order must still write a stock movement when it is paid');
+const webCost = await one('select unit_cost_cents,cost_total_cents from order_items where order_id=$1', [web.id]);
+assert.equal(webCost.unit_cost_cents,41000,'a paid order line snapshots the product cost at payment');
+assert.equal(webCost.cost_total_cents,41000,'line cost multiplies the unit snapshot by quantity');
+const { dashboard_snapshot: profitSnapshot } = await one("select dashboard_snapshot('2000-01-01'::timestamptz)");
+assert.ok(profitSnapshot.product_cost_cents>=41000,'the dashboard includes recorded product cost');
+assert.ok(profitSnapshot.uncosted_orders>0,'custom or historical sales without cost are reported honestly');
+assert.equal(profitSnapshot.gross_profit_cents,null,'gross profit is not invented while cost coverage is incomplete');
+await db.query("update orders set sold_at='2100-01-01T00:00:00Z' where id=$1",[web.id]);
+const { dashboard_snapshot: completeProfit } = await one("select dashboard_snapshot('2099-01-01'::timestamptz)");
+assert.equal(completeProfit.revenue_cents,85000,'sales revenue remains the amount the customer paid');
+assert.equal(completeProfit.product_cost_cents,41000,'product cost is the frozen sale-time cost');
+assert.equal(completeProfit.gross_profit_cents,44000,'gross profit equals sales minus product cost');
+assert.equal(Number(completeProfit.gross_margin_percent),51.8,'gross margin is profit divided by sales');
 
 const { o: fresh } = await submit('VR-GGGG');
 assert.match(await refuses("select set_order_status($1,'fulfilled'::order_status,null,$2,null)", [fresh.id, 'kyle@verre.ph'], 'inquiry straight to fulfilled'),

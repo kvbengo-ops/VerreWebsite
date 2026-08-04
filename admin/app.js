@@ -128,6 +128,7 @@ function configureAccount(){
 async function dashboard(refresh=false){
   const data=await api('dashboard'+(refresh?'?refresh=1':''));
   const a=data.attention;
+  const profitComplete=Number(data.uncosted_orders||0)===0;
   // Severity is carried on the item, not inferred from position, so the two
   // that mean "money or a customer is affected right now" stay visually
   // separate from the two that mean "keep an eye on this".
@@ -140,13 +141,15 @@ async function dashboard(refresh=false){
     ...a.open_sessions.map(s=>({level:'',text:`Session “${s.label}” has been open over 24 hours`}))
   ];
   setBody(`<div class="toolbar"><button id="refresh-dashboard" class="secondary">Refresh metrics</button></div>`+
-    `<section class="card attention"><h2>Needs attention</h2><div class="attention-list">${
+    `${profitComplete?'':`<section class="card attention"><h2>Profit needs cost information</h2><p>${data.uncosted_orders} paid order${data.uncosted_orders===1?' is':'s are'} missing a historical product cost. Sales remain accurate; gross profit is hidden rather than estimated incorrectly.</p></section>`}
+    <section class="card attention"><h2>Needs attention</h2><div class="attention-list">${
       alerts.length
         ? alerts.map(x=>`<div class="alert ${x.level}">${esc(x.text)}</div>`).join('')
         : '<div class="alert calm">Nothing needs you right now.</div>'
     }</div></section>
     <section class="grid metrics">
-      ${metric('Revenue',money(data.revenue_cents))}${metric('Orders',data.order_count)}${metric('Average order',money(data.average_order_cents))}${metric('Units sold',data.units)}
+      ${metric('Sales',money(data.revenue_cents))}${metric('Product cost',money(data.product_cost_cents||0))}${metric('Gross profit',profitComplete?money(data.gross_profit_cents):'—')}${metric('Gross margin',profitComplete&&data.gross_margin_percent!=null?data.gross_margin_percent+'%':'—')}
+      ${metric('Orders',data.order_count)}${metric('Average order',money(data.average_order_cents))}${metric('Units sold',data.units)}
     </section>
     <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
       <div class="card"><h2>Revenue by day</h2>${revenueChart(data.daily)}</div>
@@ -210,8 +213,9 @@ function drawProducts(){
   const q=$('#search').value.toLowerCase(),cat=$('#category').value,status=$('#status').value,sort=$('#sort').value;
   const rows=state.products.filter(p=>(!q||(p.name+' '+p.slug).toLowerCase().includes(q))&&(!cat||p.category===cat)&&(status==='all'||(status==='current'?p.status!=='archived':p.status===status)))
     .sort((a,b)=>sort==='stock'?a.stock_on_hand-b.stock_on_hand:a.name.localeCompare(b.name));
-  $('#products-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td>${esc(p.category)}</td><td>${money(p.price_cents)}</td><td>${p.stock_on_hand}</td><td><span class="status ${p.status}">${p.status}</span></td><td><div class="row-actions"><button data-edit="${p.id}">Edit</button>${p.status==='archived'?`<button class="secondary" data-restore="${p.id}">Restore as draft</button>`:`<button class="secondary" data-archive="${p.id}">Archive</button>`}</div></td></tr>`).join('')}</tbody></table></div>`:(state.products.length?emptyState('✦','Nothing matches',status==='current'?'Archived products are hidden. Choose Archived or All statuses to review them.':'Try clearing the search box or widening the category and status filters.'):emptyState('✦','No products yet','Add your first handmade piece and it will appear on the storefront once published.'));
+  $('#products-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Category</th><th>Price</th><th>Cost</th><th>Unit profit</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td>${esc(p.category)}</td><td>${money(p.price_cents)}</td><td>${p.cost_cents==null?'<small>Not set</small>':money(p.cost_cents)}</td><td>${p.cost_cents==null?'—':money(p.price_cents-p.cost_cents)}</td><td>${p.stock_on_hand}</td><td><span class="status ${p.status}">${p.status}</span>${p.status==='draft'?'<br><small>Hidden from shop</small>':''}</td><td><div class="row-actions"><button data-edit="${p.id}">Edit</button>${p.status==='draft'?`<button class="primary" data-publish="${p.id}">Publish to shop</button><button class="secondary" data-archive="${p.id}">Archive</button>`:p.status==='archived'?`<button class="secondary" data-restore="${p.id}">Restore as draft</button>`:`<button class="secondary" data-archive="${p.id}">Archive</button>`}</div></td></tr>`).join('')}</tbody></table></div>`:(state.products.length?emptyState('✦','Nothing matches',status==='current'?'Archived products are hidden. Choose Archived or All statuses to review them.':'Try clearing the search box or widening the category and status filters.'):emptyState('✦','No products yet','Add your first handmade piece and it will appear on the storefront once published.'));
   $$('[data-edit]').forEach(b=>b.onclick=()=>productForm(state.products.find(p=>p.id===b.dataset.edit)));
+  $$('[data-publish]').forEach(b=>b.onclick=()=>publish(b.dataset.publish));
   $$('[data-archive]').forEach(b=>b.onclick=()=>archive(b.dataset.archive));
   $$('[data-restore]').forEach(b=>b.onclick=()=>restore(b.dataset.restore));
 }
@@ -223,8 +227,9 @@ function productForm(p={}){
   <form id="product-form" class="form-grid" novalidate>
     ${field('name','Name',p.name,true)}${field('slug','Slug',p.slug,true,locked)}
     <label>Category<select name="category"><option>glass</option><option>charms</option><option>stickers</option></select></label>
-    ${field('tag','Card tag',p.tag,true)}${field('price','Price in pesos',p.price_cents!=null?(p.price_cents/100).toFixed(2):'',true)}
-    <label>Status<select name="status"><option>draft</option><option>active</option><option>archived</option></select></label>
+    ${field('tag','Card tag',p.tag,true)}${field('price','Selling price in pesos',p.price_cents!=null?(p.price_cents/100).toFixed(2):'',true)}
+    <label>Cost per product in pesos<input name="cost" value="${esc(p.cost_cents!=null?(p.cost_cents/100).toFixed(2):'')}" required><small>What one unit costs you to buy or make.</small></label>
+    <label>Shop visibility<select name="status"><option value="draft">Draft — hidden from shop</option><option value="active">Active — visible in shop</option><option value="archived">Archived — removed from shop</option></select><small>Only active products appear in the public shop.</small></label>
     <label><span>One of a kind</span><input name="one_of_a_kind" type="checkbox" ${p.one_of_a_kind?'checked':''}></label>
     ${field('low_stock_at','Low-stock warning',p.low_stock_at??2,true,'', 'number')}
     ${field('sort_order','Sort order',p.sort_order??0,true,'','number')}
@@ -267,11 +272,11 @@ function productForm(p={}){
     });
     $('#delete-product').onclick=()=>deleteProduct(p,products,true);
   }
-  form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),price=parsePeso(fd.get('price'));let error='';
+  form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),price=parsePeso(fd.get('price')),cost=parsePeso(fd.get('cost'));let error='';
     const slug=locked?p.slug:fd.get('slug');
-    if(!fd.get('name').trim())error='Name is required.';else if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))error='Slug must be lowercase kebab-case.';else if(price==null)error='Enter a valid peso amount such as 850, 850.50, ₱850, or 1,250.';else if(pendingFiles.length&&!$('#image-alt').value.trim())error='Describe the selected photo before saving.';
+    if(!fd.get('name').trim())error='Name is required.';else if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))error='Slug must be lowercase kebab-case.';else if(price==null)error='Enter a valid selling price such as 850 or 850.50.';else if(cost==null)error='Enter a valid product cost such as 400 or 400.50.';else if(pendingFiles.length&&!$('#image-alt').value.trim())error='Describe the selected photo before saving.';
     if(error){$('#product-error').textContent=error;return}
-    const body=Object.fromEntries(fd);body.slug=slug;body.price_cents=price;body.one_of_a_kind=form.one_of_a_kind.checked;body.low_stock_at=body.one_of_a_kind?0:Number(body.low_stock_at);body.sort_order=Number(body.sort_order);delete body.price;
+    const body=Object.fromEntries(fd);body.slug=slug;body.price_cents=price;body.cost_cents=cost;body.one_of_a_kind=form.one_of_a_kind.checked;body.low_stock_at=body.one_of_a_kind?0:Number(body.low_stock_at);body.sort_order=Number(body.sort_order);delete body.price;delete body.cost;
     try{
       const saved=await api('products'+(p.id?'/'+p.id:''),{method:p.id?'PATCH':'POST',body:JSON.stringify(body)});
       if(!p.id&&pendingFiles.length){
@@ -279,7 +284,7 @@ function productForm(p={}){
         if(!uploaded){state.dirty=false;closeModal();toast('Product saved, but its photo was not uploaded. Edit the product to try again.',true);return products()}
         return;
       }
-      state.dirty=false;closeModal();toast('Product saved');products();
+      state.dirty=false;closeModal();toast(body.status==='active'?'Product published to the shop':'Product saved as a draft — it is hidden from the shop');products();
     }catch(err){$('#product-error').textContent=err.message}
   };
 }
@@ -326,6 +331,7 @@ async function resizeWebp(file){
 const field=(name,label,value='',required=false,disabled=false,type='text')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${disabled?'disabled':''}></label>`;
 const area=(name,label,value='')=>`<label class="span-2">${label}<textarea name="${name}" rows="3">${esc(value||'')}</textarea></label>`;
 async function archive(id,refresh=products){if(!confirm('Archive this product? It will leave the public shop but keep its order history.'))return;try{await api(`products/${id}/archive`,{method:'POST'});toast('Product archived');await refresh()}catch(e){toast(e.message,true)}}
+async function publish(id,refresh=products){try{await api(`products/${id}/publish`,{method:'POST'});toast('Product published to the shop');await refresh()}catch(e){toast(e.message,true)}}
 async function restore(id,refresh=products){try{await api(`products/${id}/restore`,{method:'POST'});toast('Product restored as a draft');await refresh()}catch(e){toast(e.message,true)}}
 async function deleteProduct(product,refresh=products,closeAfter=false){
   if(!product)return toast('That product could not be found.',true);
@@ -412,7 +418,7 @@ async function orders(){
   $('#order-search').oninput=$('#order-status').onchange=drawOrders;drawOrders();
 }
 function drawOrders(){const q=$('#order-search').value.toLowerCase(),s=$('#order-status').value;const rows=state.orders.filter(o=>(!q||(o.ref+' '+o.customer_name+' '+o.customer_email).toLowerCase().includes(q))&&(!s||o.status===s));$('#orders-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Customer</th><th>Total</th><th>Channel</th><th>Status</th><th>Created</th></tr></thead><tbody>${rows.map(o=>`<tr class="${o.is_oversell?'low':''}" data-order="${o.id}" tabindex="0"><td><strong>${esc(o.ref)}</strong>${o.is_oversell?'<br><small>Needs attention — sold twice</small>':''}</td><td>${esc(o.customer_name||'Walk-in')}<br><small>${esc(o.customer_email||'')}</small></td><td>${money(o.total_cents)}</td><td>${o.channel}</td><td><span class="status ${o.status}">${o.status}</span></td><td>${date(o.created_at)}</td></tr>`).join('')}</tbody></table></div>`:(state.orders.length?emptyState('✦','Nothing matches','No order matches that search or status filter.'):emptyState('✦','No orders yet','Web inquiries and POS sales will both land here.'));$$('[data-order]').forEach(r=>{r.onclick=()=>orderDetail(r.dataset.order);r.onkeydown=e=>{if(e.key==='Enter')r.click()}})}
-async function orderDetail(id){const o=await api('orders/'+id);openModal(`<p class="eyebrow">${esc(o.channel)} order</p><h2>${esc(o.ref)}</h2>${o.is_oversell?'<div class="alert">Needs attention — sold twice. Contact the customer to refund or remake.</div>':''}<p><strong>${esc(o.customer_name||'Walk-in')}</strong><br>${esc(o.customer_email||'')} ${esc(o.customer_phone||'')}</p><div class="card">${(o.order_items||[]).map(i=>`<p>${i.qty} × ${esc(i.product_name)} <strong style="float:right">${money(i.line_total_cents)}</strong></p>`).join('')}<hr><p>Total <strong style="float:right">${money(o.total_cents)}</strong></p></div><div class="form-actions"><a class="button secondary" href="mailto:${encodeURIComponent(o.customer_email||'')}?subject=${encodeURIComponent('Verre order '+o.ref)}">Email customer</a>${['inquiry','quoted','awaiting_payment','paid','in_production','fulfilled','cancelled'].map(s=>`<button data-status="${s}" ${s===o.status?'disabled':''}>${s.replace('_',' ')}</button>`).join('')}</div>`);$$('[data-status]').forEach(b=>b.onclick=async()=>{const note=b.dataset.status==='cancelled'?prompt('Cancellation note:')||'Cancelled by admin':'';try{await api(`orders/${id}/status`,{method:'POST',body:JSON.stringify({status:b.dataset.status,payment_method:b.dataset.status==='paid'?'gcash':null,note})});closeModal();toast('Order updated');orders()}catch(e){toast(e.message,true)}})}
+async function orderDetail(id){const o=await api('orders/'+id);const items=o.order_items||[],costComplete=items.length>0&&items.every(i=>i.cost_total_cents!=null),productCost=costComplete?items.reduce((sum,i)=>sum+i.cost_total_cents,0):null;openModal(`<p class="eyebrow">${esc(o.channel)} order</p><h2>${esc(o.ref)}</h2>${o.is_oversell?'<div class="alert">Needs attention — sold twice. Contact the customer to refund or remake.</div>':''}<p><strong>${esc(o.customer_name||'Walk-in')}</strong><br>${esc(o.customer_email||'')} ${esc(o.customer_phone||'')}</p><div class="card">${items.map(i=>`<p>${i.qty} × ${esc(i.product_name)} <strong style="float:right">${money(i.line_total_cents)}</strong>${i.cost_total_cents!=null?`<br><small>Product cost ${money(i.cost_total_cents)}</small>`:''}</p>`).join('')}<hr><p>Total <strong style="float:right">${money(o.total_cents)}</strong></p>${costComplete?`<p>Product cost <strong style="float:right">${money(productCost)}</strong></p><p>Gross profit <strong style="float:right">${money(o.total_cents-productCost)}</strong></p>`:'<p><small>Profit unavailable because historical product cost is incomplete.</small></p>'}</div><div class="form-actions"><a class="button secondary" href="mailto:${encodeURIComponent(o.customer_email||'')}?subject=${encodeURIComponent('Verre order '+o.ref)}">Email customer</a>${['inquiry','quoted','awaiting_payment','paid','in_production','fulfilled','cancelled'].map(s=>`<button data-status="${s}" ${s===o.status?'disabled':''}>${s.replace('_',' ')}</button>`).join('')}</div>`);$$('[data-status]').forEach(b=>b.onclick=async()=>{const note=b.dataset.status==='cancelled'?prompt('Cancellation note:')||'Cancelled by admin':'';try{await api(`orders/${id}/status`,{method:'POST',body:JSON.stringify({status:b.dataset.status,payment_method:b.dataset.status==='paid'?'gcash':null,note})});closeModal();toast('Order updated');orders()}catch(e){toast(e.message,true)}})}
 
 /* ------------------------------------------------------------------ */
 /* custom commissions                                                  */

@@ -1,4 +1,4 @@
-import { listProducts, saveProduct, archiveProduct, restoreProduct, productRemovalPlan, removeProduct, uploadProductImage, deleteImage, reorderImages } from '../db/products.js';
+import { listProducts, saveProduct, archiveProduct, publishProduct, restoreProduct, productRemovalPlan, removeProduct, uploadProductImage, deleteImage, reorderImages } from '../db/products.js';
 import { adjustStock, listMovements, stocktake } from '../db/stock.js';
 import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeSession } from '../db/orders.js';
 import { dashboard } from '../db/stats.js';
@@ -125,6 +125,10 @@ export async function adminApi(request, env, user) {
   if (parts[0] === 'products' && parts[2] === 'archive' && method === 'POST') {
     if (!can(user,'catalog')) return denied();
     return mutation(env,await archiveProduct(env,parts[1],user.email));
+  }
+  if (parts[0] === 'products' && parts[2] === 'publish' && method === 'POST') {
+    if (!can(user,'catalog')) return denied();
+    return mutation(env,await publishProduct(env,parts[1],user.email));
   }
   if (parts[0] === 'products' && parts[2] === 'restore' && method === 'POST') {
     if (!can(user,'catalog')) return denied();

@@ -79,6 +79,14 @@ for(const route of ['dashboard','products','inventory','orders','sessions','acco
 }
 assert.match(adminApp,/data-inventory-archive/, 'inventory needs an archive action');
 assert.match(adminApp,/data-inventory-delete/, 'inventory needs a product-removal action');
+assert.match(adminApp,/data-publish=/, 'draft products need an explicit publish-to-shop action');
+assert.match(adminApp,/Only active products appear in the public shop\./, 'product visibility must explain the active-only shop rule');
+assert.match(adminApp,/name="cost"/, 'product form must collect per-unit buying or making cost');
+assert.match(adminApp,/Gross profit/, 'dashboard and order details must report gross profit');
+assert.match(sql,/add column cost_cents integer check \(cost_cents >= 0\)/, 'products need a validated private cost field');
+assert.match(sql,/add column unit_cost_cents integer/, 'order lines need a historical unit-cost snapshot');
+assert.match(sql,/create trigger order_items_snapshot_cost/, 'every catalog sale path must snapshot product cost');
+assert.match(sql,/'gross_profit_cents'/, 'dashboard aggregation must return gross profit');
 assert.match(adminApp,/Current products/, 'product management should hide archived rows by default');
 assert.match(adminApp,/data-restore/, 'archived products need an explicit restore-as-draft action');
 assert.match(adminApp,/cache:'no-store'/, 'admin refreshes must not reuse a pre-delete catalog response');

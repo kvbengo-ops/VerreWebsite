@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { listProducts, listPublicProducts, removeProduct, restoreProduct, uploadProductImage } from './db/products.js';
+import { listProducts, listPublicProducts, publishProduct, removeProduct, restoreProduct, saveProduct, uploadProductImage } from './db/products.js';
 
 const env = { SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
 const realFetch = globalThis.fetch;
@@ -87,8 +87,29 @@ await listPublicProducts(env, 'sold-product');
 assert.match(listUrls[0], /status=neq\.archived/, 'normal admin/inventory lists exclude archived products');
 assert.doesNotMatch(listUrls[1], /status=(?:neq|eq)\.archived/, 'product management can explicitly include archived products');
 assert.match(listUrls[2], /status=eq\.active/, 'the public catalog includes only active products');
+assert.doesNotMatch(decodeURIComponent(listUrls[2]),/cost_cents/,'buying cost must not be exposed to storefront or POS clients');
 assert.match(listUrls[3], /or=\(status\.eq\.active,slug\.eq\.sold-product\)/,
   'an archived deep link resolves without adding archived products to the normal catalog');
+
+// Cost is required on admin saves and before a draft can be published.
+let saveFetches=0;
+globalThis.fetch=async()=>{saveFetches++;return response({})};
+const missingCost=await saveProduct(env,{name:'No cost'},'owner@verre.test');
+assert.equal(missingCost.error?.code,'INVALID_PRODUCT_COST');
+assert.equal(saveFetches,0,'invalid cost is rejected before a database write');
+
+const publishCalls=[];
+globalThis.fetch=async (url,options={})=>{
+  const path=new URL(url).pathname;
+  publishCalls.push({path,method:options.method||'GET',body:options.body});
+  if(path.endsWith('/products')&&(options.method||'GET')==='GET')return response([{id:'draft-product',cost_cents:12500}]);
+  if(path.endsWith('/products'))return response([{id:'draft-product',status:'active',cost_cents:12500}]);
+  return response({});
+};
+const published=await publishProduct(env,'draft-product','owner@verre.test');
+assert.equal(published.error,null);
+assert.deepEqual(JSON.parse(publishCalls.find(call=>call.path.endsWith('/products')&&call.method==='PATCH').body),{status:'active'});
+assert.equal(JSON.parse(publishCalls.find(call=>call.path.endsWith('/admin_audit_log')).body).action,'product.publish');
 
 // An uploaded image row must become the signed URL consumed by both the
 // storefront and POS. This is the regression boundary for falling back to the

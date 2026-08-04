@@ -1,7 +1,15 @@
 import { db } from './client.js';
 import { FALLBACK_PRODUCTS } from './fallback.js';
 
-const PRODUCT_SELECT = '*,product_images(id,storage_path,alt,position)';
+const ADMIN_PRODUCT_SELECT = '*,product_images(id,storage_path,alt,position)';
+// Buying cost is private operational data. Public storefront and POS responses
+// use an allowlist so schema additions cannot leak cost_cents to customers.
+const PUBLIC_PRODUCT_SELECT = [
+  'id','slug','name','category','tag','price_cents','status','stock_on_hand',
+  'low_stock_at','one_of_a_kind','blurb','description','dimensions','materials',
+  'care','lead_time','bg_color','tape_color','sort_order',
+  'product_images(id,storage_path,alt,position)'
+].join(',');
 const encode = encodeURIComponent;
 
 export async function listPublicProducts(env, includeArchivedSlug) {
@@ -10,7 +18,7 @@ export async function listPublicProducts(env, includeArchivedSlug) {
   const filter = includeArchivedSlug
     ? `or=(status.eq.active,slug.eq.${encode(includeArchivedSlug)})`
     : 'status=eq.active';
-  const result = await client.rest('products', `select=${encode(PRODUCT_SELECT)}&${filter}&order=sort_order.asc`);
+  const result = await client.rest('products', `select=${encode(PUBLIC_PRODUCT_SELECT)}&${filter}&order=sort_order.asc`);
   // Once a real database is configured, the seed fallback is no longer a safe
   // last-known-good catalog: removed products may have changed since deploy.
   // The public route can still use its KV snapshot, but without one an empty
@@ -20,7 +28,7 @@ export async function listPublicProducts(env, includeArchivedSlug) {
 }
 
 export async function listProducts(env, params = {}) {
-  const query = [`select=${encode(PRODUCT_SELECT)}`];
+  const query = [`select=${encode(ADMIN_PRODUCT_SELECT)}`];
   if (params.search) query.push(`or=(name.ilike.*${encode(params.search)}*,slug.ilike.*${encode(params.search)}*)`);
   if (params.category) query.push('category=eq.' + encode(params.category));
   if (params.status) query.push('status=eq.' + encode(params.status));
@@ -32,16 +40,20 @@ export async function listProducts(env, params = {}) {
 }
 
 export async function getProduct(env, id) {
-  const result = await db(env).rest('products', `select=${encode(PRODUCT_SELECT)}&id=eq.${encode(id)}&limit=1`);
+  const result = await db(env).rest('products', `select=${encode(ADMIN_PRODUCT_SELECT)}&id=eq.${encode(id)}&limit=1`);
   return result.error ? result : { data: result.data?.[0] || null, error: null };
 }
 
 export async function saveProduct(env, product, actor) {
   const client = db(env);
   const id = product.id;
+  if (!Number.isInteger(product.cost_cents) || product.cost_cents < 0) {
+    return { data: null, error: { message: 'Enter a valid product cost.', code: 'INVALID_PRODUCT_COST' } };
+  }
   const body = {
     slug: product.slug, name: product.name, category: product.category, tag: product.tag,
-    price_cents: product.price_cents, status: product.status, low_stock_at: product.one_of_a_kind ? 0 : product.low_stock_at,
+    price_cents: product.price_cents, cost_cents: product.cost_cents,
+    status: product.status, low_stock_at: product.one_of_a_kind ? 0 : product.low_stock_at,
     one_of_a_kind: Boolean(product.one_of_a_kind), blurb: product.blurb || null,
     description: product.description || null, dimensions: product.dimensions || null,
     materials: product.materials || null, care: product.care || null,
@@ -60,6 +72,21 @@ export async function archiveProduct(env, id, actor) {
     method: 'PATCH', headers: { prefer: 'return=representation' }, body: JSON.stringify({ status: 'archived' })
   });
   if (!result.error) await audit(env, actor, 'product.archive', id, { status: 'archived' });
+  return result;
+}
+
+export async function publishProduct(env, id, actor) {
+  const client = db(env);
+  const product = await client.rest('products', `id=eq.${encode(id)}&select=id,cost_cents&limit=1`);
+  if (product.error) return product;
+  if (!product.data?.[0]) return { data: null, error: { message: 'Product not found', code: 'NOT_FOUND', status: 404 } };
+  if (product.data[0].cost_cents == null) {
+    return { data: null, error: { message: 'Add the product cost before publishing it to the shop.', code: 'COST_REQUIRED' } };
+  }
+  const result = await client.rest('products', `id=eq.${encode(id)}&select=*`, {
+    method: 'PATCH', headers: { prefer: 'return=representation' }, body: JSON.stringify({ status: 'active' })
+  });
+  if (!result.error) await audit(env, actor, 'product.publish', id, { status: 'active' });
   return result;
 }
 
