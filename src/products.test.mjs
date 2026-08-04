@@ -111,25 +111,21 @@ assert.equal(published.error,null);
 assert.deepEqual(JSON.parse(publishCalls.find(call=>call.path.endsWith('/products')&&call.method==='PATCH').body),{status:'active'});
 assert.equal(JSON.parse(publishCalls.find(call=>call.path.endsWith('/admin_audit_log')).body).action,'product.publish');
 
-// An uploaded image row must become the signed URL consumed by both the
-// storefront and POS. This is the regression boundary for falling back to the
-// built-in atlas even after a photo was saved successfully.
+// An uploaded image row becomes a stable same-origin URL consumed by both the
+// storefront and POS. The private storage path and service token stay server-side.
 globalThis.fetch = async (url) => {
   const path = new URL(url).pathname;
   if (path.endsWith('/products')) return response([{
     id:'photo-product', slug:'photo-product', status:'active', sort_order:1,
-    product_images:[{id:'photo-1',storage_path:'products/photo-product/front.webp',alt:'Front view',position:0}]
+    product_images:[{id:'22222222-2222-4222-8222-222222222222',storage_path:'products/photo-product/front.webp',alt:'Front view',position:0}]
   }]);
-  if (path.includes('/storage/v1/object/sign/product-images/')) {
-    return response({ signedURL:'/object/sign/product-images/products/photo-product/front.webp?token=signed-test' });
-  }
   return response({});
 };
 const catalogWithPhoto=await listPublicProducts(env);
 assert.equal(catalogWithPhoto.error,null);
 assert.equal(catalogWithPhoto.data[0].images[0].alt,'Front view');
 assert.equal(catalogWithPhoto.data[0].images[0].url,
-  'https://db.test/storage/v1/object/sign/product-images/products/photo-product/front.webp?token=signed-test');
+  '/media/products/22222222-2222-4222-8222-222222222222.webp');
 
 // A configured database failure must not resurrect the old seeded catalog.
 // Removed products are more important than a deceptively full fallback grid.

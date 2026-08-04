@@ -23,6 +23,14 @@ SUPER_ADMIN_EMAILS=
 LOCAL_AUTH_BYPASS=true
 LOCAL_AUTH_EMAIL=local@verre.test
 
+# Optional once the custom domain is connected. It pins canonical URLs and the
+# sitemap to one public origin even if the Worker also has another hostname.
+PUBLIC_SITE_URL=https://your-exact-domain.example
+
+# Optional URL-prefix Search Console verification. Domain-property verification
+# normally uses the Google TXT record in Spaceship DNS instead.
+GOOGLE_SITE_VERIFICATION=
+
 # Optional KV namespace for login rate limiting. The in-memory fallback resets
 # whenever Cloudflare recycles the isolate, which is fine for the contact form
 # and NOT fine for a password gate. Bind this in production.

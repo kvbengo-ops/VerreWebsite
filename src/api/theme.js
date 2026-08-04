@@ -1,6 +1,7 @@
 import { resolveTheme, themeById } from '../themes.js';
 import { getThemeOverride } from '../db/settings.js';
 import { listPublicMarkets } from '../db/markets.js';
+import { injectSeo } from '../seo.js';
 
 /**
  * Serve the storefront with its theme already decided.
@@ -10,7 +11,7 @@ import { listPublicMarkets } from '../db/markets.js';
  * everyday pink and then swap to Christmas a moment later. A marketing feature
  * that visibly changes its mind is worse than not having it.
  */
-export async function themedPage(request, env) {
+export async function themedPage(request, env, options = {}) {
   // Hand the path to ASSETS untouched.
   //
   // Rewriting '/' to '/index.html' makes the asset layer canonicalise it
@@ -26,7 +27,12 @@ export async function themedPage(request, env) {
   // reuses its cached copy with whatever season was live when it first loaded,
   // and the only thing that shakes it loose is index.html changing, i.e. a
   // rebuild. We need the body every time so we can dress it.
-  const assetRequest = new Request(request);
+  const assetUrl = new URL(request.url);
+  if (options.assetPath) {
+    assetUrl.pathname = options.assetPath;
+    assetUrl.search = '';
+  }
+  const assetRequest = new Request(assetUrl, request);
   assetRequest.headers.delete('if-none-match');
   assetRequest.headers.delete('if-modified-since');
 
@@ -68,6 +74,7 @@ export async function themedPage(request, env) {
   const themed = html.includes('</head>')
     ? html.replace('</head>', tag + '</head>')
     : tag + html;
+  const complete = injectSeo(themed, request, env, options);
 
   const headers = new Headers(response.headers);
   headers.set('content-type', 'text/html; charset=utf-8');
@@ -86,7 +93,7 @@ export async function themedPage(request, env) {
   );
   headers.set('x-verre-theme', payload.id);
   headers.delete('content-length'); // body length changed
-  return new Response(themed, { status: response.status, headers });
+  return new Response(complete, { status: options.status || response.status, headers });
 }
 
 async function cachedOverride(env) {

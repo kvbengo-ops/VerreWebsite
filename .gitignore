@@ -6,3 +6,6 @@ dist/
 .wrangler/
 node_modules/
 .npm-cache/
+uploads/
+*.log
+task*.md

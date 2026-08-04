@@ -11,6 +11,7 @@ import { db } from './db/client.js';
 import { themedPage } from './api/theme.js';
 import { can, resolveUser } from './roles.js';
 import { emailButton, emailMessage, emailReference, emailShell, escapeEmailHtml as esc } from './email.js';
+import { productImage, productPage, robots, sitemap } from './api/seo.js';
 
 const MAX_BODY = 16 * 1024;
 const RESEND_TIMEOUT_MS = 8000;
@@ -53,6 +54,17 @@ export default {
     // in this project so far (no backend, no theme, sign-in unavailable) had
     // the same root cause and no way to see it from outside.
     if (url.pathname === '/api/health') return handleHealth(request, env);
+
+    if (url.pathname === '/robots.txt' && request.method === 'GET') return robots(request, env);
+    if (url.pathname === '/sitemap.xml' && request.method === 'GET') return sitemap(request, env);
+    const productRoute = url.pathname.match(/^\/products\/([^/]+)\/?$/);
+    if (productRoute && request.method === 'GET') {
+      let slug;
+      try { slug = decodeURIComponent(productRoute[1]); } catch { return new Response('Not found', { status: 404 }); }
+      return productPage(request, env, slug);
+    }
+    const imageRoute = url.pathname.match(/^\/media\/products\/([0-9a-f-]+)\.webp$/i);
+    if (imageRoute && request.method === 'GET') return productImage(request, env, imageRoute[1]);
 
     if (url.pathname === '/api/inquiry') return handleInquiry(request, env);
 

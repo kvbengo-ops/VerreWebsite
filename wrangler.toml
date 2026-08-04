@@ -65,4 +65,4 @@ binding = "ASSETS"
 # The bare paths are listed separately — "/admin/*" does not match "/admin",
 # which otherwise gets a 307 directory redirect from the asset layer instead of
 # the 401 everything else under it returns.
-run_worker_first = ["/", "/index.html", "/admin", "/admin/*", "/pos", "/pos/*"]
+run_worker_first = ["/", "/index.html", "/products/*", "/media/products/*", "/robots.txt", "/sitemap.xml", "/admin", "/admin/*", "/pos", "/pos/*"]

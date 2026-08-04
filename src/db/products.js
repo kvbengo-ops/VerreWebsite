@@ -24,7 +24,7 @@ export async function listPublicProducts(env, includeArchivedSlug) {
   // The public route can still use its KV snapshot, but without one an empty
   // stale catalog is safer than silently republishing archived inventory.
   if (result.error) return { data: [], error: result.error, stale: true };
-  return { data: await attachSignedImages(env, result.data), error: null, stale: false };
+  return { data: attachPublicImages(result.data), error: null, stale: false };
 }
 
 export async function listProducts(env, params = {}) {
@@ -36,7 +36,7 @@ export async function listProducts(env, params = {}) {
   query.push('order=' + (params.sort === 'stock' ? 'stock_on_hand.asc' : 'name.asc'));
   const result = await db(env).rest('products', query.join('&'));
   if (result.error) return result;
-  return { data: await attachSignedImages(env, result.data), error: null };
+  return { data: attachPublicImages(result.data), error: null };
 }
 
 export async function getProduct(env, id) {
@@ -222,19 +222,18 @@ export async function reorderImages(env, productId, ids, actor) {
   return { data: { ids }, error: null };
 }
 
-async function signedUrl(env, path) {
-  const result = await db(env).storage('object/sign/product-images/' + path, { method: 'POST', body: JSON.stringify({ expiresIn: 3600 }) });
-  if (result.error) return null;
-  const value = result.data.signedURL || result.data.signedUrl || result.data.url;
-  return value ? (value.startsWith('http') ? value : String(env.SUPABASE_URL).replace(/\/$/, '') + '/storage/v1' + value) : null;
-}
-
-async function attachSignedImages(env, products) {
-  return Promise.all((products || []).map(async (product) => {
+function attachPublicImages(products) {
+  return (products || []).map((product) => {
     const rows = (product.product_images || product.images || []).sort((a,b) => a.position - b.position);
-    const images = await Promise.all(rows.map(async (image) => ({ ...image, url: await signedUrl(env, image.storage_path) })));
+    // Stable same-origin URLs are safe to cache and crawl. The Worker verifies
+    // the image id, reads the private bucket with its service role, and streams
+    // the bytes without exposing the storage path or a short-lived token.
+    const images = rows.map((image) => ({
+      ...image,
+      url: image.id ? `/media/products/${encodeURIComponent(image.id)}.webp` : null
+    }));
     return { ...product, images, atlas: product.sort_order, gallery: [product.sort_order, product.category === 'glass' ? 8 : product.category === 'charms' ? 9 : 10] };
-  }));
+  });
 }
 
 async function audit(env, actor, action, entityId, diff) {

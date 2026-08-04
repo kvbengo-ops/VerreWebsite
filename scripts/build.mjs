@@ -41,10 +41,7 @@ await mkdir(server, { recursive: true });
 
 await copyFile(resolve(root, "index.html"), resolve(client, "index.html"));
 await copyFile(resolve(root, "support.js"), resolve(client, "support.js"));
-await copyFile(
-  resolve(root, "assets", "verre-photo-atlas.png"),
-  resolve(client, "assets", "verre-photo-atlas.png")
-);
+await copyTree(resolve(root, "assets"), resolve(client, "assets"));
 await copyTree(resolve(root, "admin"), resolve(client, "admin"));
 await copyTree(resolve(root, "pos"), resolve(client, "pos"));
 // Public by design — it is the page you reach *because* you are not signed in.

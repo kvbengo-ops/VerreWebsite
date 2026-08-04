@@ -326,6 +326,8 @@ const homeHtml = await home.text();
 assert.equal(home.status, 200, 'the storefront renders even when the settings read fails');
 assert.match(homeHtml, /window\.__VERRE_THEME__=\{[\s\S]*<\/head>/, 'the theme is injected before </head>');
 assert.match(homeHtml, /window\.__VERRE_MARKETS__=\[/, 'published upcoming markets are injected with the theme');
+assert.match(homeHtml, /rel="canonical" href="https:\/\/verre\.test\/"/, 'the homepage has one canonical URL');
+assert.match(homeHtml, /application\/ld\+json/, 'the homepage publishes structured data');
 assert.ok(home.headers.get('x-verre-theme'), 'the resolved theme is reported in a header');
 assert.equal(home.headers.get('content-length'), null, 'stale content-length must not survive the rewrite');
 
@@ -365,7 +367,60 @@ const hostile = await worker.fetch(new Request('https://verre.test/?theme=' + en
 const hostileHtml = await hostile.text();
 assert.equal(hostile.headers.get('x-verre-theme'), 'default', 'an unknown theme falls back rather than erroring');
 assert.ok(!hostileHtml.includes('onerror=alert(1)'), 'a hostile theme parameter never reaches the document');
-assert.ok(!/__VERRE_THEME__=[^\n]*<\/script>/.test(hostileHtml.split('</head>')[0].replace(/<\/script>\s*$/, '')),
+const themeScript = hostileHtml.match(/<script>window\.__VERRE_THEME__=[\s\S]*?<\/script>/)?.[0] || '';
+assert.ok(themeScript && (themeScript.match(/<\/script>/g) || []).length === 1,
   'the injected JSON must not be able to close its own script element');
+
+// Search engines receive explicit discovery files, and each active product has
+// a stable URL with its own canonical metadata and Product structured data.
+const robotsResponse = await worker.fetch(new Request('https://verre.test/robots.txt'), themeEnv);
+const robotsBody = await robotsResponse.text();
+assert.match(robotsBody, /Sitemap: https:\/\/verre\.test\/sitemap\.xml/);
+assert.match(robotsBody, /Disallow: \/admin/);
+const workerRobots = await worker.fetch(new Request('https://verre.workers.dev/robots.txt'), themeEnv);
+assert.equal(await workerRobots.text(), 'User-agent: *\nDisallow: /\n', 'the duplicate workers.dev origin is not indexed');
+
+const sitemapResponse = await worker.fetch(new Request('https://verre.test/sitemap.xml'), themeEnv);
+const sitemapBody = await sitemapResponse.text();
+assert.match(sitemapBody, /<loc>https:\/\/verre\.test\/products\/peach-sky-glass-panel<\/loc>/);
+assert.ok(!sitemapBody.includes('/admin'), 'private tools never enter the sitemap');
+
+const productResponse = await worker.fetch(new Request('https://verre.test/products/peach-sky-glass-panel'), themeEnv);
+const productHtml = await productResponse.text();
+assert.equal(productResponse.status, 200);
+assert.match(productHtml, /<title>Peach Sky Glass Panel \| Handmade by Verre<\/title>/);
+assert.match(productHtml, /rel="canonical" href="https:\/\/verre\.test\/products\/peach-sky-glass-panel"/);
+assert.match(productHtml, /"@type":"Product"/);
+const missingProduct = await worker.fetch(new Request('https://verre.test/products/not-real'), themeEnv);
+assert.equal(missingProduct.status, 404);
+assert.match(await missingProduct.text(), /name="robots" content="noindex,follow"/);
+
+// Uploaded photos stay in the private bucket but get a permanent public shop
+// URL. Crawlers and browsers never receive a short-lived Supabase token.
+const imageId = '22222222-2222-4222-8222-222222222222';
+const imageFetch = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  const path = new URL(url).pathname;
+  if (path.endsWith('/rest/v1/product_images')) {
+    return new Response(JSON.stringify([{ storage_path: 'products/p1/front.webp' }]), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+  if (path.endsWith('/storage/v1/object/product-images/products/p1/front.webp')) {
+    return new Response(new Uint8Array([82, 73, 70, 70]), {
+      headers: { 'content-type': 'image/webp', etag: 'photo-v1' }
+    });
+  }
+  return new Response('Not found', { status: 404 });
+};
+const imageResponse = await worker.fetch(
+  new Request('https://verre.test/media/products/' + imageId + '.webp'),
+  { ...themeEnv, SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' }
+);
+assert.equal(imageResponse.status, 200);
+assert.equal(imageResponse.headers.get('content-type'), 'image/webp');
+assert.match(imageResponse.headers.get('cache-control'), /max-age=86400/);
+assert.equal(imageResponse.headers.get('etag'), 'photo-v1');
+globalThis.fetch = imageFetch;
 
 console.log('ok');
