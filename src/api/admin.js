@@ -1,4 +1,4 @@
-import { listProducts, saveProduct, archiveProduct, hardDeleteProduct, signUpload, saveImage, deleteImage, reorderImages } from '../db/products.js';
+import { listProducts, saveProduct, archiveProduct, productRemovalPlan, removeProduct, signUpload, saveImage, deleteImage, reorderImages } from '../db/products.js';
 import { adjustStock, listMovements, stocktake } from '../db/stock.js';
 import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeSession } from '../db/orders.js';
 import { dashboard } from '../db/stats.js';
@@ -113,6 +113,10 @@ export async function adminApi(request, env, user) {
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
     return mutation(env,await saveProduct(env,parsed.data,user.email),201);
   }
+  if (parts[0] === 'products' && parts[1] && parts[2] === 'removal-plan' && method === 'GET') {
+    if (!can(user,'catalog')) return denied();
+    return result(await productRemovalPlan(env,parts[1]));
+  }
   if (parts[0] === 'products' && parts[1] && method === 'PATCH') {
     if (!can(user,'catalog')) return denied();
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
@@ -124,7 +128,7 @@ export async function adminApi(request, env, user) {
   }
   if (parts[0] === 'products' && parts[1] && parts.length === 2 && method === 'DELETE') {
     if (!can(user,'catalog')) return denied();
-    return mutation(env,await hardDeleteProduct(env,parts[1],user.email));
+    return mutation(env,await removeProduct(env,parts[1],user.email));
   }
   if (path === 'images/sign' && method === 'POST') {
     if (!can(user,'catalog')) return denied();

@@ -199,7 +199,7 @@ function revenueChart(daily=[]){
 }
 
 async function products(){
-  state.products=await api('products');
+  state.products=await api('products?include_archived=true');
   setBody(`<div class="toolbar"><input id="search" type="search" placeholder="Search name or slug"><select id="category"><option value="">All categories</option><option>glass</option><option>charms</option><option>stickers</option></select><select id="status"><option value="">All statuses</option><option>active</option><option>draft</option><option>archived</option></select><select id="sort"><option value="name">Name</option><option value="stock">Lowest stock</option></select><button class="primary" id="new-product">Add product</button></div><div id="products-table"></div>`);
   const update=()=>drawProducts();
   $$('#search,#category,#status,#sort').forEach(el=>el.addEventListener('input',update));
@@ -291,23 +291,28 @@ async function resizeWebp(file){
 const field=(name,label,value='',required=false,disabled=false,type='text')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${disabled?'disabled':''}></label>`;
 const area=(name,label,value='')=>`<label class="span-2">${label}<textarea name="${name}" rows="3">${esc(value||'')}</textarea></label>`;
 async function archive(id,refresh=products){if(!confirm('Archive this product? It will leave the public shop but keep its order history.'))return;try{await api(`products/${id}/archive`,{method:'POST'});toast('Product archived');await refresh()}catch(e){toast(e.message,true)}}
-function deleteProduct(product,refresh=products,closeAfter=false){
+async function deleteProduct(product,refresh=products,closeAfter=false){
   if(!product)return toast('That product could not be found.',true);
+  let plan;
+  try{plan=await api('products/'+product.id+'/removal-plan')}
+  catch(error){return toast(error.message,true)}
+  const hasHistory=Boolean(plan.has_history);
+  const actionLabel=hasHistory?'Remove from catalog':'Delete permanently';
   deleteProductModalBody.innerHTML=`
     <form id="delete-product-form" class="danger-confirm" novalidate>
       <div class="danger-confirm__mark" aria-hidden="true">!</div>
       <div class="danger-confirm__heading">
-        <p class="eyebrow">Permanent action</p>
-        <h2 id="delete-product-title">Delete this product?</h2>
-        <p id="delete-product-description">This removes the product from your catalog and inventory. It cannot be undone.</p>
+        <p class="eyebrow">${hasHistory?'Catalog removal':'Permanent action'}</p>
+        <h2 id="delete-product-title">${hasHistory?'Remove this product from the catalog?':'Delete this product?'}</h2>
+        <p id="delete-product-description">${hasHistory?'This product has historical records. It will be removed from the active catalog while its order, sales, and inventory history remain available.':'This removes the product from your catalog and inventory. It cannot be undone.'}</p>
       </div>
       <div class="danger-confirm__product">
         <div><span>Product</span><strong>${esc(product.name)}</strong><code>${esc(product.slug)}</code></div>
         <div class="danger-confirm__meta"><span class="status ${esc(product.status||'draft')}">${esc(product.status||'draft')}</span><span>${Number(product.stock_on_hand)||0} on hand</span></div>
       </div>
       <div class="danger-confirm__notice">
-        <strong>Before you continue</strong>
-        <p>Uploaded photos will also be removed. Products with sales or stock history may need to be archived instead.</p>
+        <strong>${hasHistory?'What stays available':'Before you continue'}</strong>
+        <p>${hasHistory?'Order records, sales, stock movements, and uploaded photos will remain attached to this archived product.':'Uploaded photos will also be removed because this product has no historical records.'}</p>
       </div>
       <label class="danger-confirm__field" for="confirm-product-slug">Type <code>${esc(product.slug)}</code> to confirm
         <input id="confirm-product-slug" name="confirmation" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="delete-product-hint">
@@ -316,7 +321,7 @@ function deleteProduct(product,refresh=products,closeAfter=false){
       <p class="error danger-confirm__error" id="delete-product-error" role="status" aria-live="polite"></p>
       <div class="danger-confirm__actions">
         <button type="button" class="secondary" id="cancel-product-delete">Keep product</button>
-        <button type="submit" class="danger" id="confirm-product-delete" disabled>Delete permanently</button>
+        <button type="submit" class="danger" id="confirm-product-delete" disabled>${actionLabel}</button>
       </div>
     </form>`;
   const form=$('#delete-product-form',deleteProductModalBody);
@@ -332,15 +337,15 @@ function deleteProduct(product,refresh=products,closeAfter=false){
   form.onsubmit=async event=>{
     event.preventDefault();
     if(input.value!==product.slug)return;
-    input.disabled=true;cancelButton.disabled=true;deleteButton.disabled=true;deleteButton.textContent='Deleting…';
+    input.disabled=true;cancelButton.disabled=true;deleteButton.disabled=true;deleteButton.textContent=hasHistory?'Removing…':'Deleting…';
     try{
-      await api('products/'+product.id,{method:'DELETE'});
+      const outcome=await api('products/'+product.id,{method:'DELETE'});
       closeConfirmation();
       if(closeAfter){state.dirty=false;closeModal()}
-      toast(`${product.name} was permanently deleted`);await refresh();
+      toast(outcome.removal==='archived'?`${product.name} was removed from the active catalog`:`${product.name} was permanently deleted`);await refresh();
     }catch(error){
       errorMessage.textContent=error.message;
-      input.disabled=false;cancelButton.disabled=false;deleteButton.disabled=false;deleteButton.textContent='Delete permanently';input.focus();
+      input.disabled=false;cancelButton.disabled=false;deleteButton.disabled=false;deleteButton.textContent=actionLabel;input.focus();
     }
   };
   deleteProductModal.showModal();

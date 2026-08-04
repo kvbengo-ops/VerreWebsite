@@ -15,7 +15,7 @@ export const listMovements = (env, params = {}) => {
 };
 
 export async function stocktake(env, counts, actor) {
-  const products = await db(env).rest('products', 'select=id,name,stock_on_hand');
+  const products = await db(env).rest('products', 'select=id,name,stock_on_hand&status=neq.archived');
   if (products.error) return products;
   const byId = new Map(products.data.map((p) => [p.id, p]));
   const changes = [];

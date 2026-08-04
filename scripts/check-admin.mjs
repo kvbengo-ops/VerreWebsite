@@ -19,6 +19,8 @@ assert.match(sql,/values \('product-images', 'product-images', false\)/,'product
 assert.match(sql,/client_uuid\s+uuid unique/,'POS idempotency key must be unique');
 assert.match(sql,/greatest\(stock_on_hand - v_qty, 0\)/,'oversells must clamp stock to zero');
 assert.match(sql,/'oversell_correction'/,'oversells need a compensating movement');
+assert.match(sql,/alter table order_items\s+add constraint order_items_product_id_fkey\s+foreign key \(product_id\) references products\(id\) on delete restrict/i,
+  'historical order lines must prevent physical product deletion');
 
 // pgcrypto is installed into the `extensions` schema on Supabase and is not on
 // the search_path during migrations, so its functions must be schema qualified
@@ -72,11 +74,13 @@ for(const route of ['dashboard','products','inventory','orders','sessions','acco
   assert.ok(new RegExp('^\\s*'+route+':','m').test(adminApp),route+' needs a routeRoles and PAGES entry');
 }
 assert.match(adminApp,/data-inventory-archive/, 'inventory needs an archive action');
-assert.match(adminApp,/data-inventory-delete/, 'inventory needs a permanent-delete action');
+assert.match(adminApp,/data-inventory-delete/, 'inventory needs a product-removal action');
 assert.match(adminApp,/capabilities\?\.includes\('catalog'\)/, 'destructive inventory actions must only render for catalog managers');
 assert.match(adminHtml,/id="delete-product-modal"/, 'product deletion needs an accessible in-app confirmation dialog');
 assert.match(adminApp,/id="confirm-product-slug"/, 'product deletion must require the exact slug');
-assert.match(adminApp,/Delete permanently<\/button>/, 'product deletion needs an explicit destructive action');
+assert.match(adminApp,/Remove from catalog/, 'products with history need an archive-oriented confirmation action');
+assert.match(adminApp,/This product has historical records\. It will be removed from the active catalog while its order, sales, and inventory history remain available\./, 'historical product removal needs clear preservation copy');
+assert.match(adminApp,/Delete permanently/, 'history-free products retain an explicit permanent-delete action');
 assert.doesNotMatch(adminApp,/prompt\(`Permanently delete/, 'product deletion must not fall back to a browser prompt');
 for(const action of ['data-market-edit','data-market-delete','data-market-up','data-market-down']){
   assert.ok(adminApp.includes(action),'market CMS needs '+action);

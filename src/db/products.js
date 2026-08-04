@@ -4,13 +4,10 @@ import { FALLBACK_PRODUCTS } from './fallback.js';
 const PRODUCT_SELECT = '*,product_images(id,storage_path,alt,position)';
 const encode = encodeURIComponent;
 
-export async function listPublicProducts(env, includeArchivedSlug) {
+export async function listPublicProducts(env) {
   const client = db(env);
   if (!client.configured) return { data: FALLBACK_PRODUCTS, error: null, stale: true };
-  const filter = includeArchivedSlug
-    ? `or=(status.eq.active,slug.eq.${encode(includeArchivedSlug)})`
-    : 'status=eq.active';
-  const result = await client.rest('products', `select=${encode(PRODUCT_SELECT)}&${filter}&order=sort_order.asc`);
+  const result = await client.rest('products', `select=${encode(PRODUCT_SELECT)}&status=eq.active&order=sort_order.asc`);
   if (result.error) return { data: FALLBACK_PRODUCTS, error: result.error, stale: true };
   return { data: await attachSignedImages(env, result.data), error: null, stale: false };
 }
@@ -20,6 +17,7 @@ export async function listProducts(env, params = {}) {
   if (params.search) query.push(`or=(name.ilike.*${encode(params.search)}*,slug.ilike.*${encode(params.search)}*)`);
   if (params.category) query.push('category=eq.' + encode(params.category));
   if (params.status) query.push('status=eq.' + encode(params.status));
+  else if (params.include_archived !== 'true') query.push('status=neq.archived');
   query.push('order=' + (params.sort === 'stock' ? 'stock_on_hand.asc' : 'name.asc'));
   const result = await db(env).rest('products', query.join('&'));
   if (result.error) return result;
@@ -58,14 +56,48 @@ export async function archiveProduct(env, id, actor) {
   return result;
 }
 
-export async function hardDeleteProduct(env, id, actor) {
+export async function productRemovalPlan(env, id) {
   const client = db(env);
-  const history = await client.rest('order_items', `select=id&product_id=eq.${encode(id)}&limit=1`);
-  if (history.error) return history;
-  if (history.data.length) return { data: null, error: { message: 'Archive products that have order history', code: 'HAS_HISTORY' } };
+  const [orderItems, stockMovements] = await Promise.all([
+    client.rest('order_items', `select=id&product_id=eq.${encode(id)}&limit=1`),
+    client.rest('stock_movements', `select=id&product_id=eq.${encode(id)}&limit=1`)
+  ]);
+  if (orderItems.error) return orderItems;
+  if (stockMovements.error) return stockMovements;
+  const orderHistory = Boolean(orderItems.data?.length);
+  const stockHistory = Boolean(stockMovements.data?.length);
+  return {
+    data: {
+      has_history: orderHistory || stockHistory,
+      order_history: orderHistory,
+      stock_history: stockHistory,
+      removal: orderHistory || stockHistory ? 'archived' : 'deleted'
+    },
+    error: null
+  };
+}
+
+export async function removeProduct(env, id, actor) {
+  const client = db(env);
+  const plan = await productRemovalPlan(env, id);
+  if (plan.error) return plan;
+  if (plan.data.has_history) {
+    const archived = await archiveProduct(env, id, actor);
+    return archived.error
+      ? archived
+      : { data: { ...(archived.data?.[0] || {}), removal: 'archived', has_history: true }, error: null };
+  }
   const images = await client.rest('product_images', `select=storage_path&product_id=eq.${encode(id)}`);
   if (images.error) return images;
   const result = await client.rest('products', `id=eq.${encode(id)}`, { method: 'DELETE' });
+  // A sale or stock movement can land after the preflight checks. The database
+  // rejects that raced delete; archive on the same request instead.
+  if (result.error?.code === '23503') {
+    const archived = await archiveProduct(env, id, actor);
+    return archived.error
+      ? archived
+      : { data: { ...(archived.data?.[0] || {}), removal: 'archived', has_history: true }, error: null };
+  }
   if (!result.error) {
     // Product-image rows cascade with the product. Remove their private blobs
     // afterward; a cleanup failure must not resurrect the already-deleted row.
@@ -75,7 +107,7 @@ export async function hardDeleteProduct(env, id, actor) {
     }
     await audit(env, actor, 'product.delete', id, { images_removed: (images.data || []).length });
   }
-  return result;
+  return result.error ? result : { data: { removal: 'deleted', has_history: false }, error: null };
 }
 
 export async function signUpload(env, productId, filename) {
