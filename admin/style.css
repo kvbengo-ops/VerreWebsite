@@ -217,6 +217,38 @@ textarea{resize:vertical;min-height:88px}
 .rank small{color:var(--muted)}
 
 /* ============================================================
+   Business analytics
+   ============================================================ */
+
+.analytics-toolbar{margin-top:0;padding:var(--s3) var(--s4);border-radius:var(--r-md);background:rgba(255,255,255,.72);box-shadow:var(--lift-1)}
+.analytics-toolbar label{display:flex;align-items:center;gap:var(--s3)}
+.analytics-toolbar select{min-width:170px}
+.analytics-heading{display:flex;align-items:end;justify-content:space-between;gap:var(--s4);margin:var(--s7) 0 var(--s3)}
+.analytics-heading h2{margin:0;font:400 24px Shrikhand,cursive}
+.analytics-heading p:last-child{margin:0;color:var(--muted);font-size:12.5px;text-align:right}
+.analytics-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:var(--s4)}
+.analytics-grid--wide{grid-template-columns:minmax(0,1.35fr) minmax(280px,.8fr)}
+.analytics-mini-metrics{margin-top:0}
+.analytics-mini-metrics .metric strong{font-size:25px}
+.analytics-note{display:flex;align-items:center;gap:var(--s3);margin-top:calc(var(--s4) * -1);border-left:5px solid var(--yellow);font-size:13px}
+.analytics-note span{color:var(--muted)}
+
+.mix-list,.stat-list,.pipeline{display:grid;gap:var(--s3)}
+.mix-row{display:grid;gap:6px}
+.mix-row>div:first-child{display:flex;justify-content:space-between;gap:var(--s3);font-size:12.5px}
+.mix-row span{color:var(--muted);white-space:nowrap}
+.mix-track{height:8px;overflow:hidden;border-radius:var(--r-pill);background:var(--pink-wash)}
+.mix-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--pink),var(--pink-light))}
+
+.stat-list>div,.pipeline>div{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);padding-bottom:var(--s3);border-bottom:1px solid var(--pink-pale)}
+.stat-list>div:last-child,.pipeline>div:last-child{padding-bottom:0;border-bottom:0}
+.stat-list span{display:grid;gap:2px;min-width:0}
+.stat-list small{color:var(--muted);font-size:11.5px}
+.stat-list>div>strong,.pipeline>div>strong{flex:none;font-size:16px;color:var(--ink)}
+.stock-value-list>div>strong{color:var(--red)}
+.pipeline .status{max-width:75%;overflow:hidden;text-overflow:ellipsis}
+
+/* ============================================================
    Tables — flat and aligned on purpose
    ============================================================ */
 
@@ -379,9 +411,16 @@ dialog::backdrop{background:rgba(58,36,48,.55);backdrop-filter:blur(3px)}
   .form-grid{grid-template-columns:1fr}
   .span-2{grid-column:auto}
   .role-grid{grid-template-columns:1fr}
+  .analytics-grid,.analytics-grid--wide{grid-template-columns:1fr}
 }
 
 @media(max-width:520px){
+  .analytics-toolbar label{width:100%;align-items:flex-start;flex-direction:column}
+  .analytics-toolbar select,.analytics-toolbar button{width:100%}
+  .analytics-toolbar .spacer{display:none}
+  .analytics-heading{align-items:flex-start;flex-direction:column}
+  .analytics-heading p:last-child{text-align:left}
+  .analytics-note{align-items:flex-start;flex-direction:column}
   .danger-confirm{grid-template-columns:1fr}
   .danger-confirm__mark{width:42px;height:42px;border-radius:13px}
   .danger-confirm__heading,.danger-confirm__product,.danger-confirm__notice,.danger-confirm__field,.danger-confirm__error,.danger-confirm__actions{grid-column:1}

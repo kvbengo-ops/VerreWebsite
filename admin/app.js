@@ -6,7 +6,7 @@ const money=(c=0)=>'₱'+(Number(c)/100).toLocaleString('en-PH',{minimumFraction
 const date=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Manila'}).format(new Date(v));
 const dateOnly=(v)=>new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(String(v).slice(0,10)+'T00:00:00Z'));
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state={products:[],orders:[],movements:[],sessions:[],accounts:[],markets:[],custom:[],optionGroups:[],me:null,dirty:false};
+let state={products:[],orders:[],movements:[],sessions:[],accounts:[],markets:[],custom:[],optionGroups:[],me:null,dirty:false,dashboardDays:30};
 const roleLabels={super_admin:'Super Admin',general_admin:'General Admin',cashier:'Cashier'};
 const routeRoles={
   dashboard:['super_admin'],
@@ -126,42 +126,90 @@ function configureAccount(){
 }
 
 async function dashboard(refresh=false){
-  const data=await api('dashboard'+(refresh?'?refresh=1':''));
-  const a=data.attention;
+  const from=new Date(Date.now()-state.dashboardDays*86400000).toISOString();
+  const data=await api(`dashboard?from=${encodeURIComponent(from)}${refresh?'&refresh=1':''}`);
+  const a=data.attention||{};
+  const inventory=data.inventory||{};
   const profitComplete=Number(data.uncosted_orders||0)===0;
   // Severity is carried on the item, not inferred from position, so the two
   // that mean "money or a customer is affected right now" stay visually
   // separate from the two that mean "keep an eye on this".
   const alerts=[
-    ...a.oversells.map(o=>({level:'urgent',text:`${o.ref} needs attention — sold twice`})),
-    ...a.unanswered.map(o=>({level:'urgent',text:`Unanswered ${o.ref} is older than 48 hours`})),
-    ...a.ledger_drift.map(p=>({level:'urgent',text:`Ledger drift on ${p.name} — counted stock disagrees with the ledger`})),
-    ...a.out_of_stock.map(p=>({level:'',text:`${p.name} is active on the storefront but sold out`})),
-    ...a.low_stock.map(p=>({level:'',text:`${p.name} is low (${p.stock_on_hand} left)`})),
-    ...a.open_sessions.map(s=>({level:'',text:`Session “${s.label}” has been open over 24 hours`}))
+    ...(a.oversells||[]).map(o=>({level:'urgent',text:`${o.ref} needs attention — sold twice`})),
+    ...(a.unanswered||[]).map(o=>({level:'urgent',text:`Unanswered ${o.ref} is older than 48 hours`})),
+    ...(a.ledger_drift||[]).map(p=>({level:'urgent',text:`Ledger drift on ${p.name} — counted stock disagrees with the ledger`})),
+    ...(a.out_of_stock||[]).map(p=>({level:'',text:`${p.name} is active on the storefront but sold out`})),
+    ...(a.low_stock||[]).map(p=>({level:'',text:`${p.name} is low (${p.stock_on_hand} left)`})),
+    ...(a.missing_cost||[]).map(p=>({level:'',text:`${p.name} needs a product cost before its profit can be tracked`})),
+    ...(a.open_sessions||[]).map(s=>({level:'',text:`Session “${s.label}” has been open over 24 hours`}))
   ];
-  setBody(`<div class="toolbar"><button id="refresh-dashboard" class="secondary">Refresh metrics</button></div>`+
+  const rangeLabel=`Last ${state.dashboardDays} days`;
+  const pipeline=data.order_pipeline||{};
+  const pipelineOrder=['inquiry','quoted','awaiting_payment','paid','in_production','fulfilled','cancelled'];
+  setBody(`<div class="toolbar analytics-toolbar"><label>Reporting period<select id="dashboard-range"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option></select></label><span class="spacer"></span><button id="refresh-dashboard" class="secondary">Refresh metrics</button></div>`+
     `${profitComplete?'':`<section class="card attention"><h2>Profit needs cost information</h2><p>${data.uncosted_orders} paid order${data.uncosted_orders===1?' is':'s are'} missing a historical product cost. Sales remain accurate; gross profit is hidden rather than estimated incorrectly.</p></section>`}
     <section class="card attention"><h2>Needs attention</h2><div class="attention-list">${
       alerts.length
         ? alerts.map(x=>`<div class="alert ${x.level}">${esc(x.text)}</div>`).join('')
         : '<div class="alert calm">Nothing needs you right now.</div>'
     }</div></section>
+    <div class="analytics-heading"><div><p class="eyebrow">Sales & profit</p><h2>${rangeLabel}</h2></div><p>Paid, in-production, and fulfilled orders only.</p></div>
     <section class="grid metrics">
       ${metric('Sales',money(data.revenue_cents))}${metric('Product cost',money(data.product_cost_cents||0))}${metric('Gross profit',profitComplete?money(data.gross_profit_cents):'—')}${metric('Gross margin',profitComplete&&data.gross_margin_percent!=null?data.gross_margin_percent+'%':'—')}
-      ${metric('Orders',data.order_count)}${metric('Average order',money(data.average_order_cents))}${metric('Units sold',data.units)}
+      ${metric('Orders',data.order_count)}${metric('Average order',money(data.average_order_cents))}${metric('Units sold',data.units)}${metric('Discounts',money(data.discount_cents||0))}${metric('Web conversion',data.web_conversion_percent==null?'—':data.web_conversion_percent+'%')}
     </section>
-    <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+    <section class="grid analytics-grid analytics-grid--wide">
       <div class="card"><h2>Revenue by day</h2>${revenueChart(data.daily)}</div>
       <div class="card"><h2>Top products</h2>${
         data.top_products.length
-          ? data.top_products.map((p,i)=>`<div class="rank"><b>${i+1}</b><div><strong>${esc(p.name)}</strong><br><small>${p.units} units · ${money(p.revenue_cents)}</small></div></div>`).join('')
+          ? data.top_products.map((p,i)=>`<div class="rank"><b>${i+1}</b><div><strong>${esc(p.name)}</strong><br><small>${p.units} units · ${money(p.revenue_cents)}${p.gross_profit_cents==null?'':' · '+money(p.gross_profit_cents)+' profit'}</small></div></div>`).join('')
           : emptyState('✦','No sales yet','Once an order is marked paid, your best sellers appear here.')
       }</div>
+    </section>
+    <section class="grid analytics-grid">
+      <div class="card"><h2>Sales channels</h2>${mixList(data.channel_breakdown,'channel','revenue_cents',data.revenue_cents,money)}</div>
+      <div class="card"><h2>Payment methods</h2>${mixList(data.payment_breakdown,'payment_method','revenue_cents',data.revenue_cents,money)}</div>
+      <div class="card"><h2>Categories</h2>${mixList(data.category,'category','revenue_cents',data.revenue_cents,money)}</div>
+    </section>
+    <div class="analytics-heading"><div><p class="eyebrow">Inventory</p><h2>Current stock position</h2></div><p>Archived products are excluded from current inventory value.</p></div>
+    <section class="grid metrics analytics-mini-metrics">
+      ${metric('Products',inventory.current_products||0)}${metric('Units on hand',inventory.units_on_hand||0)}${metric('Retail value',money(inventory.retail_value_cents||0))}${metric('Inventory cost',inventory.cost_value_cents==null?'—':money(inventory.cost_value_cents))}${metric('Potential gross profit',inventory.potential_profit_cents==null?'—':money(inventory.potential_profit_cents))}${metric('Low / sold out',`${inventory.low_stock_products||0} / ${inventory.out_of_stock_products||0}`)}
+    </section>
+    ${inventory.cost_value_cents==null?`<section class="card analytics-note"><strong>Inventory value needs cost information.</strong><span>${inventory.missing_cost_units||0} stocked unit${inventory.missing_cost_units===1?' is':'s are'} attached to products without cost.</span></section>`:''}
+    <section class="grid analytics-grid analytics-grid--wide">
+      <div class="card"><h2>Stock value by product</h2>${stockValueList(inventory.top_stock)}</div>
+      <div class="card"><h2>Stock movements · ${rangeLabel.toLowerCase()}</h2>${movementSummary(data.stock_movements)}</div>
+    </section>
+    <div class="analytics-heading"><div><p class="eyebrow">Orders</p><h2>Pipeline health</h2></div><p>Orders are grouped by their current stage.</p></div>
+    <section class="grid analytics-grid analytics-grid--wide">
+      <div class="card"><h2>Order stages</h2>${pipelineList(pipelineOrder.map(status=>({status,order_count:Number(pipeline[status]||0)})))}</div>
+      <div class="card"><h2>Sales quality</h2><div class="stat-list"><div><span>Web orders</span><strong>${data.web_orders||0}</strong></div><div><span>Converted web orders</span><strong>${data.converted_web_orders||0}</strong></div><div><span>Orders with discounts</span><strong>${data.discount_order_count||0}</strong></div><div><span>Average discount</span><strong>${Number(data.discount_rate_percent||0).toFixed(1)}%</strong></div></div></div>
     </section>`);
+  $('#dashboard-range').value=String(state.dashboardDays);
+  $('#dashboard-range').onchange=e=>{state.dashboardDays=Number(e.target.value)||30;dashboard()};
   $('#refresh-dashboard').onclick=()=>dashboard(true);
 }
 const metric=(label,value)=>`<div class="card metric"><span>${label}</span><strong>${value}</strong></div>`;
+
+const analyticsLabel=value=>({web:'Online shop',pos:'POS',cash:'Cash',gcash:'GCash',bank_transfer:'Bank transfer',unpaid:'Unpaid',glass:'Glass',charms:'Charms',stickers:'Stickers',deleted:'Deleted product'}[value]||String(value||'Unknown').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()));
+function mixList(rows=[],labelKey,valueKey,total,format){
+  if(!rows?.length)return emptyState('✦','No data for this period','This breakdown appears after the first paid order.');
+  const max=Math.max(1,...rows.map(row=>Number(row[valueKey]||0)));
+  return `<div class="mix-list">${rows.map(row=>{const value=Number(row[valueKey]||0),share=total>0?value/total*100:0;return `<div class="mix-row"><div><strong>${esc(analyticsLabel(row[labelKey]))}</strong><span>${format(value)} · ${share.toFixed(1)}%</span></div><div class="mix-track" aria-label="${share.toFixed(1)} percent"><i style="width:${Math.max(2,value/max*100).toFixed(1)}%"></i></div></div>`}).join('')}</div>`;
+}
+function stockValueList(rows=[]){
+  if(!rows?.length)return emptyState('✦','No inventory yet','Add products and stock to see where inventory value is held.');
+  return `<div class="stat-list stock-value-list">${rows.map(row=>`<div><span><strong>${esc(row.name)}</strong><small>${row.stock_on_hand} on hand · ${esc(analyticsLabel(row.status))}</small></span><strong>${money(row.retail_value_cents)}</strong></div>`).join('')}</div>`;
+}
+function movementSummary(rows=[]){
+  if(!rows?.length)return emptyState('✦','No stock movements','Making, selling, returning, damaging, gifting, and counting stock will appear here.');
+  return `<div class="stat-list">${rows.map(row=>`<div><span>${esc(analyticsLabel(row.reason))}<small>${row.movement_count} entr${row.movement_count===1?'y':'ies'} · net ${row.net_units>0?'+':''}${row.net_units}</small></span><strong>${row.units_affected}</strong></div>`).join('')}</div>`;
+}
+function pipelineList(rows=[]){
+  const total=rows.reduce((sum,row)=>sum+row.order_count,0);
+  if(!total)return emptyState('✦','No orders in this period','New inquiries and completed sales will build the pipeline here.');
+  return `<div class="pipeline">${rows.filter(row=>row.order_count>0).map(row=>`<div><span class="status ${esc(row.status)}">${esc(analyticsLabel(row.status))}</span><strong>${row.order_count}</strong></div>`).join('')}</div>`;
+}
 
 /**
  * Revenue bars as real SVG rather than flex-height <i> elements.

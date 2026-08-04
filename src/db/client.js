@@ -45,8 +45,13 @@ export async function purgeReadCaches(env) {
     tasks.push(env.CATALOG_CACHE.delete('catalog:active'));
   }
   if (env.DASHBOARD_CACHE) {
-    const from = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    tasks.push(env.DASHBOARD_CACHE.delete('dashboard:' + from));
+    // The dashboard offers four reporting windows. A product, stock, or order
+    // mutation can change every one of them, so invalidating only 30 days would
+    // leave the other selectors stale for five minutes.
+    for (const days of [7, 30, 90, 365]) {
+      const from = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+      tasks.push(env.DASHBOARD_CACHE.delete('dashboard:' + from));
+    }
   }
   await Promise.allSettled(tasks);
 }
