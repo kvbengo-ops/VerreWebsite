@@ -379,6 +379,10 @@ assert.match(robotsBody, /Sitemap: https:\/\/verre\.test\/sitemap\.xml/);
 assert.match(robotsBody, /Disallow: \/admin/);
 const workerRobots = await worker.fetch(new Request('https://verre.workers.dev/robots.txt'), themeEnv);
 assert.equal(await workerRobots.text(), 'User-agent: *\nDisallow: /\n', 'the duplicate workers.dev origin is not indexed');
+const hostedAliasRobots = await worker.fetch(new Request('https://verre-host.chatgpt.site/robots.txt'), {
+  ...themeEnv, PUBLIC_SITE_URL: 'https://verrcrafts.com'
+});
+assert.equal(await hostedAliasRobots.text(), 'User-agent: *\nDisallow: /\n', 'the hosting alias cannot compete with the custom domain');
 
 const sitemapResponse = await worker.fetch(new Request('https://verre.test/sitemap.xml'), themeEnv);
 const sitemapBody = await sitemapResponse.text();
