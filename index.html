@@ -25,6 +25,10 @@
   @keyframes vMarquee { from{transform:translateX(0);} to{transform:translateX(-50%);} }
   @keyframes vSpin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
   @keyframes vTwinkle { 0%,100%{opacity:.35;transform:scale(.85);} 50%{opacity:1;transform:scale(1.1);} }
+  /* Runs once when a slide mounts. The panel is keyed on the active tab, so
+     React remounts it and the animation replays. Killed by the
+     prefers-reduced-motion block below along with everything else. */
+  @keyframes vSlideIn { from{opacity:0;transform:translateX(var(--from,22px));} to{opacity:1;transform:none;} }
   .atlas { background-image:url('./assets/verre-photo-atlas.png'); background-size:400% 400%; background-repeat:no-repeat; background-color:#FFE1EF; }
 
   :focus-visible { outline:3px solid #EF4056; outline-offset:3px; }
@@ -64,26 +68,22 @@
     <a href="#shop" style="color:#3A2430;" style-hover="color:#F157A8;">Shop</a>
     <a href="#about" style="color:#3A2430;" style-hover="color:#F157A8;">About</a>
     <a href="#stockists" style="color:#3A2430;" style-hover="color:#F157A8;">Stockists &amp; Markets</a>
+    <a href="#newsletter" style="color:#3A2430;" style-hover="color:#F157A8;">New Drops</a>
     <a href="#custom" style="color:#3A2430;" style-hover="color:#F157A8;">Custom Orders</a>
     <a href="#contact" style="color:#3A2430;" style-hover="color:#F157A8;">Contact</a>
   </div>
   <button data-cart-trigger onClick="{{ openCart }}" aria-label="{{ cartAria }}" style="border:3px solid #fff;background:linear-gradient(140deg,#FFB6D9,#F157A8);color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;padding:10px 18px;border-radius:999px;box-shadow:0 5px 0 rgba(239,64,86,.28);cursor:pointer;transition:transform .18s cubic-bezier(.2,.9,.3,1.4),box-shadow .18s;" style-hover="transform:translateY(-2px) rotate(-2deg);box-shadow:0 7px 0 rgba(239,64,86,.28);" style-active="transform:translateY(3px) scale(.97);box-shadow:0 2px 0 rgba(239,64,86,.28);">Cart {{ cartLabel }}</button>
 </nav>
 
+<!-- SEASON RIBBON -->
+<!-- Present only when a season defines one, so the everyday site is unchanged. -->
+{{ themeRibbon }}
+
 <!-- HERO -->
-<header id="top" style="position:relative;overflow:hidden;background:linear-gradient(165deg,#FFB6D9 0%,#F98AC4 45%,#F157A8 100%);padding:64px 20px 90px;text-align:center;">
-  <div aria-hidden="true" style="position:absolute;top:8%;left:6%;--r:-12deg;animation:vFloat 6s ease-in-out infinite;opacity:.95;">
-    <svg width="86" height="60" viewBox="0 0 86 60" fill="none"><path d="M22 52c-11 0-18-7-18-15S11 22 20 22c2-11 11-18 21-18 11 0 20 8 21 19 10 0 20 5 20 15S72 52 62 52z" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round"/><path d="M22 52c-11 0-18-7-18-15S11 22 20 22c2-11 11-18 21-18 11 0 20 8 21 19 10 0 20 5 20 15S72 52 62 52z" fill="#EAF7FF"/></svg>
-  </div>
-  <div aria-hidden="true" style="position:absolute;top:22%;right:7%;--r:14deg;animation:vFloat 7.5s ease-in-out .6s infinite;">
-    <svg width="64" height="64" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="#FFD166" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
-  </div>
-  <div aria-hidden="true" style="position:absolute;bottom:14%;left:11%;--r:-8deg;animation:vFloat 8s ease-in-out 1.2s infinite;">
-    <svg width="58" height="54" viewBox="0 0 58 54"><path d="M29 50C13 38 4 30 4 20 4 11 11 4 20 4c5 0 9 3 9 3s4-3 9-3c9 0 16 7 16 16 0 10-9 18-25 30z" fill="#EF4056" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
-  </div>
-  <div aria-hidden="true" style="position:absolute;bottom:26%;right:14%;--r:6deg;animation:vFloat 6.8s ease-in-out .3s infinite;">
-    <svg width="46" height="46" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="#7ED3F2" stroke="#fff" stroke-width="6" stroke-linejoin="round"/></svg>
-  </div>
+<!-- Gradient and floating shapes come from the active season, resolved on the
+     server and injected before this page renders. See src/themes.js. -->
+<header id="top" style="position:relative;overflow:hidden;background:{{ heroBg }};padding:64px 20px 90px;text-align:center;">
+  {{ heroDecor }}
 
   <div style="position:relative;max-width:1060px;margin:0 auto;">
     <p style="margin:0 0 14px;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#fff;opacity:.95;">Cebu City, Philippines ✦ est. 2022</p>
@@ -148,10 +148,10 @@
       <sc-for list="{{ products }}" as="p" hint-placeholder-count="8">
         <article data-reveal style="position:relative;background:#fff;padding:12px 12px 18px;border-radius:14px;box-shadow:0 8px 22px rgba(160,40,90,.14);transform:rotate({{ p.rot }});transition:transform .3s cubic-bezier(.2,.9,.3,1.4),box-shadow .3s;" style-hover="transform:rotate(0deg) translateY(-6px);box-shadow:0 16px 32px rgba(160,40,90,.2);">
           <span style="position:absolute;top:-10px;left:14px;width:64px;height:22px;background:{{ p.tape }};opacity:.75;transform:rotate(-8deg);box-shadow:0 1px 3px rgba(0,0,0,.06);"></span>
-          <div role="button" tabindex="0" onClick="{{ p.open }}" onKeyDown="{{ p.keyOpen }}" aria-label="View details for {{ p.name }}" style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};overflow:hidden;cursor:pointer;">{{ p.art }}</div>
+          <a href="{{ p.href }}" onClick="{{ p.open }}" aria-label="View details for {{ p.name }}" style="aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:{{ p.bg }};overflow:hidden;cursor:pointer;">{{ p.art }}</a>
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-top:14px;">
             <div>
-              <h3 style="margin:0;font-size:14px;font-weight:600;line-height:1.3;"><button onClick="{{ p.open }}" style="padding:0;border:0;background:none;color:#3A2430;font:inherit;text-align:left;cursor:pointer;">{{ p.name }}</button></h3>
+              <h3 style="margin:0;font-size:14px;font-weight:600;line-height:1.3;"><a href="{{ p.href }}" onClick="{{ p.open }}" style="padding:0;border:0;background:none;color:#3A2430;font:inherit;text-align:left;cursor:pointer;">{{ p.name }}</a></h3>
               <p style="margin:3px 0 0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#B98AA0;">{{ p.tag }}</p>
             </div>
             <span style="flex:none;transform:rotate(6deg);background:#FFF6F0;border:2px dashed #FFB6D9;border-radius:8px;padding:4px 9px;font-size:12px;font-weight:700;color:#EF4056;">{{ p.price }}</span>
@@ -227,20 +227,47 @@
   </div>
 </section>
 
-<!-- CUSTOM ORDERS -->
-<section id="custom" style="padding:70px 20px;background:linear-gradient(180deg,#FFF0F7,#FFE2F0);">
-  <div style="max-width:900px;margin:0 auto;background:#fff;border:6px solid #fff;border-radius:34px;padding:clamp(24px,5vw,44px);box-shadow:0 14px 0 rgba(239,64,86,.12),0 26px 44px rgba(160,40,90,.14);position:relative;">
-    <span style="position:absolute;top:-22px;left:50%;transform:translateX(-50%) rotate(-3deg);background:#FFD166;border:4px solid #fff;border-radius:999px;padding:6px 20px;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#7A4A00;">Commissions open</span>
-    <div style="text-align:center;margin-bottom:26px;">
-      <h2 style="margin:10px 0 10px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6.5vw,40px);color:#3A2430;">Want something painted just for you?</h2>
-      <p style="margin:0 auto;max-width:480px;font-size:14.5px;line-height:1.7;color:#7A5C6B;">Pets, portraits, band logos, wedding gifts — tell me what you're picturing and I'll send a quote within 2–3 days.</p>
+<!-- CONNECT — one card, three slides -->
+<!-- Sits directly after Stockists on purpose: someone who just read "come find
+     us at a market" and cannot make that date is exactly the person who wants
+     to hear about the next drop.
+
+     Newsletter, commissions and general enquiries used to be three stacked
+     sections, roughly 900px of consecutive forms. They are one panel now.
+     Never auto-rotates: swapping the slide under someone mid-sentence would
+     lose what they had typed. -->
+<section id="connect" style="position:relative;padding:20px 20px 76px;background:#FFF6F0;">
+  <!-- The nav still links to #newsletter, #custom and #contact, and those may
+       be in the wild. They stay as scroll anchors and each selects its slide.
+       Offset upward to clear the sticky nav. -->
+  <span id="newsletter" aria-hidden="true" style="position:absolute;top:-80px;"></span>
+  <span id="custom" aria-hidden="true" style="position:absolute;top:-80px;"></span>
+  <span id="contact" aria-hidden="true" style="position:absolute;top:-80px;"></span>
+
+  <div style="max-width:880px;margin:0 auto;">
+    <div style="text-align:center;margin-bottom:22px;">
+      <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Come say hello</p>
+      <h2 style="margin:10px 0 0;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(28px,7vw,44px);color:#3A2430;">Let's talk</h2>
     </div>
-    {{ customForm }}
+
+    {{ connectTabs }}
+
+    <div style="position:relative;overflow:hidden;border:6px solid #fff;border-radius:34px;box-shadow:0 14px 0 rgba(239,64,86,.12),0 26px 44px rgba(160,40,90,.16);background:{{ connectBg }};transition:background .45s ease;">
+      <div aria-hidden="true" style="position:absolute;top:-18px;right:-14px;--r:12deg;animation:vFloat 7s ease-in-out infinite;opacity:.9;">
+        <svg width="88" height="88" viewBox="0 0 64 64"><path d="M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z" fill="{{ connectStar }}" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg>
+      </div>
+      <div aria-hidden="true" style="position:absolute;bottom:-22px;left:-16px;--r:-10deg;animation:vFloat 8.5s ease-in-out .8s infinite;opacity:.85;">
+        <svg width="74" height="70" viewBox="0 0 58 54"><path d="M29 50C13 38 4 30 4 20 4 11 11 4 20 4c5 0 9 3 9 3s4-3 9-3c9 0 16 7 16 16 0 10-9 18-25 30z" fill="{{ connectHeart }}" stroke="#fff" stroke-width="5" stroke-linejoin="round"/></svg>
+      </div>
+      {{ connectPanel }}
+    </div>
   </div>
 </section>
 
 <!-- INSTAGRAM -->
-<section id="contact" style="padding:0 0 70px;background:#FFF6F0;">
+<!-- The contact form moved into #connect above. The id moved with it, since the
+     nav and any existing links point at the form, not at this grid. -->
+<section id="instagram" style="padding:0 0 70px;background:#FFF6F0;">
   <div aria-hidden="true" style="overflow:hidden;background:linear-gradient(90deg,#FFB6D9,#F157A8);padding:14px 0;margin-bottom:34px;">
     <div style="display:flex;width:max-content;animation:vMarquee 26s linear infinite;">
       <span style="font-family:'Shrikhand',cursive;font-size:26px;color:#fff;white-space:nowrap;">@verrecrafts ✦ made by hand ✦ Cebu City ✦ @verrecrafts ✦ made by hand ✦ Cebu City ✦ </span>
@@ -252,14 +279,6 @@
       <sc-for list="{{ gram }}" as="g" hint-placeholder-count="6">
         <div role="img" aria-label="{{ g.label }}" style="aspect-ratio:1;border-radius:18px;border:4px solid #fff;background:{{ g.bg }};box-shadow:0 8px 18px rgba(160,40,90,.12);display:grid;place-items:center;"></div>
       </sc-for>
-    </div>
-    <div style="max-width:760px;margin:50px auto 0;background:#fff;border:5px solid #fff;border-radius:28px;padding:clamp(22px,5vw,38px);box-shadow:0 10px 0 rgba(239,64,86,.1),0 18px 30px rgba(160,40,90,.12);">
-      <div style="text-align:center;margin-bottom:24px;">
-        <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#F157A8;">Say hello</p>
-        <h2 style="margin:8px 0 8px;font-family:'Shrikhand',cursive;font-weight:400;font-size:clamp(26px,6vw,38px);color:#3A2430;">Send a little note</h2>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#7A5C6B;">Questions about a piece, a market, or an order? I’ll get back to you within 2–3 days.</p>
-      </div>
-      {{ contactForm }}
     </div>
   </div>
 </section>
@@ -332,8 +351,17 @@ const atlasBg = (index) => {
 const productPhoto = (product, galleryIndex, thumbnail) => {
   const image = product.images && product.images[galleryIndex];
   if (!image || !image.url) {
-    const atlasIndex = product.gallery[galleryIndex] ?? product.gallery[0];
-    return atlasPhoto(atlasIndex, product.name + (thumbnail ? ' thumbnail' : ' photo'));
+    return h('div', {
+      role: 'img',
+      'aria-label': product.name + ' photo coming soon',
+      style: {
+        width: '100%', height: '100%', display: 'grid', placeItems: 'center',
+        padding: thumbnail ? 4 : 18, boxSizing: 'border-box', textAlign: 'center',
+        background: 'linear-gradient(145deg,' + (product.bg || '#FFE1EF') + ',#FFF6F0)',
+        color: '#7A5C6B', fontSize: thumbnail ? 8 : 12, fontWeight: 700,
+        letterSpacing: '.1em', textTransform: 'uppercase'
+      }
+    }, thumbnail ? 'No photo' : 'Photo coming soon');
   }
   return h('img', {
     src: image.url,
@@ -346,6 +374,103 @@ const productPhoto = (product, galleryIndex, thumbnail) => {
 };
 
 const peso = (n) => '₱' + n.toLocaleString('en-PH');
+
+/* ------------------------------------------------------------------ */
+/* seasonal theme                                                      */
+/* ------------------------------------------------------------------ */
+
+// Injected into <head> by the Worker before this script runs, so the hero
+// paints the right season on the first frame. The fallback is the everyday
+// look — if the injection ever fails the site is simply not dressed up, which
+// is a non-event rather than a broken page.
+const THEME = (typeof window !== 'undefined' && window.__VERRE_THEME__) || {
+  id: 'default',
+  hero: 'linear-gradient(165deg,#FFB6D9 0%,#F98AC4 45%,#F157A8 100%)',
+  accent: '#F157A8',
+  accentDeep: '#EF4056',
+  onHero: '#fff',
+  ribbon: null,
+  decor: [
+    { kind: 'cloud', fill: '#EAF7FF' },
+    { kind: 'star', fill: '#FFD166' },
+    { kind: 'heart', fill: '#EF4056' },
+    { kind: 'star', fill: '#7ED3F2' }
+  ]
+};
+
+// Each shape is drawn on a 64×64 grid so they can be swapped freely between
+// seasons without any of them needing its own sizing rules.
+const DECOR_SHAPES = {
+  star: 'M32 3c3 15 14 26 29 29-15 3-26 14-29 32-3-18-14-29-29-32C18 29 29 18 32 3z',
+  heart: 'M32 56C15 43 6 35 6 24 6 14 13 7 22 7c5 0 9 3 10 6 1-3 5-6 10-6 9 0 22 7 22 17 0 11-15 19-32 32z',
+  cloud: 'M20 48c-8 0-14-5-14-12s6-12 13-12c2-8 9-13 17-13s16 6 17 15c8 0 13 4 13 11s-6 11-14 11z',
+  sparkle: 'M32 6l6 18 18 6-18 6-6 18-6-18-18-6 18-6z',
+  sun: 'M32 16a16 16 0 1 0 .01 32A16 16 0 0 0 32 16zM32 0l5 10h-10zM32 64l-5-10h10zM0 32l10-5v10zM64 32l-10 5V27zM9 9l10 4-6 6zM55 55l-10-4 6-6zM55 9l-4 10-6-6zM9 55l4-10 6 6z',
+  // A parol is the star lantern that goes up all over the Philippines from
+  // September. Five points with a tail on each lower arm.
+  parol: 'M32 2l8 20 22 3-16 15 4 22-18-11-18 11 4-22L2 25l22-3zM20 46l-8 14 10-4zM44 46l8 14-10-4z',
+  candle: 'M32 4c5 7 8 11 8 15a8 8 0 0 1-16 0c0-4 3-8 8-15zM22 30h20v30H22z'
+};
+
+function renderDecor() {
+  // Fixed positions and drifts so the arrangement stays recognisably Verre
+  // whatever shapes a season puts in it.
+  const slots = [
+    { style: { top: '8%', left: '6%' }, size: 78, r: '-12deg', dur: '6s', delay: '0s' },
+    { style: { top: '22%', right: '7%' }, size: 64, r: '14deg', dur: '7.5s', delay: '.6s' },
+    { style: { bottom: '14%', left: '11%' }, size: 58, r: '-8deg', dur: '8s', delay: '1.2s' },
+    { style: { bottom: '26%', right: '14%' }, size: 46, r: '6deg', dur: '6.8s', delay: '.3s' }
+  ];
+  return (THEME.decor || []).slice(0, 4).map((piece, index) => {
+    const slot = slots[index];
+    const path = DECOR_SHAPES[piece.kind] || DECOR_SHAPES.star;
+    return h('div', {
+      key: index,
+      'aria-hidden': true,
+      style: {
+        position: 'absolute', ...slot.style, '--r': slot.r,
+        animation: 'vFloat ' + slot.dur + ' ease-in-out ' + slot.delay + ' infinite'
+      }
+    }, h('svg', { width: slot.size, height: slot.size, viewBox: '0 0 64 64' },
+      h('path', { d: path, fill: piece.fill, stroke: '#fff', strokeWidth: 5, strokeLinejoin: 'round' })
+    ));
+  });
+}
+
+// One table drives the tab strip, the panel copy and the card tint, so a slide
+// cannot end up with a label that disagrees with its heading.
+const CONNECT_TABS = [
+  {
+    id: 'newsletter', label: 'New drops',
+    accent: 'linear-gradient(140deg,#7ED3F2,#3FA9D4)', shadow: 'rgba(40,90,120,.24)',
+    bg: 'linear-gradient(150deg,#7ED3F2 0%,#A8E2F7 45%,#D6F0FC 100%)',
+    star: '#FFD166', heart: '#F157A8',
+    ink: '#20475C', body: '#2B5568',
+    eyebrow: 'Never miss a drop',
+    title: 'Get first look at new pieces',
+    copy: "Everything is made in small batches and the one-of-a-kind pieces usually go within a day. I'll email you when a new batch lands, and when I'll be at a market near you. No more than twice a month."
+  },
+  {
+    id: 'custom', label: 'Custom order',
+    accent: 'linear-gradient(140deg,#FFB6D9,#F157A8)', shadow: 'rgba(239,64,86,.24)',
+    bg: 'linear-gradient(150deg,#FFF0F7 0%,#FFE2F0 55%,#FFD9EC 100%)',
+    star: '#FFD166', heart: '#EF4056',
+    ink: '#3A2430', body: '#7A5C6B',
+    badge: 'Commissions open',
+    title: 'Want something painted just for you?',
+    copy: "Pets, portraits, band logos, wedding gifts. Answer a few questions and I'll send you a real quote within 2–3 days — nothing is charged until you say yes."
+  },
+  {
+    id: 'contact', label: 'Say hello',
+    accent: 'linear-gradient(140deg,#FFC9A8,#EF4056)', shadow: 'rgba(239,64,86,.24)',
+    bg: 'linear-gradient(150deg,#FFF6F0 0%,#FFEFE6 55%,#FFE4E0 100%)',
+    star: '#7ED3F2', heart: '#F157A8',
+    ink: '#3A2430', body: '#7A5C6B',
+    eyebrow: 'Say hello',
+    title: 'Send a little note',
+    copy: 'Questions about a piece, a market, or an order? I’ll get back to you within 2–3 days.'
+  }
+];
 
 async function postInquiry(payload) {
   const controller = new AbortController();
@@ -376,6 +501,43 @@ async function postInquiry(payload) {
     clearTimeout(timer);
   }
 }
+
+/**
+ * Same contract as postInquiry, but returns the whole payload rather than just
+ * a ref. The commission endpoint answers with a tracking token and an estimate
+ * as well, and dropping those on the floor would mean asking for them again.
+ */
+async function postJson(url, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    let body = null;
+    try { body = await response.json(); } catch {}
+    if (response.ok && body && body.ok) return { ok: true, data: body };
+    return {
+      ok: false,
+      error: (body && body.error) || 'That did not go through. Please try again in a moment.',
+      ...(body && body.field ? { field: body.field } : {})
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error && error.name === 'AbortError'
+        ? 'That took too long. Please check your connection and try again.'
+        : 'I could not reach the studio. Please check your connection and try again.'
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const money = (cents) => '₱' + Number(cents / 100).toLocaleString('en-PH');
 
 const inputStyle = {
   width: '100%', border: '3px solid #FFE0EE', borderRadius: 16, padding: '13px 16px',
@@ -410,12 +572,30 @@ class Component extends DCLogic {
     customFormError: '',
     customErrorField: '',
     customFormRef: '',
-    customDraft: { name: '', email: '', message: '', hp: '' },
+    customTrackUrl: '',
+    customPhotoState: '',
+    // The commission wizard. Steps come from the database so Kyle can add a
+    // size or a finish without a deploy; the browser only ever holds keys.
+    wizardSteps: [],
+    wizardState: 'loading',        // loading | ready | unavailable
+    wizardIndex: 0,                // 0..visibleSteps.length — the last one is Review
+    wizardChoice: {},              // { groupKey: optionKey }
+    wizardText: {},                // { groupKey: 'free text' }
+    wizardPhotos: [],              // File objects, uploaded only after submit
+    customDraft: {
+      name: '', email: '', phone: '', fulfillment: 'ship', message: '', hp: '',
+      ship_line1: '', ship_line2: '', ship_city: '', ship_province: '', ship_postcode: ''
+    },
     contactFormState: 'idle',
     contactFormError: '',
     contactErrorField: '',
     contactFormRef: '',
     contactDraft: { name: '', email: '', message: '', hp: '' },
+    connectTab: 'newsletter',
+    connectFrom: 1,
+    newsletterState: 'idle',
+    newsletterError: '',
+    newsletterDraft: { email: '', hp: '' },
     orderFormState: 'idle',
     orderFormError: '',
     orderErrorField: '',
@@ -426,7 +606,21 @@ class Component extends DCLogic {
   componentDidMount() {
     this._onPopState = () => this.syncProductFromUrl();
     window.addEventListener('popstate', this._onPopState);
+
+    // #newsletter, #custom and #contact are still linked from the nav and may
+    // exist as bookmarks. They now share one section, so the hash also picks
+    // the slide — otherwise "Custom Orders" would scroll you to a card showing
+    // the newsletter.
+    this._onHash = () => {
+      const id = location.hash.slice(1);
+      if (CONNECT_TABS.some((t) => t.id === id)) this.selectConnect(id);
+    };
+    window.addEventListener('hashchange', this._onHash);
+    this._onHash();
+
     this.loadCatalog();
+    this.restoreWizardDraft();
+    this.loadWizard();
 
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       const els = Array.from(document.querySelectorAll('[data-reveal]'));
@@ -451,6 +645,7 @@ class Component extends DCLogic {
   componentWillUnmount() {
     if (this._io) this._io.disconnect();
     if (this._onPopState) window.removeEventListener('popstate', this._onPopState);
+    if (this._onHash) window.removeEventListener('hashchange', this._onHash);
     this.releaseOverlay(false);
   }
 
@@ -459,7 +654,7 @@ class Component extends DCLogic {
   }
 
   async loadCatalog() {
-    const requested = new URL(location.href).searchParams.get('p');
+    const requested = this.productSlugFromUrl();
     try {
       const response = await fetch('/api/products' + (requested ? '?slug=' + encodeURIComponent(requested) : ''));
       if (!response.ok) throw new Error('Catalog request failed');
@@ -473,7 +668,7 @@ class Component extends DCLogic {
         price: product.price_cents / 100,
         stock: product.stock_on_hand,
         atlas: Number(product.atlas ?? product.sort_order ?? 0),
-        gallery: product.gallery || [Number(product.sort_order || 0)],
+        gallery: product.images && product.images.length ? product.images : [0],
         images: product.images || [],
         bg: product.bg_color || '#FFE1EF',
         tape: product.tape_color || '#FFD166',
@@ -499,6 +694,15 @@ class Component extends DCLogic {
         this.syncProductFromUrl(true);
       });
     }
+  }
+
+  productSlugFromUrl() {
+    const url = new URL(location.href);
+    const match = url.pathname.match(/^\/products\/([^/]+)\/?$/);
+    if (match) {
+      try { return decodeURIComponent(match[1]); } catch { return null; }
+    }
+    return url.searchParams.get('p');
   }
 
   restoreCart() {
@@ -559,10 +763,11 @@ class Component extends DCLogic {
 
   syncProductFromUrl(firstLoad) {
     const url = new URL(location.href);
-    const id = url.searchParams.get('p');
+    const id = this.productSlugFromUrl();
     const product = this.product(id);
     if (id && !product) {
       url.searchParams.delete('p');
+      url.pathname = '/';
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     }
     if (product) {
@@ -580,7 +785,8 @@ class Component extends DCLogic {
     const product = this.product(id);
     if (!product) return;
     const url = new URL(location.href);
-    url.searchParams.set('p', id);
+    url.pathname = '/products/' + encodeURIComponent(id);
+    url.searchParams.delete('p');
     history.pushState({ ...(history.state || {}), verreProduct: id }, '', url.pathname + url.search + url.hash);
     this._productPushed = true;
     this._returnFocus = trigger || document.activeElement;
@@ -590,12 +796,13 @@ class Component extends DCLogic {
 
   clearProductUrl() {
     const url = new URL(location.href);
-    if (!url.searchParams.has('p')) return;
+    if (!this.productSlugFromUrl()) return;
     if (this._productPushed) {
       this._productPushed = false;
       history.back();
     } else {
       url.searchParams.delete('p');
+      url.pathname = '/';
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     }
   }
@@ -705,22 +912,279 @@ class Component extends DCLogic {
     return null;
   }
 
+  /* ---------------------------------------------------------------- */
+  /* commission wizard                                                 */
+  /* ---------------------------------------------------------------- */
+
+  async loadWizard() {
+    try {
+      const response = await fetch('/api/custom/wizard');
+      if (!response.ok) throw new Error('wizard request failed');
+      const body = await response.json();
+      const steps = (body.steps || []).filter((step) => step && step.key);
+      // A restored draft can name an option Kyle retired in the meantime.
+      // Keeping it would let the wizard look complete, then fail on submit with
+      // "that choice is no longer available" — after the person had filled in
+      // their address. Drop it now so the step simply reads as unanswered.
+      const live = new Set(steps.flatMap((step) => (step.options || []).map((o) => step.key + ' ' + o.key)));
+      const choice = {};
+      for (const [groupKey, optionKey] of Object.entries(this.state.wizardChoice)) {
+        if (live.has(groupKey + ' ' + optionKey)) choice[groupKey] = optionKey;
+      }
+      // No steps configured is not an error state to shout about, but it is
+      // also not something to render an empty wizard for — fall back to the
+      // plain "tell me what you want" note, which still reaches Kyle.
+      this.setState({
+        wizardSteps: steps,
+        wizardChoice: choice,
+        wizardState: steps.length ? 'ready' : 'unavailable'
+      });
+    } catch {
+      this.setState({ wizardState: 'unavailable' });
+    }
+  }
+
+  /**
+   * Steps that apply given what has been picked so far.
+   *
+   * A step whose every option depends on a choice nobody made is not "empty",
+   * it is not part of this path — the sizes for a glass panel have nothing to
+   * say to someone commissioning stickers. Dropping it here keeps the progress
+   * bar honest: "step 2 of 4" must count the steps this person will actually see.
+   */
+  wizardVisible() {
+    const chosen = this.state.wizardChoice;
+    return (this.state.wizardSteps || []).reduce((visible, step) => {
+      if (step.input_kind === 'text') { visible.push({ ...step, options: [] }); return visible; }
+      const options = (step.options || []).filter((option) =>
+        !option.parent_key || chosen[option.parent_group_key] === option.parent_key);
+      if (options.length) visible.push({ ...step, options });
+      return visible;
+    }, []);
+  }
+
+  wizardChoose(groupKey, optionKey) {
+    this.setState((state) => {
+      const choice = { ...state.wizardChoice, [groupKey]: optionKey };
+      // Changing the base invalidates the size that was only offered because of
+      // it. Leaving it selected but hidden is how a submit ends up carrying an
+      // A3 panel on a sticker order.
+      for (const step of state.wizardSteps) {
+        const option = (step.options || []).find((o) => o.key === choice[step.key]);
+        if (option && option.parent_group_key === groupKey && option.parent_key !== optionKey) {
+          delete choice[step.key];
+        }
+      }
+      return { wizardChoice: choice, customFormError: '' };
+    }, () => this.saveWizardDraft());
+  }
+
+  wizardSetText(groupKey, value) {
+    this.setState((state) => ({ wizardText: { ...state.wizardText, [groupKey]: value }, customFormError: '' }),
+      () => this.saveWizardDraft());
+  }
+
+  // Prices shown here are display only. The Worker re-reads every delta from
+  // the option rows on submit, so editing this in a console changes the number
+  // on screen and nothing that reaches Kyle.
+  wizardEstimate() {
+    return this.wizardVisible().reduce((total, step) => {
+      const option = (step.options || []).find((o) => o.key === this.state.wizardChoice[step.key]);
+      return total + (option ? option.price_delta_cents || 0 : 0);
+    }, 0);
+  }
+
+  wizardLeadTime() {
+    return this.wizardVisible().reduce((days, step) => {
+      const option = (step.options || []).find((o) => o.key === this.state.wizardChoice[step.key]);
+      return Math.max(days, option && option.lead_time_days ? option.lead_time_days : 0);
+    }, 0);
+  }
+
+  wizardStepReady(step) {
+    if (!step) return true;
+    if (step.input_kind === 'text') {
+      return !step.required || Boolean((this.state.wizardText[step.key] || '').trim());
+    }
+    return !step.required || Boolean(this.state.wizardChoice[step.key]);
+  }
+
+  wizardGo(delta) {
+    const steps = this.wizardVisible();
+    const next = Math.min(Math.max(this.state.wizardIndex + delta, 0), steps.length);
+    if (delta > 0 && !this.wizardStepReady(steps[this.state.wizardIndex])) {
+      this.setState({ customFormError: 'Please pick one to carry on.' });
+      return;
+    }
+    this.setState({ wizardIndex: next, customFormError: '' }, () => {
+      // Moving between steps replaces everything on screen with no scroll, so
+      // without this a screen reader and a returning eye both land on stale
+      // context. Focus the new heading instead of the top of the document.
+      const heading = document.getElementById('wizard-heading');
+      if (heading) heading.focus();
+      this.saveWizardDraft();
+    });
+  }
+
+  /* draft persistence ------------------------------------------------ */
+  // A four-step form on a phone is one stray back-swipe away from gone. Photos
+  // are File handles and cannot be serialised, so they are deliberately not
+  // restored — the review step says so rather than silently dropping them.
+
+  saveWizardDraft() {
+    try {
+      localStorage.setItem('verre:custom-draft', JSON.stringify({
+        at: Date.now(),
+        choice: this.state.wizardChoice,
+        text: this.state.wizardText,
+        details: { ...this.state.customDraft, hp: '' }
+      }));
+    } catch {}
+  }
+
+  restoreWizardDraft() {
+    try {
+      const raw = localStorage.getItem('verre:custom-draft');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      // A month-old brief is not a draft, it is a ghost. Expire it rather than
+      // resurrecting choices someone has long forgotten making.
+      if (!saved || Date.now() - (saved.at || 0) > 30 * 86400000) {
+        localStorage.removeItem('verre:custom-draft');
+        return;
+      }
+      this.setState((state) => ({
+        wizardChoice: saved.choice || {},
+        wizardText: saved.text || {},
+        customDraft: { ...state.customDraft, ...(saved.details || {}), hp: '' }
+      }));
+    } catch {}
+  }
+
+  clearWizardDraft() {
+    try { localStorage.removeItem('verre:custom-draft'); } catch {}
+  }
+
+  /* photos ----------------------------------------------------------- */
+
+  wizardAddPhotos(fileList) {
+    const incoming = Array.from(fileList || []);
+    const room = 5 - this.state.wizardPhotos.length;
+    const tooBig = incoming.find((file) => file.size > 8 * 1024 * 1024);
+    if (tooBig) {
+      this.setState({ customFormError: 'Photos need to be under 8MB each. ' + tooBig.name + ' is bigger than that.' });
+      return;
+    }
+    this.setState((state) => ({
+      wizardPhotos: state.wizardPhotos.concat(incoming.slice(0, Math.max(room, 0))),
+      customFormError: room < incoming.length ? 'Five reference photos is the limit.' : ''
+    }));
+  }
+
+  wizardRemovePhoto(index) {
+    this.setState((state) => ({ wizardPhotos: state.wizardPhotos.filter((_, i) => i !== index) }));
+  }
+
+  /**
+   * Uploaded after the order exists, never before.
+   *
+   * The signed URL is scoped to one path under this order, and ref + token is
+   * what authorises it — so there is nothing to upload to until the row is
+   * written. It also means a failed photo cannot cost the brief: the
+   * commission is already saved and Kyle can ask for the picture by email.
+   */
+  async uploadReferencePhotos(ref, token) {
+    const photos = this.state.wizardPhotos;
+    if (!photos.length || !token) return;
+    for (const [index, file] of photos.entries()) {
+      this.setState({ customPhotoState: 'Sending photo ' + (index + 1) + ' of ' + photos.length + '…' });
+      try {
+        const signed = await fetch('/api/custom/upload', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ref, token, content_type: file.type })
+        }).then((r) => r.json());
+        if (!signed.ok) throw new Error(signed.error);
+        const put = await fetch(signed.data.signedUrl, {
+          method: 'PUT', headers: { 'content-type': file.type }, body: file
+        });
+        if (!put.ok) throw new Error('upload failed');
+        await fetch('/api/custom/upload', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ref, token, action: 'attach', path: signed.data.path, position: index })
+        });
+      } catch {
+        this.setState({ customPhotoState: "Your request is saved, but I couldn't attach every photo. Reply to the confirmation email and send them across." });
+        return;
+      }
+    }
+    this.setState({ customPhotoState: '' });
+  }
+
+  validateWizardDetails() {
+    const draft = this.state.customDraft;
+    const needsAddress = draft.fulfillment === 'ship' || draft.fulfillment === 'delivery';
+    if (!draft.name.trim()) return { field: 'name', error: 'Please tell me your name.' };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) return { field: 'email', error: 'Please enter a valid email address.' };
+    if (needsAddress && !draft.ship_line1.trim()) return { field: 'ship_line1', error: 'Please add a street address.' };
+    if (needsAddress && !draft.ship_city.trim()) return { field: 'ship_city', error: 'Please add a city or municipality.' };
+    if (draft.fulfillment === 'ship' && !draft.ship_province.trim()) return { field: 'ship_province', error: 'Please add a province.' };
+    return null;
+  }
+
   async submitCustom(event) {
     event.preventDefault();
     if (this.state.customFormState === 'submitting') return;
-    const invalid = this.validateDraft(this.state.customDraft, 'custom', true);
+
+    const invalid = this.validateWizardDetails();
     if (invalid) {
       this.setState({ customFormState: 'error', customFormError: invalid.error, customErrorField: invalid.field });
+      setTimeout(() => {
+        const el = document.querySelector('#custom [name="' + invalid.field + '"]');
+        if (el) el.focus();
+      }, 0);
       return;
     }
+
+    const steps = this.wizardVisible();
+    const unfinished = steps.find((step) => !this.wizardStepReady(step));
+    if (unfinished) {
+      this.setState({
+        wizardIndex: steps.indexOf(unfinished),
+        customFormState: 'error',
+        customFormError: '"' + unfinished.label + '" still needs an answer.'
+      });
+      return;
+    }
+
     this.setState({ customFormState: 'submitting', customFormError: '', customErrorField: '' });
     const draft = this.state.customDraft;
-    const result = await postInquiry({ type: 'custom', name: draft.name, email: draft.email, message: draft.message, hp: draft.hp });
-    if (result.ok) this.setState({ customFormState: 'success', customFormRef: result.ref });
-    else {
+    const selections = steps.map((step) => ({
+      group_key: step.key,
+      option_key: this.state.wizardChoice[step.key] || null,
+      text_value: (this.state.wizardText[step.key] || '').trim() || null
+    })).filter((entry) => entry.option_key || entry.text_value);
+
+    const result = await postJson('/api/custom/request', {
+      name: draft.name, email: draft.email, phone: draft.phone,
+      fulfillment: draft.fulfillment, message: draft.message, hp: draft.hp,
+      ship_line1: draft.ship_line1, ship_line2: draft.ship_line2, ship_city: draft.ship_city,
+      ship_province: draft.ship_province, ship_postcode: draft.ship_postcode,
+      selections
+    });
+
+    if (!result.ok) {
       this.setState({ customFormState: 'error', customFormError: result.error, customErrorField: result.field || '' });
       if (result.field) setTimeout(() => { const el = document.querySelector('#custom [name="' + result.field + '"]'); if (el) el.focus(); }, 0);
+      return;
     }
+
+    this.clearWizardDraft();
+    this.setState({
+      customFormState: 'success',
+      customFormRef: result.data.ref,
+      customTrackUrl: result.data.track_url || ''
+    });
+    await this.uploadReferencePhotos(result.data.ref, result.data.token);
   }
 
   async submitContact(event) {
@@ -738,6 +1202,49 @@ class Component extends DCLogic {
     else {
       this.setState({ contactFormState: 'error', contactFormError: result.error, contactErrorField: result.field || '' });
       if (result.field) setTimeout(() => { const el = document.querySelector('#contact [name="' + result.field + '"]'); if (el) el.focus(); }, 0);
+    }
+  }
+
+  async subscribe(event) {
+    event.preventDefault();
+    if (this.state.newsletterState === 'submitting') return;
+    const email = (this.state.newsletterDraft.email || '').trim();
+    if (!email || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) {
+      this.setState({ newsletterState: 'error', newsletterError: "That email doesn't look right." });
+      setTimeout(() => { const el = document.querySelector('#newsletter [name="email"]'); if (el) el.focus(); }, 0);
+      return;
+    }
+    this.setState({ newsletterState: 'submitting', newsletterError: '' });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, source: 'storefront', hp: this.state.newsletterDraft.hp }),
+        signal: controller.signal
+      });
+      let body = null;
+      try { body = await response.json(); } catch {}
+      if (response.ok && body && body.ok) {
+        this.setState({ newsletterState: 'success', newsletterDraft: { email: '', hp: '' } });
+      } else {
+        // The typed address stays in state, so a failure never costs a retype.
+        this.setState({
+          newsletterState: 'error',
+          newsletterError: (body && body.error) || 'That did not go through. Please try again in a moment.'
+        });
+      }
+    } catch (error) {
+      this.setState({
+        newsletterState: 'error',
+        newsletterError: error && error.name === 'AbortError'
+          ? 'That took too long. Please check your connection and try again.'
+          : 'I could not reach the studio. Please check your connection and try again.'
+      });
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -806,23 +1313,382 @@ class Component extends DCLogic {
   }
 
   renderCustomForm() {
-    if (this.state.customFormState === 'success') {
-      return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '34px 10px' } }, [
-        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 44 } }, '✦'),
-        h('h3', { key: 'title', style: { margin: '8px 0 6px', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 26, color: '#EF4056' } }, 'Yay — request sent!'),
-        h('p', { key: 'copy', style: { margin: 0, fontSize: 14, color: '#7A5C6B' } }, "I'll reply within 2–3 days. Your reference is "),
-        h('strong', { key: 'ref', style: { color: '#3A2430' } }, this.state.customFormRef)
-      ]);
+    if (this.state.customFormState === 'success') return this.renderCustomSuccess();
+    if (this.state.wizardState === 'loading') {
+      return h('p', { role: 'status', style: { textAlign: 'center', color: '#7A5C6B', fontSize: 14, padding: '30px 0' } },
+        'Getting the options ready…');
     }
+    // No configured steps must never mean no way to commission something.
+    if (this.state.wizardState === 'unavailable') return this.renderCustomFallback();
+
+    const steps = this.wizardVisible();
+    const onReview = this.state.wizardIndex >= steps.length;
+    const step = steps[this.state.wizardIndex];
+
+    return h('div', { style: { display: 'grid', gap: 20 } }, [
+      this.renderWizardProgress(steps, onReview),
+      onReview ? this.renderWizardReview(steps) : this.renderWizardStep(step, steps)
+    ]);
+  }
+
+  renderWizardProgress(steps, onReview) {
+    const total = steps.length + 1;
+    const at = Math.min(this.state.wizardIndex, steps.length);
+    return h('div', { key: 'progress', style: { display: 'grid', gap: 10 } }, [
+      h('div', { key: 'bar', 'aria-hidden': true, style: { display: 'flex', gap: 6 } },
+        Array.from({ length: total }, (_, index) => h('span', {
+          key: index,
+          style: {
+            flex: 1, height: 7, borderRadius: 999,
+            background: index <= at ? 'linear-gradient(90deg,#FFB6D9,#F157A8)' : '#FFE0EE',
+            transition: 'background .3s'
+          }
+        }))),
+      h('p', {
+        key: 'label',
+        style: { margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: '#B98AA0', textAlign: 'center' }
+      }, 'Step ' + (at + 1) + ' of ' + total + (onReview ? ' · Review' : ''))
+    ]);
+  }
+
+  renderWizardStep(step, steps) {
+    if (!step) return null;
+    const chosen = this.state.wizardChoice[step.key];
+    const ready = this.wizardStepReady(step);
+
+    const body = step.input_kind === 'text'
+      ? h('div', { key: 'text', style: { display: 'grid', gap: 12 } }, [
+          h('label', { key: 'label', htmlFor: 'wizard-' + step.key, style: hiddenFieldStyle }, step.label),
+          h('textarea', {
+            key: 'input',
+            id: 'wizard-' + step.key,
+            name: step.key,
+            rows: 5,
+            maxLength: 2000,
+            placeholder: 'My cat Biscuit — orange tabby, one ear folded. For my mum\'s birthday in October.',
+            value: this.state.wizardText[step.key] || '',
+            onChange: (event) => this.wizardSetText(step.key, event.target.value),
+            style: { ...inputStyle, resize: 'vertical', fontFamily: "'Poppins',sans-serif" }
+          }),
+          this.renderPhotoPicker()
+        ])
+      : h('div', {
+          key: 'options',
+          role: 'radiogroup',
+          'aria-labelledby': 'wizard-heading',
+          style: { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))' }
+        }, step.options.map((option) => {
+          const active = chosen === option.key;
+          return h('button', {
+            key: option.key,
+            type: 'button',
+            role: 'radio',
+            'aria-checked': active ? 'true' : 'false',
+            onClick: () => this.wizardChoose(step.key, option.key),
+            style: {
+              textAlign: 'left', cursor: 'pointer', fontFamily: "'Poppins',sans-serif",
+              border: active ? '3px solid #F157A8' : '3px solid #fff',
+              background: active ? '#fff' : (option.swatch || '#FFF6F0'),
+              borderRadius: 22, padding: '16px 18px',
+              boxShadow: active ? '0 7px 0 rgba(239,64,86,.24)' : '0 4px 0 rgba(160,40,90,.10)',
+              transform: active ? 'translateY(-2px)' : 'none',
+              transition: 'transform .2s cubic-bezier(.2,.9,.3,1.4), box-shadow .2s, border-color .2s'
+            }
+          }, [
+            h('span', { key: 'label', style: { display: 'block', fontWeight: 700, fontSize: 14.5, color: '#3A2430' } }, option.label),
+            option.description
+              ? h('span', { key: 'desc', style: { display: 'block', marginTop: 4, fontSize: 12.5, lineHeight: 1.5, color: '#7A5C6B' } }, option.description)
+              : null,
+            // Zero is worth saying out loud. "+₱0" reads as "this one is
+            // included", where silence reads as "they forgot to price it".
+            h('span', {
+              key: 'price',
+              style: {
+                display: 'inline-block', marginTop: 10, fontSize: 12, fontWeight: 700,
+                color: '#EF4056', background: '#fff', border: '2px dashed #FFB6D9',
+                borderRadius: 8, padding: '3px 9px'
+              }
+            }, option.price_delta_cents ? '+ ' + money(option.price_delta_cents) : 'Included')
+          ]);
+        }));
+
+    return h('div', { key: 'step-' + step.key, style: { display: 'grid', gap: 16 } }, [
+      h('div', { key: 'head', style: { textAlign: 'center' } }, [
+        h('h4', {
+          key: 'title', id: 'wizard-heading', tabIndex: -1,
+          style: { margin: 0, fontSize: 19, fontWeight: 700, color: '#3A2430', outline: 'none' }
+        }, step.label),
+        step.helper
+          ? h('p', { key: 'helper', style: { margin: '6px 0 0', fontSize: 13, color: '#7A5C6B' } }, step.helper)
+          : null
+      ]),
+      body,
+      this.renderWizardNav(steps, ready)
+    ]);
+  }
+
+  renderPhotoPicker() {
+    const photos = this.state.wizardPhotos;
+    return h('div', { key: 'photos', style: { display: 'grid', gap: 10 } }, [
+      h('label', {
+        key: 'add',
+        htmlFor: 'wizard-photos',
+        style: {
+          display: 'block', textAlign: 'center', cursor: 'pointer', border: '3px dashed #FFB6D9',
+          borderRadius: 18, padding: '16px 14px', background: '#FFFBFD', fontSize: 13, color: '#7A5C6B'
+        }
+      }, [
+        h('strong', { key: 'title', style: { display: 'block', color: '#3A2430', fontSize: 14 } }, '📎 Add reference photos'),
+        h('span', { key: 'hint' }, photos.length ? photos.length + ' of 5 added' : 'Optional, but a photo tells me more than a paragraph. Up to 5, 8MB each.')
+      ]),
+      h('input', {
+        key: 'input', id: 'wizard-photos', type: 'file', accept: 'image/jpeg,image/png,image/webp',
+        multiple: true, style: hiddenFieldStyle,
+        onChange: (event) => { this.wizardAddPhotos(event.target.files); event.target.value = ''; }
+      }),
+      photos.length
+        ? h('ul', { key: 'list', style: { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 } },
+            photos.map((file, index) => h('li', {
+              key: file.name + index,
+              style: { display: 'flex', alignItems: 'center', gap: 10, background: '#FFF6F0', borderRadius: 12, padding: '8px 12px', fontSize: 12.5, color: '#3A2430' }
+            }, [
+              h('span', { key: 'name', style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, file.name),
+              h('button', {
+                key: 'remove', type: 'button',
+                'aria-label': 'Remove ' + file.name,
+                onClick: () => this.wizardRemovePhoto(index),
+                style: { border: 0, background: 'none', color: '#EF4056', fontWeight: 700, cursor: 'pointer', fontSize: 13 }
+              }, '×')
+            ])))
+        : null
+    ]);
+  }
+
+  renderWizardNav(steps, ready) {
+    const first = this.state.wizardIndex === 0;
+    return h('div', { key: 'nav', style: { display: 'grid', gap: 10 } }, [
+      this.state.customFormError
+        ? h('p', { key: 'error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError)
+        : null,
+      h('div', { key: 'buttons', style: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' } }, [
+        first ? null : h('button', {
+          key: 'back', type: 'button', onClick: () => this.wizardGo(-1),
+          style: {
+            border: '3px solid #fff', background: '#fff', color: '#7A5C6B', fontWeight: 700,
+            fontSize: 14, padding: '13px 24px', borderRadius: 999, cursor: 'pointer',
+            boxShadow: '0 4px 0 rgba(160,40,90,.12)', fontFamily: "'Poppins',sans-serif"
+          }
+        }, '← Back'),
+        h('button', {
+          key: 'next', type: 'button', onClick: () => this.wizardGo(1), disabled: !ready,
+          style: {
+            ...primaryButtonStyle, fontFamily: "'Poppins',sans-serif",
+            opacity: ready ? 1 : .5, cursor: ready ? 'pointer' : 'not-allowed'
+          }
+        }, this.state.wizardIndex === steps.length - 1 ? 'Review my order' : 'Next →')
+      ]),
+      this.renderEstimateStrip()
+    ]);
+  }
+
+  // Deliberately worded as a range and never as a total. Calling it a price on
+  // a piece nobody has made yet is a promise Kyle has to either honour or walk
+  // back, and walking it back is how a commission turns into an argument.
+  renderEstimateStrip() {
+    const estimate = this.wizardEstimate();
+    if (!estimate) return null;
+    const lead = this.wizardLeadTime();
+    return h('p', {
+      key: 'estimate',
+      style: { margin: 0, textAlign: 'center', fontSize: 12.5, color: '#7A5C6B' }
+    }, [
+      h('strong', { key: 'amount', style: { color: '#EF4056', fontSize: 14 } }, 'Roughly ' + money(estimate)),
+      h('span', { key: 'note' }, ' · an estimate, not a quote' + (lead ? ' · about ' + lead + ' days to make' : ''))
+    ]);
+  }
+
+  renderWizardReview(steps) {
     const busy = this.state.customFormState === 'submitting';
-    return h('form', { onSubmit: (event) => this.submitCustom(event), noValidate: true, style: { display: 'grid', gap: 14 } }, [
+    const draft = this.state.customDraft;
+    const estimate = this.wizardEstimate();
+    const needsAddress = draft.fulfillment === 'ship' || draft.fulfillment === 'delivery';
+
+    const summary = steps.map((step, index) => {
+      const option = (step.options || []).find((o) => o.key === this.state.wizardChoice[step.key]);
+      const text = (this.state.wizardText[step.key] || '').trim();
+      return h('li', {
+        key: step.key,
+        style: { display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 0', borderBottom: '2px solid #FFE0EE' }
+      }, [
+        h('span', { key: 'label', style: { flex: '0 0 34%', fontSize: 12, color: '#B98AA0', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase' } }, step.label),
+        h('span', { key: 'value', style: { flex: 1, fontSize: 13.5, color: '#3A2430', whiteSpace: 'pre-wrap' } }, option ? option.label : text || '—'),
+        h('button', {
+          key: 'edit', type: 'button',
+          onClick: () => this.setState({ wizardIndex: index, customFormError: '' }),
+          'aria-label': 'Change ' + step.label,
+          style: { border: 0, background: 'none', color: '#F157A8', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: "'Poppins',sans-serif" }
+        }, 'Change')
+      ]);
+    });
+
+    return h('form', {
+      key: 'review', onSubmit: (event) => this.submitCustom(event), noValidate: true,
+      style: { display: 'grid', gap: 18 }
+    }, [
+      h('h4', {
+        key: 'title', id: 'wizard-heading', tabIndex: -1,
+        style: { margin: 0, textAlign: 'center', fontSize: 19, fontWeight: 700, color: '#3A2430', outline: 'none' }
+      }, 'Does this look right?'),
+
+      h('ul', { key: 'summary', style: { listStyle: 'none', margin: 0, padding: 0, background: '#fff', borderRadius: 20, padding: '4px 18px' } }, summary),
+
+      this.state.wizardPhotos.length
+        ? h('p', { key: 'photos', style: { margin: 0, textAlign: 'center', fontSize: 12.5, color: '#7A5C6B' } },
+            this.state.wizardPhotos.length + ' reference photo' + (this.state.wizardPhotos.length > 1 ? 's' : '') + ' attached')
+        : null,
+
+      estimate
+        ? h('p', { key: 'estimate', style: { margin: 0, textAlign: 'center', fontSize: 13.5, color: '#7A5C6B' } }, [
+            h('strong', { key: 'v', style: { color: '#EF4056', fontSize: 16 } }, 'Roughly ' + money(estimate)),
+            h('span', { key: 'n', style: { display: 'block', marginTop: 2, fontSize: 12 } },
+              "I read every brief myself and send the real quote within 2–3 days. Nothing is charged until you say yes.")
+          ])
+        : null,
+
+      h('div', { key: 'who', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' } }, [
+        this.field('custom', 'customDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
+        this.field('custom', 'customDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' })
+      ]),
+      this.field('custom', 'customDraft', 'phone', 'Phone (optional)', { placeholder: '0917 000 0000', autoComplete: 'tel', required: false }),
+
+      h('fieldset', { key: 'how', style: { border: 0, margin: 0, padding: 0, display: 'grid', gap: 8 } }, [
+        h('legend', { key: 'legend', style: { ...labelStyle, marginBottom: 4 } }, 'How should it reach you?'),
+        h('div', { key: 'radios', style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+          [['pickup', 'Pickup in Cebu'], ['delivery', 'Cebu delivery'], ['ship', 'Ship nationwide']].map(([value, label]) => {
+            const active = draft.fulfillment === value;
+            return h('label', {
+              key: value,
+              style: {
+                flex: '1 1 130px', textAlign: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                border: active ? '3px solid #F157A8' : '3px solid #fff', borderRadius: 999,
+                padding: '10px 14px', background: '#fff', color: active ? '#EF4056' : '#7A5C6B',
+                boxShadow: active ? '0 4px 0 rgba(239,64,86,.2)' : '0 3px 0 rgba(160,40,90,.08)'
+              }
+            }, [
+              h('input', {
+                key: 'input', type: 'radio', name: 'fulfillment', value, checked: active,
+                onChange: () => this.setDraft('customDraft', 'fulfillment', value),
+                style: hiddenFieldStyle
+              }),
+              label
+            ]);
+          }))
+      ]),
+
+      // Only asked for when something has to travel. A pickup order that
+      // demands a province is a form arguing with the person filling it in.
+      needsAddress
+        ? h('div', { key: 'address', style: { display: 'grid', gap: 14 } }, [
+            this.field('custom', 'customDraft', 'ship_line1', 'Street address', { placeholder: '12 Mango Ave', autoComplete: 'address-line1' }),
+            this.field('custom', 'customDraft', 'ship_line2', 'Unit, barangay (optional)', { placeholder: 'Brgy. Kamputhaw', autoComplete: 'address-line2', required: false }),
+            h('div', { key: 'row', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' } }, [
+              this.field('custom', 'customDraft', 'ship_city', 'City / municipality', { placeholder: 'Cebu City', autoComplete: 'address-level2' }),
+              draft.fulfillment === 'ship'
+                ? this.field('custom', 'customDraft', 'ship_province', 'Province', { placeholder: 'Cebu', autoComplete: 'address-level1' })
+                : null,
+              this.field('custom', 'customDraft', 'ship_postcode', 'Postcode', { placeholder: '6000', autoComplete: 'postal-code', required: false })
+            ])
+          ])
+        : null,
+
+      this.field('custom', 'customDraft', 'message', 'Anything else? (optional)', {
+        placeholder: 'Needed before 14 October, if that is possible.', rows: 3, maxLength: 2000, textarea: true, required: false
+      }),
+      this.honeypot('customDraft'),
+
+      this.state.customFormError
+        ? h('p', { key: 'error', id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError)
+        : null,
+
+      h('div', { key: 'buttons', style: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' } }, [
+        h('button', {
+          key: 'back', type: 'button', onClick: () => this.wizardGo(-1), disabled: busy,
+          style: {
+            border: '3px solid #fff', background: '#fff', color: '#7A5C6B', fontWeight: 700,
+            fontSize: 14, padding: '13px 24px', borderRadius: 999, cursor: 'pointer',
+            boxShadow: '0 4px 0 rgba(160,40,90,.12)', fontFamily: "'Poppins',sans-serif"
+          }
+        }, '← Back'),
+        h('button', {
+          key: 'submit', type: 'submit', disabled: busy,
+          style: { ...primaryButtonStyle, fontFamily: "'Poppins',sans-serif", opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' }
+        }, busy ? 'Sending…' : 'Send my request')
+      ])
+    ]);
+  }
+
+  renderCustomSuccess() {
+    return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '30px 10px' } }, [
+      h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 44 } }, '✦'),
+      h('h3', { key: 'title', style: { margin: '8px 0 6px', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 26, color: '#EF4056' } }, 'Got it — thank you!'),
+      h('p', { key: 'copy', style: { margin: '0 0 6px', fontSize: 14, color: '#7A5C6B' } },
+        "I'll read your brief and send a real quote within 2–3 days."),
+      h('p', { key: 'ref', style: { margin: '0 0 18px', fontSize: 14, color: '#3A2430' } }, [
+        'Your reference is ',
+        h('strong', { key: 'v' }, this.state.customFormRef)
+      ]),
+      this.state.customPhotoState
+        ? h('p', { key: 'photo', style: { margin: '0 0 14px', fontSize: 12.5, color: '#7A5C6B' } }, this.state.customPhotoState)
+        : null,
+      // The tracking link is the whole point of the status pipeline: without it
+      // the customer's only way to ask "where is my piece?" is to email Kyle,
+      // and he becomes the status API.
+      this.state.customTrackUrl
+        ? h('a', {
+            key: 'track', href: this.state.customTrackUrl,
+            style: {
+              display: 'inline-block', border: '3px solid #fff',
+              background: 'linear-gradient(140deg,#FFB6D9,#F157A8)', color: '#fff',
+              fontWeight: 700, fontSize: 14, padding: '13px 26px', borderRadius: 999,
+              textDecoration: 'none', boxShadow: '0 6px 0 rgba(239,64,86,.28)'
+            }
+          }, 'Track your order')
+        : null,
+      h('p', { key: 'hint', style: { margin: '14px 0 0', fontSize: 12, color: '#B98AA0' } },
+        "The same link is in your confirmation email — it's the only way back to this page.")
+    ]);
+  }
+
+  // Shown when the wizard's options cannot be loaded. A commission request is
+  // worth more than a tidy form, so this stays a working way to reach Kyle
+  // rather than an apology.
+  renderCustomFallback() {
+    const busy = this.state.customFormState === 'submitting';
+    return h('form', {
+      onSubmit: async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        const invalid = this.validateDraft(this.state.customDraft, 'custom', true);
+        if (invalid) {
+          this.setState({ customFormState: 'error', customFormError: invalid.error, customErrorField: invalid.field });
+          return;
+        }
+        this.setState({ customFormState: 'submitting', customFormError: '' });
+        const draft = this.state.customDraft;
+        const sent = await postInquiry({ type: 'custom', name: draft.name, email: draft.email, message: draft.message, hp: draft.hp });
+        if (sent.ok) this.setState({ customFormState: 'success', customFormRef: sent.ref });
+        else this.setState({ customFormState: 'error', customFormError: sent.error, customErrorField: sent.field || '' });
+      },
+      noValidate: true,
+      style: { display: 'grid', gap: 14 }
+    }, [
       h('div', { key: 'row', style: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' } }, [
         this.field('custom', 'customDraft', 'name', 'Your name', { placeholder: 'Maria', autoComplete: 'name' }),
         this.field('custom', 'customDraft', 'email', 'Email', { placeholder: 'hello@email.com', autoComplete: 'email', type: 'email' })
       ]),
       this.field('custom', 'customDraft', 'message', 'Your request', { placeholder: 'A little glass painting of my cat, Biscuit ✦', rows: 4, maxLength: 2000, textarea: true }),
       this.honeypot('customDraft'),
-      this.state.customFormError ? h('p', { id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError) : null,
+      this.state.customFormError ? h('p', { key: 'error', id: 'custom-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.customFormError) : null,
       h('button', { key: 'button', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, justifySelf: 'center', marginTop: 6, opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending…' : 'Send my request')
     ]);
   }
@@ -845,6 +1711,179 @@ class Component extends DCLogic {
       this.honeypot('contactDraft'),
       this.state.contactFormError ? h('p', { id: 'contact-error', role: 'status', 'aria-live': 'polite', style: { margin: 0, color: '#EF4056', fontSize: 13, textAlign: 'center' } }, this.state.contactFormError) : null,
       h('button', { key: 'button', type: 'submit', disabled: busy, style: { ...primaryButtonStyle, justifySelf: 'center', opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' } }, busy ? 'Sending…' : 'Send my note')
+    ]);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* connect carousel                                                  */
+  /* ---------------------------------------------------------------- */
+
+  selectConnect(tab) {
+    if (tab === this.state.connectTab) return;
+    const order = CONNECT_TABS.map((t) => t.id);
+    // Direction so the panel slides in from the side you came from, which is
+    // what makes a tab strip read as a carousel rather than a swap.
+    const from = order.indexOf(tab) > order.indexOf(this.state.connectTab) ? 1 : -1;
+    this.setState({ connectTab: tab, connectFrom: from });
+  }
+
+  // Arrow keys move between tabs, which is what a tablist is expected to do.
+  connectKeys(event) {
+    const order = CONNECT_TABS.map((t) => t.id);
+    const at = order.indexOf(this.state.connectTab);
+    let next = null;
+    if (event.key === 'ArrowRight') next = order[(at + 1) % order.length];
+    if (event.key === 'ArrowLeft') next = order[(at - 1 + order.length) % order.length];
+    if (event.key === 'Home') next = order[0];
+    if (event.key === 'End') next = order[order.length - 1];
+    if (!next) return;
+    event.preventDefault();
+    this.selectConnect(next);
+    setTimeout(() => { const el = document.getElementById('tab-' + next); if (el) el.focus(); }, 0);
+  }
+
+  renderConnectTabs() {
+    return h('div', {
+      role: 'tablist',
+      'aria-label': 'Ways to get in touch',
+      onKeyDown: (event) => this.connectKeys(event),
+      style: { display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 22 }
+    }, CONNECT_TABS.map((tab) => {
+      const active = tab.id === this.state.connectTab;
+      return h('button', {
+        key: tab.id,
+        id: 'tab-' + tab.id,
+        role: 'tab',
+        type: 'button',
+        'aria-selected': active ? 'true' : 'false',
+        // Only the selected tab points at a panel. Just one panel is mounted at
+        // a time, so pointing every tab at it would have the inactive tabs
+        // claiming to control a panel that is not theirs.
+        'aria-controls': active ? 'panel-' + tab.id : undefined,
+        // Only the selected tab is in the tab order; arrows move within the
+        // strip. Three separate tab stops for one control is noise.
+        tabIndex: active ? 0 : -1,
+        onClick: () => this.selectConnect(tab.id),
+        style: {
+          border: '3px solid #fff', cursor: 'pointer', fontFamily: "'Poppins',sans-serif",
+          fontWeight: 700, fontSize: 13.5, letterSpacing: '.02em', padding: '12px 22px',
+          borderRadius: 999,
+          background: active ? tab.accent : '#fff',
+          color: active ? '#fff' : '#7A5C6B',
+          boxShadow: active ? '0 6px 0 ' + tab.shadow : '0 4px 0 rgba(160,40,90,.10)',
+          transform: active ? 'translateY(-2px)' : 'none',
+          transition: 'background .25s, color .25s, transform .2s cubic-bezier(.2,.9,.3,1.4), box-shadow .2s'
+        }
+      }, tab.label);
+    }));
+  }
+
+  renderConnectPanel() {
+    const tab = CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0];
+    const body = tab.id === 'newsletter' ? this.renderNewsletterForm()
+      : tab.id === 'custom' ? this.renderCustomForm()
+      : this.renderContactForm();
+
+    return h('div', {
+      // Keyed on the tab so React remounts it and the entry animation replays.
+      key: tab.id,
+      id: 'panel-' + tab.id,
+      role: 'tabpanel',
+      'aria-labelledby': 'tab-' + tab.id,
+      tabIndex: -1,
+      style: {
+        position: 'relative',
+        padding: 'clamp(30px,5vw,46px) clamp(20px,5vw,44px)',
+        '--from': (this.state.connectFrom * 22) + 'px',
+        animation: 'vSlideIn .34s cubic-bezier(.2,.9,.3,1.4) both'
+      }
+    }, [
+      h('div', { key: 'head', style: { maxWidth: 520, margin: '0 auto', textAlign: 'center' } }, [
+        tab.badge
+          ? h('span', {
+              key: 'badge',
+              style: {
+                display: 'inline-block', marginBottom: 14, background: '#FFD166', border: '3px solid #fff',
+                borderRadius: 999, padding: '5px 18px', fontSize: 11, fontWeight: 700,
+                letterSpacing: '.18em', textTransform: 'uppercase', color: '#7A4A00', transform: 'rotate(-2deg)'
+              }
+            }, tab.badge)
+          : h('p', {
+              key: 'eyebrow',
+              style: { margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '.3em', textTransform: 'uppercase', color: tab.ink }
+            }, tab.eyebrow),
+        h('h3', {
+          key: 'title',
+          style: {
+            margin: '12px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400,
+            fontSize: 'clamp(25px,6vw,38px)', color: tab.ink, lineHeight: 1.15
+          }
+        }, tab.title),
+        h('p', { key: 'copy', style: { margin: '0 0 24px', fontSize: 14.5, lineHeight: 1.7, color: tab.body } }, tab.copy)
+      ]),
+      // The commission wizard lays option cards out in a grid and needs the
+      // room; the other two panels are single-column forms that get harder to
+      // read as they get wider.
+      h('div', { key: 'form', style: { maxWidth: tab.id === 'custom' ? 680 : 520, margin: '0 auto' } }, body)
+    ]);
+  }
+
+  renderNewsletterForm() {
+    if (this.state.newsletterState === 'success') {
+      return h('div', { role: 'status', 'aria-live': 'polite', style: { textAlign: 'center', padding: '18px 10px' } }, [
+        h('div', { key: 'icon', 'aria-hidden': true, style: { fontSize: 38 } }, '✦'),
+        h('h3', { key: 'title', style: { margin: '6px 0', fontFamily: "'Shrikhand',cursive", fontWeight: 400, fontSize: 24, color: '#20475C' } }, "You're on the list!"),
+        h('p', { key: 'copy', style: { margin: 0, fontSize: 14, color: '#2B5568' } }, "I'll email you the moment the next batch is ready. 💗")
+      ]);
+    }
+    const busy = this.state.newsletterState === 'submitting';
+    return h('form', { onSubmit: (event) => this.subscribe(event), noValidate: true, style: { display: 'grid', gap: 12 } }, [
+      // Row on desktop, stacked on mobile — flexWrap does this without a media
+      // query, which this inline-styled document has no way to express.
+      h('div', { key: 'row', style: { display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' } }, [
+        h('label', { key: 'field', htmlFor: 'newsletter-email', style: hiddenFieldStyle }, 'Email address'),
+        h('input', {
+          key: 'input',
+          id: 'newsletter-email',
+          name: 'email',
+          type: 'email',
+          required: true,
+          autoComplete: 'email',
+          placeholder: 'hello@email.com',
+          value: this.state.newsletterDraft.email,
+          disabled: busy,
+          'aria-invalid': this.state.newsletterState === 'error' ? 'true' : undefined,
+          'aria-describedby': this.state.newsletterError ? 'newsletter-error' : undefined,
+          onChange: (event) => this.setState({
+            newsletterDraft: { ...this.state.newsletterDraft, email: event.target.value }
+          }),
+          style: {
+            flex: '1 1 240px', minWidth: 0, border: '3px solid #fff', borderRadius: 999,
+            padding: '14px 20px', fontSize: 15, color: '#20475C', background: '#fff',
+            outline: 'none', fontFamily: "'Poppins',sans-serif"
+          }
+        }),
+        h('button', {
+          key: 'button',
+          type: 'submit',
+          disabled: busy,
+          style: {
+            flex: 'none', border: '3px solid #fff', background: busy ? '#F98AC4' : 'linear-gradient(140deg,#FFB6D9,#F157A8)',
+            color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '.05em',
+            padding: '14px 28px', borderRadius: 999, boxShadow: '0 6px 0 rgba(32,71,92,.22)',
+            cursor: busy ? 'wait' : 'pointer', fontFamily: "'Poppins',sans-serif"
+          }
+        }, busy ? 'Signing up…' : 'Keep me posted')
+      ]),
+      this.honeypot('newsletterDraft'),
+      this.state.newsletterError
+        ? h('p', {
+            key: 'error', id: 'newsletter-error', role: 'status', 'aria-live': 'polite',
+            style: { margin: 0, color: '#A81F32', background: '#fff', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 600 }
+          }, this.state.newsletterError)
+        : null,
+      h('p', { key: 'promise', style: { margin: 0, fontSize: 12, color: '#2B5568', opacity: .8 } },
+        'Just new drops and market dates. Unsubscribe from any email.')
     ]);
   }
 
@@ -1060,13 +2099,8 @@ class Component extends DCLogic {
       art: productPhoto(p, 0, false),
       price: peso(p.price),
       priceLabel: peso(p.price),
-      open: (event) => this.openProduct(p.id, event.currentTarget),
-      keyOpen: (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          this.openProduct(p.id, event.currentTarget);
-        }
-      },
+      href: '/products/' + encodeURIComponent(p.id),
+      open: (event) => { event.preventDefault(); this.openProduct(p.id, event.currentTarget); },
       addButton: h('button', {
         onClick: (event) => { event.stopPropagation(); this.addToCart(p.id, event.currentTarget); },
         disabled: p.stock < 1,
@@ -1091,8 +2125,21 @@ class Component extends DCLogic {
         role: 'status',
         style: { margin: '8px 0 0', color: '#9C536E', fontSize: 12 }
       }, 'Stock may be a little out of date while the studio reconnects.') : null,
-      customForm: this.renderCustomForm(),
-      contactForm: this.renderContactForm(),
+      heroBg: THEME.hero,
+      heroDecor: renderDecor(),
+      themeRibbon: THEME.ribbon
+        ? h('div', {
+            style: {
+              background: THEME.accentDeep, color: '#fff', textAlign: 'center',
+              padding: '9px 18px', fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em'
+            }
+          }, THEME.ribbon)
+        : null,
+      connectTabs: this.renderConnectTabs(),
+      connectPanel: this.renderConnectPanel(),
+      connectBg: (CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0]).bg,
+      connectStar: (CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0]).star,
+      connectHeart: (CONNECT_TABS.find((t) => t.id === this.state.connectTab) || CONNECT_TABS[0]).heart,
       overlay: this.renderOverlay(cartLines, subtotal),
       categories: [
         { title: 'Glass Paintings', copy: 'Hand-painted panels, cups and mini frames — colour laid on the back of the glass.', bg: '#FFE1EF', art: atlasPhoto(8, 'Assortment of hand-painted glass art', 'landscape'), rot: rot(-1) },
@@ -1103,7 +2150,7 @@ class Component extends DCLogic {
         { name: 'CR8 Cebu', address: '3F Ayala Central Bloc, Cebu Business Park', hours: 'Open daily · 11am – 9pm', dot: '#F157A8' },
         { name: 'Art Treats PH', address: '2F Talamban Times Square, Talamban', hours: 'Tue – Sun · 10am – 8pm', dot: '#7ED3F2' }
       ],
-      markets: [
+      markets: Array.isArray(window.__VERRE_MARKETS__) ? window.__VERRE_MARKETS__ : [
         { day: '09', month: 'Aug', name: 'Sugbo Artist Alley', place: 'Robinsons Galleria Cebu', bg: '#F157A8' },
         { day: '23', month: 'Aug', name: 'Handmade Sunday', place: 'The Outpost, Lahug', bg: '#7ED3F2' },
         { day: '06', month: 'Sep', name: 'Cebu Craft Fair', place: 'Ayala Central Bloc Atrium', bg: '#FFD166' },

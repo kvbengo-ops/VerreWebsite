@@ -5,7 +5,7 @@ const esc=(value)=>String(value??'').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<
 const state={products:[],cart:new Map(),category:'all',payment:'cash',session:null,queue:[],review:[],lastSale:null,syncing:false,resetTimer:null};
 function signIn(){
   const returnTo=location.pathname+location.search+location.hash;
-  location.replace('/signin-with-chatgpt?return_to='+encodeURIComponent(returnTo));
+  location.replace('/login?return_to='+encodeURIComponent(returnTo));
 }
 
 const openDb=()=>new Promise((resolve,reject)=>{
@@ -66,8 +66,8 @@ async function init(){
 async function refreshCatalog(){
   try{
     const result=await api('products');
-    const products=Array.isArray(result)?result:result?.data||[];
-    if(products.length){
+    const products=Array.isArray(result)?result:Array.isArray(result?.data)?result.data:null;
+    if(products){
       const local=new Map(state.products.map(p=>[p.id,p.stock_on_hand]));
       state.products=products.map(p=>({...p,stock_on_hand:local.has(p.id)&&state.queue.length?Math.min(p.stock_on_hand,local.get(p.id)):p.stock_on_hand}));
       await put('kv',state.products,'catalog');renderProducts();
@@ -93,9 +93,10 @@ function renderProducts(){
   const products=state.products.filter(p=>(state.category==='all'||p.category===state.category)&&(!query||(p.name+' '+p.slug).toLowerCase().includes(query)));
   $('#products').innerHTML=products.length?products.map(p=>{
     const image=p.images?.[0]?.url;
-    return `<button class="product ${p.stock_on_hand<=0?'out':''}" data-product="${esc(p.id||'')}">
+    const out=p.stock_on_hand<=0, low=!out&&p.stock_on_hand<=2;
+    return `<button class="product ${out?'out':''} ${low?'low':''}" data-product="${esc(p.id||'')}">
       <span class="product-art" style="--product-bg:${esc(p.bg_color||'#FFE0EE')}">${image?`<img src="${esc(image)}" alt="">`:`<span aria-hidden="true">${p.category==='glass'?'✦':p.category==='charms'?'♡':'☁'}</span>`}</span>
-      <span class="product-copy"><strong>${esc(p.name)}</strong><small>${money(p.price_cents)} · ${p.stock_on_hand} left</small></span>
+      <span class="product-copy"><strong>${esc(p.name)}</strong><small>${money(p.price_cents)}</small><span class="stock">${out?'Sold out':p.stock_on_hand+' left'}</span></span>
     </button>`;
   }).join(''):'<div class="empty">No pieces match.</div>';
   $$('[data-product]').forEach(button=>button.onclick=()=>addProduct(button.dataset.product));
@@ -117,11 +118,33 @@ function renderCart(){
   $('#cart-lines').innerHTML=lines.length?lines.map(({product,qty})=>`<div class="line"><div><strong>${esc(product.name)}</strong><small>${money(product.price_cents*qty)}</small></div><div class="stepper"><button data-step="${product.id}" data-delta="-1" aria-label="Remove one">−</button><b>${qty}</b><button data-step="${product.id}" data-delta="1" aria-label="Add one">+</button></div></div>`).join(''):'<div class="empty">Tap a piece to begin.</div>';
   $$('[data-step]').forEach(button=>button.onclick=()=>{const id=button.dataset.step,next=(state.cart.get(id)||0)+Number(button.dataset.delta);if(next<=0)state.cart.delete(id);else state.cart.set(id,next);renderCart()});
   const value=totals();$('#subtotal').textContent=money(value.subtotal);$('#discount-total').textContent='−'+money(value.discount);$('#total').textContent=money(value.total);updateChange(value.total);
+  // The amount lives on the button itself. At a stall the question is always
+  // "how much?", and the answer should be on the thing you are about to press.
+  $('#to-payment').textContent='Charge '+money(value.total);
+  $('#to-payment').disabled=!lines.length;
   $('#complete').disabled=!lines.length;
+  // Emptying the basket while on the payment step would leave you paying for
+  // nothing, so fall back to step one.
+  if(!lines.length&&cartView()==='pay')setCartView('cart');
+}
+
+const cartView=()=>document.querySelector('.cart').dataset.view;
+function setCartView(view){
+  const cart=document.querySelector('.cart');
+  cart.dataset.view=view;
+  const paying=view==='pay';
+  $('#back-to-cart').hidden=!paying;
+  $('#cart-title').textContent=paying?'Payment':'Cart';
+  // Focus follows the step so a keyboard or screen-reader user is not left
+  // behind at the top of a panel whose contents just changed underneath them.
+  const target=paying?$('#tendered'):$('#to-payment');
+  if(target&&!target.hidden&&!target.disabled)target.focus({preventScroll:true});
+  if(paying)cart.querySelector('.pay-pane').scrollTop=0;
 }
 function updateChange(total=totals().total){const tender=parsePeso($('#tendered').value)||0;$('#change').textContent=money(Math.max(0,tender-total))}
 function renderSession(){
   $('#session-button').textContent=state.session?.label||'No open session';
+  $('#session-button').classList.toggle('none',!state.session);
   $('#session-warning').hidden=Boolean(state.session);
 }
 function updateNetwork(){
@@ -129,6 +152,7 @@ function updateNetwork(){
 }
 function renderQueue(){
   $('#pending-count').textContent=state.queue.length;
+  $('#queue-button').classList.toggle('pending',state.queue.length>0||state.review.length>0);
   const rows=[...state.queue.map(s=>({...s,state:'Pending'})),...state.review.map(s=>({...s,state:'Needs review'}))];
   $('#queue-list').innerHTML=rows.length?rows.map(s=>`<div class="queue-item"><strong>${esc(s.state)}</strong> · ${money(s.total_cents)}<br><small>${new Date(s.sold_at).toLocaleString('en-PH')} · ${esc(s.client_uuid)}</small>${s.sync_error?`<br><small>${esc(s.sync_error)}</small>`:''}</div>`).join(''):'<div class="empty">Everything is synced.</div>';
   $('#queue-message').textContent=state.review.length?'A rejected sale needs review. Nothing has been silently dropped.':state.queue.length?'Sales sync oldest first when the connection returns.':'No pending sales.';
@@ -164,7 +188,7 @@ function showSuccess(sale){
   $('#undo').disabled=false;$('#success').showModal();
   clearTimeout(state.resetTimer);state.resetTimer=setTimeout(nextSale,4000);
 }
-function nextSale(){clearTimeout(state.resetTimer);if($('#success').open)$('#success').close();state.cart.clear();$('#discount').value='';$('#discount-reason').value='';$('#tendered').value='';$('#gcash-reference').value='';renderCart()}
+function nextSale(){clearTimeout(state.resetTimer);if($('#success').open)$('#success').close();state.cart.clear();$('#discount').value='';$('#discount-reason').value='';$('#tendered').value='';$('#gcash-reference').value='';setCartView('cart');renderCart()}
 
 async function syncQueue(){
   if(state.syncing||!navigator.onLine||!state.queue.length)return;
@@ -236,6 +260,11 @@ $('#discount').oninput=$('#discount-type').onchange=renderCart;
 $('#tendered').oninput=()=>updateChange();
 $$('[data-payment]').forEach(button=>button.onclick=()=>{state.payment=button.dataset.payment;$$('[data-payment]').forEach(x=>x.classList.toggle('active',x===button));$('#cash-fields').hidden=state.payment!=='cash';$('#gcash-fields').hidden=state.payment!=='gcash';renderCart()});
 $$('[data-tender]').forEach(button=>button.onclick=()=>{$('#tendered').value=button.dataset.tender==='exact'?(totals().total/100).toFixed(2):button.dataset.tender;updateChange()});
+$('#to-payment').onclick=()=>setCartView('pay');
+$('#back-to-cart').onclick=()=>setCartView('cart');
+// Escape backs out of payment. Nothing has been recorded yet at this point, so
+// there is no confirmation to ask for.
+document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&cartView()==='pay'&&!document.querySelector('dialog[open]'))setCartView('cart')});
 $('#complete').onclick=completeSale;$('#next-sale').onclick=nextSale;$('#undo').onclick=undoLast;
 $('#queue-button').onclick=()=>$('#queue-dialog').showModal();$('#sync-now').onclick=syncQueue;
 $('#session-button').onclick=openSessionDialog;

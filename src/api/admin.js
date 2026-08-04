@@ -1,11 +1,21 @@
-import { listProducts, saveProduct, archiveProduct, hardDeleteProduct, signUpload, saveImage, deleteImage, reorderImages } from '../db/products.js';
+import { listProducts, saveProduct, archiveProduct, restoreProduct, productRemovalPlan, removeProduct, uploadProductImage, deleteImage, reorderImages } from '../db/products.js';
 import { adjustStock, listMovements, stocktake } from '../db/stock.js';
 import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeSession } from '../db/orders.js';
 import { dashboard } from '../db/stats.js';
 import { body, json, result } from './http.js';
 import { purgeReadCaches } from '../db/client.js';
-import { listAccounts, saveAccount } from '../db/accounts.js';
+import { deleteAccount, findAccountById, isUuid, listAccounts, saveAccount } from '../db/accounts.js';
+import { listSubscribers } from '../db/subscribers.js';
+import {
+  listOptionGroups, saveOptionGroup, saveOption, retireOption,
+  listCustomOrders, getCustomOrder, setCustomQuote, setCustomShipping
+} from '../db/custom.js';
+import { setThemeOverride } from '../db/settings.js';
+import { currentTheme, isKnownTheme } from './theme.js';
+import { ALL_THEMES } from '../themes.js';
 import { can } from '../roles.js';
+import { sendAccountInvite } from './invite.js';
+import { listMarkets, saveMarket, deleteMarket, reorderMarkets } from '../db/markets.js';
 
 async function mutation(env, value, success = 200) {
   if (!value.error) await purgeReadCaches(env);
@@ -18,17 +28,54 @@ export async function adminApi(request, env, user) {
   const parts = path.split('/').filter(Boolean);
   const method = request.method;
 
-  if (path === 'me' && method === 'GET') return json(200,{ok:true,user});
+  // Under `data`, like every other route here. The client unwraps
+  // `body.data ?? body`, so returning {ok,user} hands it the envelope instead
+  // of the user: state.me.role comes back undefined, render() bounces the hash
+  // to the value it already has, no hashchange fires, and the shell sits on
+  // "Loading the studio…" forever with no error anywhere.
+  if (path === 'me' && method === 'GET') return json(200,{ok:true,data:user});
   if (parts[0] === 'accounts') {
     if (!can(user,'accounts')) return denied();
     if (parts.length === 1 && method === 'GET') return result(await listAccounts(env));
     if (parts.length === 1 && method === 'POST') {
       const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
-      return result(await saveAccount(env,parsed.data,user.email),201);
+      const saved=await saveAccount(env,parsed.data,user.email);
+      if(saved.error)return result(saved);
+      if(saved.data?.active===false){
+        return json(201,{ok:true,data:{...saved.data,invite_sent:false,invite_warning:'The inactive account was saved without sending an invitation.'}});
+      }
+      const invitation=await sendAccountInvite(env,saved.data,url.origin,user);
+      return json(201,{ok:true,data:{...saved.data,invite_sent:invitation.sent,...(!invitation.sent&&{invite_warning:invitation.error})}});
+    }
+    if (parts.length === 3 && parts[2] === 'invite' && method === 'POST') {
+      const found=await findAccountById(env,parts[1]);
+      if(found.error)return result(found);
+      if(!found.data)return json(404,{ok:false,error:'Account not found'});
+      const invitation=await sendAccountInvite(env,found.data,url.origin,user);
+      return invitation.sent
+        ? json(200,{ok:true,data:{invite_sent:true}})
+        : json(invitation.status||502,{ok:false,error:invitation.error||'The invitation could not be sent.'});
     }
     if (parts.length === 2 && method === 'PATCH') {
       const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
       return result(await saveAccount(env,{...parsed.data,id:parts[1]},user.email));
+    }
+    if (parts.length === 2 && method === 'DELETE') {
+      const actorId=user.account_id||user.id;
+      const selectedAccountId=parts[1];
+      if (!isUuid(actorId)) {
+        return json(401,{ok:false,error:'Unable to identify the signed-in administrator.',code:'INVALID_ACTOR_ID'});
+      }
+      if (!isUuid(selectedAccountId)) {
+        return json(400,{ok:false,error:'Unable to identify the selected administrator account.',code:'INVALID_ACCOUNT_ID'});
+      }
+      const found=await findAccountById(env,selectedAccountId);
+      if(found.error)return result(found);
+      if(!found.data)return json(404,{ok:false,error:'Account not found'});
+      if(found.data.id===actorId){
+        return json(400,{ok:false,error:'You cannot delete your own account.'});
+      }
+      return result(await deleteAccount(env,selectedAccountId,actorId));
     }
   }
   if (path === 'dashboard' && method === 'GET') {
@@ -37,6 +84,25 @@ export async function adminApi(request, env, user) {
     from:url.searchParams.get('from'),
     refresh:url.searchParams.get('refresh') === '1'
     }));
+  }
+  if (parts[0] === 'markets') {
+    if (!can(user,'catalog')) return denied();
+    if (parts.length === 1 && method === 'GET') return result(await listMarkets(env));
+    if (parts.length === 1 && method === 'POST') {
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return mutation(env,await saveMarket(env,parsed.data,user.email),201);
+    }
+    if (parts.length === 2 && parts[1] === 'reorder' && method === 'POST') {
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return mutation(env,await reorderMarkets(env,parsed.data.ids,user.email));
+    }
+    if (parts.length === 2 && method === 'PATCH') {
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return mutation(env,await saveMarket(env,{...parsed.data,id:parts[1]},user.email));
+    }
+    if (parts.length === 2 && method === 'DELETE') {
+      return mutation(env,await deleteMarket(env,parts[1],user.email));
+    }
   }
   if (parts[0] === 'products' && parts.length === 1 && method === 'GET') {
     if (!can(user,'catalog') && !can(user,'inventory')) return denied();
@@ -47,6 +113,10 @@ export async function adminApi(request, env, user) {
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
     return mutation(env,await saveProduct(env,parsed.data,user.email),201);
   }
+  if (parts[0] === 'products' && parts[1] && parts[2] === 'removal-plan' && method === 'GET') {
+    if (!can(user,'catalog')) return denied();
+    return result(await productRemovalPlan(env,parts[1]));
+  }
   if (parts[0] === 'products' && parts[1] && method === 'PATCH') {
     if (!can(user,'catalog')) return denied();
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
@@ -56,19 +126,26 @@ export async function adminApi(request, env, user) {
     if (!can(user,'catalog')) return denied();
     return mutation(env,await archiveProduct(env,parts[1],user.email));
   }
+  if (parts[0] === 'products' && parts[2] === 'restore' && method === 'POST') {
+    if (!can(user,'catalog')) return denied();
+    return mutation(env,await restoreProduct(env,parts[1],user.email));
+  }
   if (parts[0] === 'products' && parts[1] && parts.length === 2 && method === 'DELETE') {
     if (!can(user,'catalog')) return denied();
-    return mutation(env,await hardDeleteProduct(env,parts[1],user.email));
+    return mutation(env,await removeProduct(env,parts[1],user.email));
   }
-  if (path === 'images/sign' && method === 'POST') {
+  if (path === 'images/upload' && method === 'POST') {
     if (!can(user,'catalog')) return denied();
-    const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
-    return result(await signUpload(env,parsed.data.product_id,parsed.data.filename));
-  }
-  if (path === 'images' && method === 'POST') {
-    if (!can(user,'catalog')) return denied();
-    const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
-    return mutation(env,await saveImage(env,parsed.data,user.email),201);
+    const declared=Number(request.headers.get('content-length')||0);
+    if(declared>6*1024*1024)return json(413,{ok:false,error:'The prepared photo is over 6 MB'});
+    if(request.headers.get('content-type')!=='image/webp')return json(415,{ok:false,error:'Product photos must be WebP images'});
+    const file=await request.arrayBuffer();
+    return mutation(env,await uploadProductImage(env,{
+      product_id:url.searchParams.get('product_id'),
+      filename:url.searchParams.get('filename'),
+      alt:url.searchParams.get('alt'),
+      position:Number(url.searchParams.get('position')||0)
+    },file,user.email),201);
   }
   if (path === 'images/reorder' && method === 'POST') {
     if (!can(user,'catalog')) return denied();
@@ -83,6 +160,38 @@ export async function adminApi(request, env, user) {
     if (!can(user,'inventory')) return denied();
     const value=await listMovements(env,Object.fromEntries(url.searchParams));
     if(url.searchParams.get('format')==='csv'&&!value.error)return csv(value.data);
+    return result(value);
+  }
+  if (path === 'theme' && method === 'GET') {
+    if (!can(user,'admin')) return denied();
+    const state=await currentTheme(env);
+    return json(200,{ok:true,data:{
+      ...state,
+      // Palettes travel with the state so the admin never keeps its own copy —
+      // a swatch that disagreed with the live site would be worse than none.
+      themes:ALL_THEMES.map(t=>({id:t.id,label:t.label,blurb:t.blurb,swatch:t.swatch,hero:t.hero,ribbon:t.ribbon,
+        window:t.from?{from:t.from,to:t.to}:null}))
+    }});
+  }
+  if (path === 'theme' && method === 'POST') {
+    if (!can(user,'catalog')) return denied();
+    const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+    const value=String(parsed.data?.theme??'auto');
+    if(!isKnownTheme(value))return json(400,{ok:false,error:'That is not a theme we know about',field:'theme'});
+    // 'auto' clears the override and hands the storefront back to the calendar.
+    const saved=await setThemeOverride(env,value==='auto'?null:value,user.email);
+    if(saved.error)return result(saved);
+    // The homepage caches the override for a minute; drop it so a change made
+    // for a market day is visible immediately rather than eventually.
+    if(env.CATALOG_CACHE){try{await env.CATALOG_CACHE.delete('theme:override')}catch{}}
+    return json(200,{ok:true,data:await currentTheme(env)});
+  }
+  if (path === 'subscribers' && method === 'GET') {
+    if (!can(user,'admin')) return denied();
+    const value=await listSubscribers(env);
+    if(url.searchParams.get('format')==='csv'&&!value.error){
+      return toCsv(['email','source','created_at','unsubscribed_at'],value.data,'verre-subscribers.csv');
+    }
     return result(value);
   }
   if (path === 'inventory/adjust' && method === 'POST') {
@@ -122,14 +231,75 @@ export async function adminApi(request, env, user) {
     const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
     return result(await closeSession(env,parts[1],parsed.data));
   }
+  /* ---- custom commissions ---------------------------------------- */
+  // Reading and quoting is `sales` — the same capability that already covers
+  // web orders, so a General Admin can answer a commission without also being
+  // handed the product catalog. Editing the wizard's option tables is `catalog`:
+  // it changes what the public storefront offers and what it says things cost.
+  if (parts[0] === 'custom') {
+    if (parts[1] === 'options' && parts.length === 2 && method === 'GET') {
+      if (!can(user,'catalog')) return denied();
+      return result(await listOptionGroups(env));
+    }
+    if (parts[1] === 'groups' && parts.length === 2 && method === 'POST') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOptionGroup(env,parsed.data,user.email),201);
+    }
+    if (parts[1] === 'groups' && parts[2] && method === 'PATCH') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOptionGroup(env,{...parsed.data,id:parts[2]},user.email));
+    }
+    if (parts[1] === 'options' && parts.length === 2 && method === 'POST') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOption(env,parsed.data,user.email),201);
+    }
+    if (parts[1] === 'options' && parts[2] && method === 'PATCH') {
+      if (!can(user,'catalog')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await saveOption(env,{...parsed.data,id:parts[2]},user.email));
+    }
+    if (parts[1] === 'options' && parts[2] && method === 'DELETE') {
+      if (!can(user,'catalog')) return denied();
+      return result(await retireOption(env,parts[2],user.email));
+    }
+    if (parts[1] === 'orders' && parts.length === 2 && method === 'GET') {
+      if (!can(user,'sales')) return denied();
+      return result(await listCustomOrders(env,Object.fromEntries(url.searchParams)));
+    }
+    if (parts[1] === 'orders' && parts[2] && parts.length === 3 && method === 'GET') {
+      if (!can(user,'sales')) return denied();
+      return result(await getCustomOrder(env,parts[2]));
+    }
+    if (parts[1] === 'orders' && parts[3] === 'quote' && method === 'POST') {
+      if (!can(user,'sales')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await setCustomQuote(env,parts[2],parsed.data,user.email));
+    }
+    if (parts[1] === 'orders' && parts[3] === 'shipping' && method === 'POST') {
+      if (!can(user,'sales')) return denied();
+      const parsed=await body(request); if(parsed.error)return json(400,{ok:false,error:parsed.error});
+      return result(await setCustomShipping(env,parts[2],parsed.data,user.email));
+    }
+  }
+
   return json(404,{ok:false,error:'Admin route not found'});
 }
 
 const denied = () => json(403,{ok:false,error:'Your role does not allow this action',code:'FORBIDDEN'});
 
-function csv(rows) {
-  const columns=['created_at','product_id','delta','reason','note','created_by'];
-  const quote=(value)=>'"'+String(value??'').replace(/"/g,'""')+'"';
-  const text=[columns.join(','),...(rows||[]).map(row=>columns.map(key=>quote(row[key])).join(','))].join('\n');
-  return new Response(text,{headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="verre-stock-movements.csv"'}});
-}
+// A leading =, +, - or @ makes Excel and Sheets treat a cell as a formula, so a
+// crafted subscriber address or product note can execute on open. Prefixing an
+// apostrophe keeps the value visible and inert.
+const quoteCell=(value)=>{
+  const text=String(value??'');
+  return '"'+(/^[=+\-@\t\r]/.test(text)?"'"+text:text).replace(/"/g,'""')+'"';
+};
+const toCsv=(columns,rows,filename)=>new Response(
+  [columns.join(','),...(rows||[]).map(row=>columns.map(key=>quoteCell(row[key])).join(','))].join('\n'),
+  {headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="'+filename+'"'}}
+);
+
+const csv=(rows)=>toCsv(['created_at','product_id','delta','reason','note','created_by'],rows,'verre-stock-movements.csv');

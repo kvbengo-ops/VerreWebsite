@@ -4,6 +4,13 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node scripts/check-catalog.mjs && node src/worker.test.mjs && node src/auth.test.mjs && node src/roles.test.mjs && node scripts/check-admin.mjs"
+    "dev": "node scripts/dev.mjs",
+    "create-admin": "node scripts/create-admin.mjs",
+    "deploy": "node scripts/build.mjs && wrangler deploy",
+    "test": "node scripts/check-catalog.mjs && node src/worker.test.mjs && node src/custom.test.mjs && node src/auth.test.mjs && node src/invite.test.mjs && node src/products.test.mjs && node src/markets.test.mjs && node src/themes.test.mjs && node src/roles.test.mjs && node scripts/check-admin.mjs && node scripts/check-db.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "wrangler": "^4.118.0"
   }
 }

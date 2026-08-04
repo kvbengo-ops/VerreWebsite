@@ -6,6 +6,15 @@
   <meta name="theme-color" content="#3A2430">
   <title>Verre Market POS</title>
   <link rel="manifest" href="/pos/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Loaded non-blocking on purpose. This is an offline-first till used on
+       market wifi; a slow or unreachable font server must never delay the
+       screen someone is trying to take money on. The CSS falls back to
+       system-ui / Georgia, so a missing webfont costs a little character and
+       nothing else. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Poppins:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Poppins:wght@500;600;700&display=swap"></noscript>
   <link rel="stylesheet" href="/pos/style.css">
 </head>
 <body>
@@ -26,23 +35,34 @@
       </div>
       <div id="products" class="products" aria-live="polite"></div>
     </section>
-    <aside class="cart" aria-label="Current sale">
-      <div><p class="eyebrow">Current sale</p><h1>Cart</h1></div>
-      <div id="session-warning" class="warning" hidden>Selling without an open session. The sale will still be safe.</div>
+    <!-- Three bands, and the middle one is the only thing that scrolls.
+         Previously every part of the cart was a sibling in one scrolling
+         column, so a long basket pushed the total and the Complete button
+         below the fold — and, because the line list could shrink but not
+         clip, it painted straight over the totals. -->
+    <!-- Two steps, one panel.
+         Ringing up and taking payment never happen at the same moment, but
+         stacking both stole ~700px from the line list — you could not see what
+         you were adding. Step one is the basket, step two is payment, and each
+         gets the whole panel.
+
+         Both panes stay in the DOM at all times: app.js reads #tendered,
+         #discount and friends directly, so they are hidden with CSS rather
+         than removed. -->
+    <aside class="cart" data-view="cart" aria-label="Current sale">
+      <div class="cart-head">
+        <button id="back-to-cart" class="back" hidden>← Back to cart</button>
+        <p class="eyebrow">Current sale</p>
+        <h1 id="cart-title">Cart</h1>
+        <div id="session-warning" class="warning" hidden>Selling without an open session. The sale will still be safe.</div>
+      </div>
+
+      <!-- Step 1 -->
       <div id="cart-lines" class="cart-lines"></div>
-      <div class="discount">
-        <label>Discount
-          <div class="discount-row"><input id="discount" inputmode="decimal" placeholder="0"><select id="discount-type"><option value="amount">₱</option><option value="percent">%</option></select></div>
-        </label>
-        <label>Reason <input id="discount-reason" placeholder="Optional reason"></label>
-      </div>
-      <div class="totals">
-        <p><span>Subtotal</span><strong id="subtotal">₱0.00</strong></p>
-        <p><span>Discount</span><strong id="discount-total">−₱0.00</strong></p>
-        <p class="grand"><span>Total</span><strong id="total">₱0.00</strong></p>
-      </div>
-      <div class="payment">
-        <div class="pay-tabs"><button data-payment="cash" class="active">Cash</button><button data-payment="gcash">GCash</button></div>
+
+      <!-- Step 2 -->
+      <div id="pay-pane" class="pay-pane">
+        <div class="pay-tabs" role="group" aria-label="Payment method"><button data-payment="cash" class="active">Cash</button><button data-payment="gcash">GCash</button></div>
         <div id="cash-fields">
           <label>Tendered <input id="tendered" inputmode="decimal" placeholder="0.00"></label>
           <div class="quick"><button data-tender="exact">Exact</button><button data-tender="500">₱500</button><button data-tender="1000">₱1,000</button></div>
@@ -50,7 +70,27 @@
         </div>
         <label id="gcash-fields" hidden>GCash reference <input id="gcash-reference" autocomplete="off" placeholder="Optional"></label>
       </div>
-      <button id="complete" class="complete" disabled>Complete sale</button>
+
+      <div class="cart-foot">
+        <details class="discount-block">
+          <summary>Add a discount</summary>
+          <div class="discount">
+            <label>Discount
+              <div class="discount-row"><input id="discount" inputmode="decimal" placeholder="0"><select id="discount-type"><option value="amount">₱</option><option value="percent">%</option></select></div>
+            </label>
+            <label>Reason <input id="discount-reason" placeholder="Optional reason"></label>
+          </div>
+        </details>
+
+        <div class="totals">
+          <p><span>Subtotal</span><strong id="subtotal">₱0.00</strong></p>
+          <p><span>Discount</span><strong id="discount-total">−₱0.00</strong></p>
+          <p class="grand"><span>Total</span><strong id="total">₱0.00</strong></p>
+        </div>
+
+        <button id="to-payment" class="complete" disabled>Charge ₱0.00</button>
+        <button id="complete" class="complete" disabled hidden>Complete sale</button>
+      </div>
     </aside>
   </main>
 
