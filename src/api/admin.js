@@ -4,7 +4,7 @@ import { listOrders, getOrder, setOrderStatus, listSessions, openSession, closeS
 import { dashboard } from '../db/stats.js';
 import { body, json, result } from './http.js';
 import { purgeReadCaches } from '../db/client.js';
-import { deleteAccount, findAccountById, listAccounts, saveAccount } from '../db/accounts.js';
+import { deleteAccount, findAccountById, isUuid, listAccounts, saveAccount } from '../db/accounts.js';
 import { listSubscribers } from '../db/subscribers.js';
 import {
   listOptionGroups, saveOptionGroup, saveOption, retireOption,
@@ -61,13 +61,21 @@ export async function adminApi(request, env, user) {
       return result(await saveAccount(env,{...parsed.data,id:parts[1]},user.email));
     }
     if (parts.length === 2 && method === 'DELETE') {
-      const found=await findAccountById(env,parts[1]);
+      const actorId=user.account_id||user.id;
+      const selectedAccountId=parts[1];
+      if (!isUuid(actorId)) {
+        return json(401,{ok:false,error:'Unable to identify the signed-in administrator.',code:'INVALID_ACTOR_ID'});
+      }
+      if (!isUuid(selectedAccountId)) {
+        return json(400,{ok:false,error:'Unable to identify the selected administrator account.',code:'INVALID_ACCOUNT_ID'});
+      }
+      const found=await findAccountById(env,selectedAccountId);
       if(found.error)return result(found);
       if(!found.data)return json(404,{ok:false,error:'Account not found'});
-      if(found.data.email.toLowerCase()===user.email.toLowerCase()){
+      if(found.data.id===actorId){
         return json(400,{ok:false,error:'You cannot delete your own account.'});
       }
-      return result(await deleteAccount(env,parts[1],user.email));
+      return result(await deleteAccount(env,selectedAccountId,actorId));
     }
   }
   if (path === 'dashboard' && method === 'GET') {

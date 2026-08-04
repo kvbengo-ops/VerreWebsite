@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { adminApi } from './api/admin.js';
+import { deleteAccount } from './db/accounts.js';
 import { posApi } from './api/pos.js';
 import { ROLES, can, isBootstrapSuperAdmin, resolveUser } from './roles.js';
 import worker from './worker.js';
@@ -62,6 +63,46 @@ globalThis.fetch=originalFetch;
 assert.equal(resolved.error,null);
 assert.equal(resolved.data.role,ROLES.GENERAL_ADMIN);
 assert.equal(resolved.data.display_name,'Studio Admin');
+
+const actorId='00000000-0000-4000-8000-000000000010';
+const selectedAccountId='00000000-0000-4000-8000-000000000011';
+let deleteRpcPayload;
+globalThis.fetch=async (url,options={})=>{
+  const path=new URL(url).pathname;
+  if(path.endsWith('/admin_accounts')){
+    return new Response(JSON.stringify([{
+      id:selectedAccountId,
+      email:'staff@example.com',
+      display_name:'Staff Member',
+      role:'general_admin',
+      active:true
+    }]),{headers:{'content-type':'application/json'}});
+  }
+  assert.match(path,/\/rpc\/delete_admin_account$/);
+  deleteRpcPayload=JSON.parse(options.body);
+  return new Response(JSON.stringify({id:selectedAccountId}),{headers:{'content-type':'application/json'}});
+};
+const deleteEnv={SUPABASE_URL:'https://database.example',SUPABASE_SERVICE_ROLE_KEY:'secret'};
+const deleted=await adminApi(
+  new Request(`https://verre.test/api/admin/accounts/${selectedAccountId}`,{method:'DELETE'}),
+  deleteEnv,
+  {email:'owner@example.com',account_id:actorId,role:ROLES.SUPER_ADMIN}
+);
+assert.equal(deleted.status,200);
+assert.deepEqual(deleteRpcPayload,{p_id:selectedAccountId,p_actor:actorId},'account deletion sends only UUIDs to the RPC');
+
+let malformedRpcCalled=false;
+globalThis.fetch=async ()=>{malformedRpcCalled=true;throw new Error('RPC must not be called')};
+const missingActor=await adminApi(
+  new Request(`https://verre.test/api/admin/accounts/${selectedAccountId}`,{method:'DELETE'}),
+  deleteEnv,
+  {email:'owner@example.com',role:ROLES.SUPER_ADMIN}
+);
+assert.equal(missingActor.status,401);
+assert.match((await missingActor.json()).error,/identify the signed-in administrator/i);
+const malformedTarget=await deleteAccount(deleteEnv,'staff@example.com',actorId);
+assert.equal(malformedTarget.error.code,'INVALID_ACCOUNT_ID');
+assert.equal(malformedRpcCalled,false,'malformed UUIDs are rejected before the RPC');
 
 globalThis.fetch=async ()=>new Response(JSON.stringify([{
   id:'00000000-0000-4000-8000-000000000002',
