@@ -82,6 +82,10 @@ assert.match(adminApp,/Remove from catalog/, 'products with history need an arch
 assert.match(adminApp,/This product has historical records\. It will be removed from the active catalog while its order, sales, and inventory history remain available\./, 'historical product removal needs clear preservation copy');
 assert.match(adminApp,/Delete permanently/, 'history-free products retain an explicit permanent-delete action');
 assert.doesNotMatch(adminApp,/prompt\(`Permanently delete/, 'product deletion must not fall back to a browser prompt');
+assert.match(adminApp,/formData\.append\('cacheControl','3600'\)/, 'signed product uploads need Supabase multipart metadata');
+assert.match(adminApp,/formData\.append\('',blob,/, 'signed product uploads must send browser blobs as multipart form data');
+assert.match(adminApp,/'x-upsert':'false'/, 'signed product uploads must declare non-upsert behavior');
+assert.doesNotMatch(adminApp,/headers:\{'content-type':'image\/webp'\}/, 'the browser must set the multipart content-type boundary');
 for(const action of ['data-market-edit','data-market-delete','data-market-up','data-market-down']){
   assert.ok(adminApp.includes(action),'market CMS needs '+action);
 }

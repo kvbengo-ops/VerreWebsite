@@ -116,10 +116,13 @@ export async function signUpload(env, productId, filename) {
   const result = await db(env).storage('object/upload/sign/product-images/' + path, { method: 'POST', body: '{}' });
   if (result.error) return result;
   const value = result.data.url || result.data.signedURL || result.data.signedUrl;
-  const signedUrl = value?.startsWith('http')
-    ? value
-    : String(env.SUPABASE_URL).replace(/\/$/, '') + '/storage/v1' + value;
-  return { data: { path, token: result.data.token, signedUrl }, error: null };
+  if (!value) return { data: null, error: { message: 'Storage did not return an upload URL', code: 'BAD_UPLOAD_URL' } };
+  const storageBase = String(env.SUPABASE_URL).replace(/\/$/, '') + '/storage/v1';
+  const signedUrl = value.startsWith('http') ? value : storageBase + (value.startsWith('/') ? '' : '/') + value;
+  let token = result.data.token;
+  try { token ||= new URL(signedUrl).searchParams.get('token'); } catch {}
+  if (!token) return { data: null, error: { message: 'Storage did not return an upload token', code: 'BAD_UPLOAD_TOKEN' } };
+  return { data: { path, token, signedUrl }, error: null };
 }
 
 export async function saveImage(env, image, actor) {

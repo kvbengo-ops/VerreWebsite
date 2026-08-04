@@ -232,7 +232,7 @@ function productForm(p={}){
     ${area('care','Care',p.care)}${field('lead_time','Lead time',p.lead_time)}
     ${field('bg_color','Card color',p.bg_color||'#FFE1EF')}${field('tape_color','Tape color',p.tape_color||'#FFD166')}
     <div class="span-2 preview"><h3>Card preview</h3><div class="preview-card" id="preview"></div></div>
-    ${p.id?`<section class="span-2 card" id="image-panel"><h3>Product photos</h3><p>Drag photos to reorder them; the first is primary.</p><div class="image-list">${(p.images||[]).map(image=>`<figure draggable="true" data-image-id="${image.id}"><img class="thumb" src="${esc(image.url||'')}" alt="${esc(image.alt)}"><figcaption>${esc(image.alt)}</figcaption><button type="button" data-delete-image="${image.id}">Delete</button></figure>`).join('')||'<p>No product photos yet. The atlas remains as a fallback.</p>'}</div><div id="image-drop" class="drop-zone"><label>Required alt text<input id="image-alt" placeholder="Describe what is visible"></label><label>Choose photos<input id="image-files" type="file" accept="image/*" multiple></label><p>Drop photos here or choose files. Originals over 10 MB are rejected; uploads become WebP at max 1600 px.</p></div></section>`:''}
+    ${p.id?`<section class="span-2 card" id="image-panel"><h3>Product photos</h3><p>Drag photos to reorder them; the first is primary.</p><div class="image-list">${(p.images||[]).map(image=>`<figure draggable="true" data-image-id="${image.id}"><img class="thumb" src="${esc(image.url||'')}" alt="${esc(image.alt)}"><figcaption>${esc(image.alt)}</figcaption><button type="button" data-delete-image="${image.id}">Delete</button></figure>`).join('')||'<p>No product photos yet. The atlas remains as a fallback.</p>'}</div><div id="image-drop" class="drop-zone"><label>Required alt text<input id="image-alt" placeholder="Describe what is visible"></label><label>Choose photos<input id="image-files" type="file" accept="image/*" multiple></label><p>Drop photos here or choose files. Originals over 10 MB are rejected; uploads become WebP at max 1600 px.</p><p id="image-upload-status" role="status" aria-live="polite"></p></div></section>`:''}
     <p class="error span-2" id="product-error" role="status"></p>
     <div class="span-2 form-actions">${p.id?'<button type="button" class="danger" id="delete-product">Delete permanently</button>':''}<button type="button" class="secondary" id="cancel-product">Cancel</button><button class="primary">Save product</button></div>
   </form>`);
@@ -266,21 +266,41 @@ function productForm(p={}){
   };
 }
 async function uploadImages(product,files){
-  const alt=$('#image-alt').value.trim();
-  if(!alt)return toast('Alt text is required before uploading.',true);
+  const altInput=$('#image-alt'),fileInput=$('#image-files'),drop=$('#image-drop'),status=$('#image-upload-status');
+  const alt=altInput.value.trim();
+  if(!files.length)return;
+  if(!alt){status.className='error';status.textContent='Add a description before choosing a photo.';altInput.focus();return}
+  if(drop.dataset.uploading==='true')return;
+  drop.dataset.uploading='true';fileInput.disabled=true;status.className='';
+  let uploaded=0;
+  const failures=[];
   for(const file of files){
-    if(!file.type.startsWith('image/')){toast(file.name+' is not an image.',true);continue}
-    if(file.size>10*1024*1024){toast(file.name+' is over 10 MB.',true);continue}
+    if(!file.type.startsWith('image/')){failures.push(file.name+' is not an image.');continue}
+    if(file.size>10*1024*1024){failures.push(file.name+' is over 10 MB.');continue}
     try{
+      status.textContent='Preparing '+file.name+'…';
       const blob=await resizeWebp(file);
       const signed=await api('images/sign',{method:'POST',body:JSON.stringify({product_id:product.id,filename:file.name})});
-      const upload=await fetch(signed.signedUrl,{method:'PUT',headers:{'content-type':'image/webp'},body:blob});
-      if(!upload.ok)throw new Error('Storage upload failed ('+upload.status+')');
-      await api('images',{method:'POST',body:JSON.stringify({product_id:product.id,storage_path:signed.path,alt,position:(product.images||[]).length})});
-      toast(file.name+' uploaded');
-    }catch(error){toast(error.message,true)}
+      const formData=new FormData();
+      formData.append('cacheControl','3600');
+      formData.append('',blob,file.name.replace(/\.[^.]+$/, '')+'.webp');
+      status.textContent='Uploading '+file.name+'…';
+      const upload=await fetch(signed.signedUrl,{method:'PUT',headers:{'x-upsert':'false'},body:formData});
+      if(!upload.ok){
+        let detail='Storage upload failed ('+upload.status+')';
+        try{const body=await upload.json();detail=body.message||body.error||detail}catch{}
+        throw new Error(detail);
+      }
+      await api('images',{method:'POST',body:JSON.stringify({product_id:product.id,storage_path:signed.path,alt,position:(product.images||[]).length+uploaded})});
+      uploaded++;
+    }catch(error){failures.push(file.name+': '+error.message)}
   }
-  state.dirty=false;closeModal();products();
+  drop.dataset.uploading='false';fileInput.disabled=false;fileInput.value='';
+  if(!uploaded){status.className='error';status.textContent=failures.join(' ');return}
+  state.dirty=false;closeModal();
+  toast(uploaded===1?'Photo uploaded':uploaded+' photos uploaded');
+  if(failures.length)toast(failures.join(' '),true);
+  products();
 }
 async function resizeWebp(file){
   const bitmap=await createImageBitmap(file),scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
