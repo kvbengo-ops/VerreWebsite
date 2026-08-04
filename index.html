@@ -351,8 +351,17 @@ const atlasBg = (index) => {
 const productPhoto = (product, galleryIndex, thumbnail) => {
   const image = product.images && product.images[galleryIndex];
   if (!image || !image.url) {
-    const atlasIndex = product.gallery[galleryIndex] ?? product.gallery[0];
-    return atlasPhoto(atlasIndex, product.name + (thumbnail ? ' thumbnail' : ' photo'));
+    return h('div', {
+      role: 'img',
+      'aria-label': product.name + ' photo coming soon',
+      style: {
+        width: '100%', height: '100%', display: 'grid', placeItems: 'center',
+        padding: thumbnail ? 4 : 18, boxSizing: 'border-box', textAlign: 'center',
+        background: 'linear-gradient(145deg,' + (product.bg || '#FFE1EF') + ',#FFF6F0)',
+        color: '#7A5C6B', fontSize: thumbnail ? 8 : 12, fontWeight: 700,
+        letterSpacing: '.1em', textTransform: 'uppercase'
+      }
+    }, thumbnail ? 'No photo' : 'Photo coming soon');
   }
   return h('img', {
     src: image.url,
@@ -659,7 +668,7 @@ class Component extends DCLogic {
         price: product.price_cents / 100,
         stock: product.stock_on_hand,
         atlas: Number(product.atlas ?? product.sort_order ?? 0),
-        gallery: product.gallery || [Number(product.sort_order || 0)],
+        gallery: product.images && product.images.length ? product.images : [0],
         images: product.images || [],
         bg: product.bg_color || '#FFE1EF',
         tape: product.tape_color || '#FFD166',

@@ -66,8 +66,8 @@ async function init(){
 async function refreshCatalog(){
   try{
     const result=await api('products');
-    const products=Array.isArray(result)?result:result?.data||[];
-    if(products.length){
+    const products=Array.isArray(result)?result:Array.isArray(result?.data)?result.data:null;
+    if(products){
       const local=new Map(state.products.map(p=>[p.id,p.stock_on_hand]));
       state.products=products.map(p=>({...p,stock_on_hand:local.has(p.id)&&state.queue.length?Math.min(p.stock_on_hand,local.get(p.id)):p.stock_on_hand}));
       await put('kv',state.products,'catalog');renderProducts();

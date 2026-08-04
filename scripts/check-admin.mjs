@@ -47,6 +47,10 @@ for(const render of ['renderNewsletterForm','renderCustomForm','renderContactFor
   assert.ok(html.includes(render+'()'),render+' must still be reachable from the panel');
 }
 assert.ok(html.includes('{{ connectPanel }}')&&html.includes('{{ connectTabs }}'),'the connect panel and its tabs must be bound in the template');
+const productPhotoBlock=html.slice(html.indexOf('const productPhoto'),html.indexOf('const peso'));
+assert.match(productPhotoBlock,/image\.url/,'storefront product art must use uploaded database image URLs');
+assert.match(productPhotoBlock,/Photo coming soon/,'products without database photos need an honest missing-photo state');
+assert.doesNotMatch(productPhotoBlock,/atlasPhoto\(/,'product cards must not disguise a missing database photo with static atlas art');
 // Auto-rotating a panel that contains a form can swap it mid-sentence.
 assert.ok(!/connectTab[\s\S]{0,200}setInterval/.test(html),'the connect carousel must never rotate on a timer');
 
@@ -75,6 +79,9 @@ for(const route of ['dashboard','products','inventory','orders','sessions','acco
 }
 assert.match(adminApp,/data-inventory-archive/, 'inventory needs an archive action');
 assert.match(adminApp,/data-inventory-delete/, 'inventory needs a product-removal action');
+assert.match(adminApp,/Current products/, 'product management should hide archived rows by default');
+assert.match(adminApp,/data-restore/, 'archived products need an explicit restore-as-draft action');
+assert.match(adminApp,/cache:'no-store'/, 'admin refreshes must not reuse a pre-delete catalog response');
 assert.match(adminApp,/capabilities\?\.includes\('catalog'\)/, 'destructive inventory actions must only render for catalog managers');
 assert.match(adminHtml,/id="delete-product-modal"/, 'product deletion needs an accessible in-app confirmation dialog');
 assert.match(adminApp,/id="confirm-product-slug"/, 'product deletion must require the exact slug');

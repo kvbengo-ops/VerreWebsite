@@ -4,11 +4,18 @@ import { FALLBACK_PRODUCTS } from './fallback.js';
 const PRODUCT_SELECT = '*,product_images(id,storage_path,alt,position)';
 const encode = encodeURIComponent;
 
-export async function listPublicProducts(env) {
+export async function listPublicProducts(env, includeArchivedSlug) {
   const client = db(env);
   if (!client.configured) return { data: FALLBACK_PRODUCTS, error: null, stale: true };
-  const result = await client.rest('products', `select=${encode(PRODUCT_SELECT)}&status=eq.active&order=sort_order.asc`);
-  if (result.error) return { data: FALLBACK_PRODUCTS, error: result.error, stale: true };
+  const filter = includeArchivedSlug
+    ? `or=(status.eq.active,slug.eq.${encode(includeArchivedSlug)})`
+    : 'status=eq.active';
+  const result = await client.rest('products', `select=${encode(PRODUCT_SELECT)}&${filter}&order=sort_order.asc`);
+  // Once a real database is configured, the seed fallback is no longer a safe
+  // last-known-good catalog: removed products may have changed since deploy.
+  // The public route can still use its KV snapshot, but without one an empty
+  // stale catalog is safer than silently republishing archived inventory.
+  if (result.error) return { data: [], error: result.error, stale: true };
   return { data: await attachSignedImages(env, result.data), error: null, stale: false };
 }
 
@@ -53,6 +60,14 @@ export async function archiveProduct(env, id, actor) {
     method: 'PATCH', headers: { prefer: 'return=representation' }, body: JSON.stringify({ status: 'archived' })
   });
   if (!result.error) await audit(env, actor, 'product.archive', id, { status: 'archived' });
+  return result;
+}
+
+export async function restoreProduct(env, id, actor) {
+  const result = await db(env).rest('products', `id=eq.${encode(id)}&select=*`, {
+    method: 'PATCH', headers: { prefer: 'return=representation' }, body: JSON.stringify({ status: 'draft' })
+  });
+  if (!result.error) await audit(env, actor, 'product.restore', id, { status: 'draft' });
   return result;
 }
 

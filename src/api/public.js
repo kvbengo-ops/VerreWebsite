@@ -3,14 +3,16 @@ import { getOrder } from '../db/orders.js';
 import { json } from './http.js';
 
 export async function publicProducts(request, env) {
-  const cacheKey = 'catalog:active';
+  const rawSlug = new URL(request.url).searchParams.get('slug') || '';
+  const requestedSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawSlug) ? rawSlug : '';
+  const cacheKey = requestedSlug ? 'catalog:slug:' + requestedSlug : 'catalog:active';
   if (env.CATALOG_CACHE) {
     try {
       const cached = await env.CATALOG_CACHE.get(cacheKey, 'json');
       if (cached) return json(200, { ok:true, products:cached, stale:false }, { 'cache-control':'public,max-age=60', 'x-verre-cache':'hit' });
     } catch {}
   }
-  const response = await listPublicProducts(env);
+  const response = await listPublicProducts(env, requestedSlug || null);
   if (response.stale && env.CATALOG_CACHE) {
     try {
       const snapshot = await env.CATALOG_CACHE.get('catalog:snapshot', 'json');
@@ -20,7 +22,7 @@ export async function publicProducts(request, env) {
   if (!response.stale && env.CATALOG_CACHE) {
     try {
       await env.CATALOG_CACHE.put(cacheKey, JSON.stringify(response.data), { expirationTtl:60 });
-      await env.CATALOG_CACHE.put('catalog:snapshot', JSON.stringify(response.data));
+      if (!requestedSlug) await env.CATALOG_CACHE.put('catalog:snapshot', JSON.stringify(response.data));
     } catch {}
   }
   return json(200, { ok:true, products:response.data, stale:Boolean(response.stale) }, {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { listProducts, listPublicProducts, removeProduct, uploadProductImage } from './db/products.js';
+import { listProducts, listPublicProducts, removeProduct, restoreProduct, uploadProductImage } from './db/products.js';
 
 const env = { SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
 const realFetch = globalThis.fetch;
@@ -83,9 +83,51 @@ globalThis.fetch = async (url) => {
 await listProducts(env);
 await listProducts(env, { include_archived: 'true' });
 await listPublicProducts(env);
+await listPublicProducts(env, 'sold-product');
 assert.match(listUrls[0], /status=neq\.archived/, 'normal admin/inventory lists exclude archived products');
 assert.doesNotMatch(listUrls[1], /status=(?:neq|eq)\.archived/, 'product management can explicitly include archived products');
 assert.match(listUrls[2], /status=eq\.active/, 'the public catalog includes only active products');
+assert.match(listUrls[3], /or=\(status\.eq\.active,slug\.eq\.sold-product\)/,
+  'an archived deep link resolves without adding archived products to the normal catalog');
+
+// An uploaded image row must become the signed URL consumed by both the
+// storefront and POS. This is the regression boundary for falling back to the
+// built-in atlas even after a photo was saved successfully.
+globalThis.fetch = async (url) => {
+  const path = new URL(url).pathname;
+  if (path.endsWith('/products')) return response([{
+    id:'photo-product', slug:'photo-product', status:'active', sort_order:1,
+    product_images:[{id:'photo-1',storage_path:'products/photo-product/front.webp',alt:'Front view',position:0}]
+  }]);
+  if (path.includes('/storage/v1/object/sign/product-images/')) {
+    return response({ signedURL:'/object/sign/product-images/products/photo-product/front.webp?token=signed-test' });
+  }
+  return response({});
+};
+const catalogWithPhoto=await listPublicProducts(env);
+assert.equal(catalogWithPhoto.error,null);
+assert.equal(catalogWithPhoto.data[0].images[0].alt,'Front view');
+assert.equal(catalogWithPhoto.data[0].images[0].url,
+  'https://db.test/storage/v1/object/sign/product-images/products/photo-product/front.webp?token=signed-test');
+
+// A configured database failure must not resurrect the old seeded catalog.
+// Removed products are more important than a deceptively full fallback grid.
+globalThis.fetch = async () => response({message:'database unavailable',code:'NETWORK'},503);
+const unavailableCatalog=await listPublicProducts(env);
+assert.equal(unavailableCatalog.stale,true);
+assert.deepEqual(unavailableCatalog.data,[]);
+
+const restoreCalls=[];
+globalThis.fetch=async (url,options={})=>{
+  const path=new URL(url).pathname;
+  restoreCalls.push({path,method:options.method||'GET',body:options.body});
+  if(path.endsWith('/products'))return response([{id:'archived-product',status:'draft'}]);
+  return response({});
+};
+const restored=await restoreProduct(env,'archived-product','owner@verre.test');
+assert.equal(restored.error,null);
+assert.deepEqual(JSON.parse(restoreCalls.find(call=>call.path.endsWith('/products')).body),{status:'draft'});
+assert.equal(JSON.parse(restoreCalls.find(call=>call.path.endsWith('/admin_audit_log')).body).action,'product.restore');
 
 // Product photos travel through the authenticated Worker and are written with
 // the service role. This avoids a fragile cross-origin browser upload while

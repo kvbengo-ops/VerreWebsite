@@ -35,7 +35,7 @@ async function signOut(){
 document.getElementById('sign-out')?.addEventListener('click',signOut);
 
 async function api(path,options={}){
-  const response=await fetch('/api/admin/'+path,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});
+  const response=await fetch('/api/admin/'+path,{cache:'no-store',...options,headers:{'content-type':'application/json',...(options.headers||{})}});
   if(response.status===401){signIn();return new Promise(()=>{})}
   const type=response.headers.get('content-type')||'';
   if(!type.includes('application/json'))throw new Error(response.redirected?'Session expired — sign in again.':'The server returned an unreadable response.');
@@ -200,7 +200,7 @@ function revenueChart(daily=[]){
 
 async function products(){
   state.products=await api('products?include_archived=true');
-  setBody(`<div class="toolbar"><input id="search" type="search" placeholder="Search name or slug"><select id="category"><option value="">All categories</option><option>glass</option><option>charms</option><option>stickers</option></select><select id="status"><option value="">All statuses</option><option>active</option><option>draft</option><option>archived</option></select><select id="sort"><option value="name">Name</option><option value="stock">Lowest stock</option></select><button class="primary" id="new-product">Add product</button></div><div id="products-table"></div>`);
+  setBody(`<div class="toolbar"><input id="search" type="search" placeholder="Search name or slug"><select id="category"><option value="">All categories</option><option>glass</option><option>charms</option><option>stickers</option></select><select id="status"><option value="current">Current products</option><option value="active">Active</option><option value="draft">Draft</option><option value="archived">Archived</option><option value="all">All statuses</option></select><select id="sort"><option value="name">Name</option><option value="stock">Lowest stock</option></select><button class="primary" id="new-product">Add product</button></div><div id="products-table"></div>`);
   const update=()=>drawProducts();
   $$('#search,#category,#status,#sort').forEach(el=>el.addEventListener('input',update));
   $('#new-product').onclick=()=>productForm();
@@ -208,11 +208,12 @@ async function products(){
 }
 function drawProducts(){
   const q=$('#search').value.toLowerCase(),cat=$('#category').value,status=$('#status').value,sort=$('#sort').value;
-  const rows=state.products.filter(p=>(!q||(p.name+' '+p.slug).toLowerCase().includes(q))&&(!cat||p.category===cat)&&(!status||p.status===status))
+  const rows=state.products.filter(p=>(!q||(p.name+' '+p.slug).toLowerCase().includes(q))&&(!cat||p.category===cat)&&(status==='all'||(status==='current'?p.status!=='archived':p.status===status)))
     .sort((a,b)=>sort==='stock'?a.stock_on_hand-b.stock_on_hand:a.name.localeCompare(b.name));
-  $('#products-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td>${esc(p.category)}</td><td>${money(p.price_cents)}</td><td>${p.stock_on_hand}</td><td><span class="status ${p.status}">${p.status}</span></td><td><div class="row-actions"><button data-edit="${p.id}">Edit</button>${p.status==='archived'?'':`<button class="secondary" data-archive="${p.id}">Archive</button>`}</div></td></tr>`).join('')}</tbody></table></div>`:(state.products.length?emptyState('✦','Nothing matches','Try clearing the search box or widening the category and status filters.'):emptyState('✦','No products yet','Add your first handmade piece and it will appear on the storefront once published.'));
+  $('#products-table').innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Piece</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.stock_on_hand===0?'out':p.stock_on_hand<=p.low_stock_at?'low':''}"><td><strong>${esc(p.name)}</strong><br><small>${esc(p.slug)}</small></td><td>${esc(p.category)}</td><td>${money(p.price_cents)}</td><td>${p.stock_on_hand}</td><td><span class="status ${p.status}">${p.status}</span></td><td><div class="row-actions"><button data-edit="${p.id}">Edit</button>${p.status==='archived'?`<button class="secondary" data-restore="${p.id}">Restore as draft</button>`:`<button class="secondary" data-archive="${p.id}">Archive</button>`}</div></td></tr>`).join('')}</tbody></table></div>`:(state.products.length?emptyState('✦','Nothing matches',status==='current'?'Archived products are hidden. Choose Archived or All statuses to review them.':'Try clearing the search box or widening the category and status filters.'):emptyState('✦','No products yet','Add your first handmade piece and it will appear on the storefront once published.'));
   $$('[data-edit]').forEach(b=>b.onclick=()=>productForm(state.products.find(p=>p.id===b.dataset.edit)));
   $$('[data-archive]').forEach(b=>b.onclick=()=>archive(b.dataset.archive));
+  $$('[data-restore]').forEach(b=>b.onclick=()=>restore(b.dataset.restore));
 }
 const slugify=v=>v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 function parsePeso(v){const cleaned=String(v).replace(/[₱,\s]/g,'');if(!/^\d+(?:\.\d{1,2})?$/.test(cleaned))return null;return Math.round(Number(cleaned)*100)}
@@ -234,7 +235,7 @@ function productForm(p={}){
     <div class="span-2 preview"><h3>Card preview</h3><div class="preview-card" id="preview"></div></div>
     <section class="span-2 card" id="image-panel"><h3>Product photos</h3><p>${p.id?'Drag photos to reorder them; the first is primary.':'Choose photos now. They will upload after the product is saved.'}</p><div class="image-list">${(p.images||[]).map(image=>`<figure draggable="true" data-image-id="${image.id}"><img class="thumb" src="${esc(image.url||'')}" alt="${esc(image.alt)}"><figcaption>${esc(image.alt)}</figcaption><button type="button" data-delete-image="${image.id}">Delete</button></figure>`).join('')||'<p>No product photos selected yet. The atlas remains as a fallback.</p>'}</div><div id="image-drop" class="drop-zone"><label>Required alt text<input id="image-alt" placeholder="Describe what is visible"></label><label>Choose photos<input id="image-files" type="file" accept="image/*" multiple></label><p>Drop photos here or choose files. Originals over 10 MB are rejected; uploads become WebP at max 1600 px.</p><p id="image-upload-status" role="status" aria-live="polite"></p></div></section>
     <p class="error span-2" id="product-error" role="status"></p>
-    <div class="span-2 form-actions">${p.id?'<button type="button" class="danger" id="delete-product">Delete permanently</button>':''}<button type="button" class="secondary" id="cancel-product">Cancel</button><button class="primary">Save product</button></div>
+    <div class="span-2 form-actions">${p.id?'<button type="button" class="danger" id="delete-product">Remove product…</button>':''}<button type="button" class="secondary" id="cancel-product">Cancel</button><button class="primary">Save product</button></div>
   </form>`);
   const form=$('#product-form');form.category.value=p.category||'glass';form.status.value=p.status||'draft';
   if(locked)form.slug.title='This slug has been public and cannot change.';
@@ -325,6 +326,7 @@ async function resizeWebp(file){
 const field=(name,label,value='',required=false,disabled=false,type='text')=>`<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${disabled?'disabled':''}></label>`;
 const area=(name,label,value='')=>`<label class="span-2">${label}<textarea name="${name}" rows="3">${esc(value||'')}</textarea></label>`;
 async function archive(id,refresh=products){if(!confirm('Archive this product? It will leave the public shop but keep its order history.'))return;try{await api(`products/${id}/archive`,{method:'POST'});toast('Product archived');await refresh()}catch(e){toast(e.message,true)}}
+async function restore(id,refresh=products){try{await api(`products/${id}/restore`,{method:'POST'});toast('Product restored as a draft');await refresh()}catch(e){toast(e.message,true)}}
 async function deleteProduct(product,refresh=products,closeAfter=false){
   if(!product)return toast('That product could not be found.',true);
   let plan;
