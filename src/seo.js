@@ -146,8 +146,8 @@ export function injectSeo(html, request, env = {}, options = {}) {
 export function robotsText(request, env = {}) {
   const requestUrl = new URL(request.url);
   const origin = siteOrigin(request, env);
-  const duplicateWorkerOrigin = requestUrl.hostname.endsWith('.workers.dev') && origin === requestUrl.origin;
-  if (duplicateWorkerOrigin) return 'User-agent: *\nDisallow: /\n';
+  const duplicateOrigin = origin !== requestUrl.origin || requestUrl.hostname.endsWith('.workers.dev');
+  if (duplicateOrigin) return 'User-agent: *\nDisallow: /\n';
   return [
     'User-agent: *',
     'Allow: /',
