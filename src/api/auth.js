@@ -16,6 +16,7 @@ import {
 } from '../db/sessions.js';
 import { CAPABILITIES } from '../roles.js';
 import { emailButton, emailShell, escapeEmailHtml } from '../email.js';
+import { hitCount } from '../rate-limit.js';
 
 const MIN_PASSWORD = 12;
 
@@ -76,34 +77,9 @@ export const clearCookie = (url) => {
 /* rate limiting                                                       */
 /* ------------------------------------------------------------------ */
 
-// KV-backed when available, in-memory otherwise.
-//
-// The in-memory map in worker.js is fine for the contact form — a flooder who
-// waits out an isolate recycle just sends another enquiry. It is NOT fine for a
-// password gate, where surviving a recycle is the whole point. Bind AUTH_LIMITS
-// in production; the fallback exists so local dev and tests still work.
-const memory = new Map();
-
-async function hitCount(env, key, windowMs) {
-  const now = Date.now();
-  if (env.AUTH_LIMITS) {
-    const raw = await env.AUTH_LIMITS.get(key);
-    const times = (raw ? JSON.parse(raw) : []).filter((t) => now - t < windowMs);
-    times.push(now);
-    await env.AUTH_LIMITS.put(key, JSON.stringify(times), {
-      expirationTtl: Math.max(60, Math.ceil(windowMs / 1000))
-    });
-    return times.length;
-  }
-  const times = (memory.get(key) || []).filter((t) => now - t < windowMs);
-  times.push(now);
-  memory.set(key, times);
-  if (memory.size > 2000) {
-    for (const [k, v] of memory) if (!v.some((t) => now - t < windowMs)) memory.delete(k);
-  }
-  return times.length;
-}
-
+// Production counters live in a Durable Object, so all isolates and regions
+// share one serialized counter per key. The local fallback exists only for
+// development and tests; readiness fails when RATE_LIMITER is not bound.
 const tooMany = (retryAfter = 900) =>
   json(429, { ok: false, error: 'Too many attempts. Try again shortly.', code: 'RATE_LIMITED' },
     { 'retry-after': String(retryAfter) });
@@ -309,7 +285,7 @@ async function sendResetEmail(env, account, link) {
     footer: 'Security email from the Verre workroom.'
   });
   try {
-    await fetch('https://api.resend.com/emails', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         authorization: 'Bearer ' + env.RESEND_API_KEY,
@@ -325,8 +301,14 @@ async function sendResetEmail(env, account, link) {
       }),
       signal: AbortSignal.timeout(8000)
     });
+    if (!response.ok) {
+      console.error('auth: reset email provider rejected request - HTTP ' + response.status);
+      return { ok: false, status: response.status };
+    }
+    return { ok: true };
   } catch (error) {
     console.error('auth: reset email failed — ' + (error?.name || 'unknown'));
+    return { ok: false, status: 0 };
   }
 }
 

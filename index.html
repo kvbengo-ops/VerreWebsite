@@ -6,7 +6,7 @@
 <title>Verre — Handmade Glass Paintings, Charms &amp; Stickers | Cebu City</title>
 <meta name="description" content="Verre is a small-batch arts &amp; crafts studio in Cebu City — hand-painted glass, beaded charms and die-cut stickers, made by hand since 2022.">
 <meta name="theme-color" content="#F157A8">
-<script src="./support.js"></script>
+<script src="/support.js"></script>
 </head>
 <body>
 <x-dc>
@@ -29,7 +29,7 @@
      React remounts it and the animation replays. Killed by the
      prefers-reduced-motion block below along with everything else. */
   @keyframes vSlideIn { from{opacity:0;transform:translateX(var(--from,22px));} to{opacity:1;transform:none;} }
-  .atlas { background-image:url('./assets/verre-photo-atlas.png'); background-size:400% 400%; background-repeat:no-repeat; background-color:#FFE1EF; }
+  .atlas { background-image:url('/assets/verre-photo-atlas-v1.webp'); background-size:400% 400%; background-repeat:no-repeat; background-color:#FFE1EF; }
 
   :focus-visible { outline:3px solid #EF4056; outline-offset:3px; }
 
@@ -289,17 +289,12 @@
   <p style="margin:16px 0 6px;font-family:'Shrikhand',cursive;font-size:22px;color:#fff;">Verre</p>
   <p style="margin:0 0 20px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:#C9A4B7;">Arts &amp; Crafts — Made by Hand</p>
   <div style="display:flex;justify-content:center;gap:12px;margin-bottom:20px;">
-    <a href="#top" aria-label="Instagram" style="display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);transition:transform .25s cubic-bezier(.2,.9,.3,1.4),background .25s;" style-hover="transform:translateY(-3px) rotate(-6deg);background:#F157A8;">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1.2" fill="#fff" stroke="none"/></svg>
-    </a>
-    <a href="#top" aria-label="Facebook" style="display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);transition:transform .25s cubic-bezier(.2,.9,.3,1.4),background .25s;" style-hover="transform:translateY(-3px) rotate(6deg);background:#7ED3F2;">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="#fff"><path d="M13.5 21v-8h2.7l.4-3h-3.1V8.2c0-.9.3-1.5 1.5-1.5h1.7V4.1c-.3 0-1.3-.1-2.5-.1-2.5 0-4.2 1.5-4.2 4.3V10H7v3h3v8z"/></svg>
-    </a>
     <a href="mailto:hello@verrecrafts.ph" aria-label="Email" style="display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.1);transition:transform .25s cubic-bezier(.2,.9,.3,1.4),background .25s;" style-hover="transform:translateY(-3px) rotate(-6deg);background:#FFD166;">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 7l8 6 8-6"/></svg>
     </a>
   </div>
   <p style="margin:0 0 6px;font-size:13px;"><a href="mailto:hello@verrecrafts.ph" style="color:#FFB6D9;">hello@verrecrafts.ph</a></p>
+  <p style="margin:0 0 10px;font-size:12px;"><a href="/policies/#privacy" style="color:#FFE7F2;">Privacy</a> · <a href="/policies/#orders" style="color:#FFE7F2;">Orders</a> · <a href="/policies/#shipping" style="color:#FFE7F2;">Shipping</a> · <a href="/policies/#returns" style="color:#FFE7F2;">Returns</a></p>
   <p style="margin:0;font-size:12px;color:#C9A4B7;">Made by hand in Cebu 💗</p>
 </footer>
 {{ overlay }}
@@ -337,7 +332,7 @@ const atlasPhoto = (index, label, shape) => {
     style: {
       width: '100%',
       height: '100%',
-      backgroundImage: "url('./assets/verre-photo-atlas.png')",
+      backgroundImage: "url('/assets/verre-photo-atlas-v1.webp')",
       backgroundSize: shape === 'landscape' ? '400% auto' : '400% 400%',
       backgroundRepeat: 'no-repeat',
       backgroundPosition: stops[index % 4] + ' ' + (shape === 'landscape' ? landscapeRows[Math.floor(index / 4)] : stops[Math.floor(index / 4)])
@@ -346,7 +341,7 @@ const atlasPhoto = (index, label, shape) => {
 };
 const atlasBg = (index) => {
   const stops = ['0%', '33.333%', '66.667%', '100%'];
-  return "url('./assets/verre-photo-atlas.png') " + stops[index % 4] + ' ' + stops[Math.floor(index / 4)] + ' / 400% 400% no-repeat';
+  return "url('/assets/verre-photo-atlas-v1.webp') " + stops[index % 4] + ' ' + stops[Math.floor(index / 4)] + ' / 400% 400% no-repeat';
 };
 const productPhoto = (product, galleryIndex, thumbnail) => {
   const image = product.images && product.images[galleryIndex];
@@ -655,6 +650,9 @@ class Component extends DCLogic {
 
   async loadCatalog() {
     const requested = this.productSlugFromUrl();
+    let cached = [];
+    try { cached = JSON.parse(localStorage.getItem('verre.catalog.v1') || '[]'); } catch {}
+    if (!Array.isArray(cached)) cached = [];
     try {
       const response = await fetch('/api/products' + (requested ? '?slug=' + encodeURIComponent(requested) : ''));
       if (!response.ok) throw new Error('Catalog request failed');
@@ -681,15 +679,16 @@ class Component extends DCLogic {
         leadTime: product.lead_time || '',
         status: product.status
       }));
-      try { localStorage.setItem('verre.catalog.v1', JSON.stringify(products)); } catch {}
-      this.setState({ products, catalogStale: Boolean(body.stale) }, () => {
+      const safeProducts = body.stale && cached.length ? cached : products;
+      if (!body.stale && products.length) {
+        try { localStorage.setItem('verre.catalog.v1', JSON.stringify(products)); } catch {}
+      }
+      this.setState({ products: safeProducts, catalogStale: Boolean(body.stale) }, () => {
         this.restoreCart();
         this.syncProductFromUrl(true);
       });
     } catch {
-      let products = [];
-      try { products = JSON.parse(localStorage.getItem('verre.catalog.v1') || '[]'); } catch {}
-      this.setState({ products: Array.isArray(products) ? products : [], catalogStale: true }, () => {
+      this.setState({ products: cached, catalogStale: true }, () => {
         this.restoreCart();
         this.syncProductFromUrl(true);
       });
@@ -926,10 +925,10 @@ class Component extends DCLogic {
       // Keeping it would let the wizard look complete, then fail on submit with
       // "that choice is no longer available" — after the person had filled in
       // their address. Drop it now so the step simply reads as unanswered.
-      const live = new Set(steps.flatMap((step) => (step.options || []).map((o) => step.key + ' ' + o.key)));
+      const live = new Set(steps.flatMap((step) => (step.options || []).map((o) => step.key + '::' + o.key)));
       const choice = {};
       for (const [groupKey, optionKey] of Object.entries(this.state.wizardChoice)) {
-        if (live.has(groupKey + ' ' + optionKey)) choice[groupKey] = optionKey;
+        if (live.has(groupKey + '::' + optionKey)) choice[groupKey] = optionKey;
       }
       // No steps configured is not an error state to shout about, but it is
       // also not something to render an empty wizard for — fall back to the
@@ -1035,9 +1034,7 @@ class Component extends DCLogic {
     try {
       localStorage.setItem('verre:custom-draft', JSON.stringify({
         at: Date.now(),
-        choice: this.state.wizardChoice,
-        text: this.state.wizardText,
-        details: { ...this.state.customDraft, hp: '' }
+        choice: this.state.wizardChoice
       }));
     } catch {}
   }
@@ -1055,8 +1052,8 @@ class Component extends DCLogic {
       }
       this.setState((state) => ({
         wizardChoice: saved.choice || {},
-        wizardText: saved.text || {},
-        customDraft: { ...state.customDraft, ...(saved.details || {}), hp: '' }
+        wizardText: {},
+        customDraft: { ...state.customDraft, hp: '' }
       }));
     } catch {}
   }
@@ -1108,11 +1105,16 @@ class Component extends DCLogic {
           method: 'PUT', headers: { 'content-type': file.type }, body: file
         });
         if (!put.ok) throw new Error('upload failed');
-        await fetch('/api/custom/upload', {
+        const attachedResponse = await fetch('/api/custom/upload', {
           method: 'POST', headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ ref, token, action: 'attach', path: signed.data.path, position: index })
         });
-      } catch {
+        let attached = null;
+        try { attached = await attachedResponse.json(); } catch {}
+        if (!attachedResponse.ok || !attached || !attached.ok) {
+          throw new Error((attached && attached.error) || 'attachment failed');
+        }
+      } catch (error) {
         this.setState({ customPhotoState: "Your request is saved, but I couldn't attach every photo. Reply to the confirmation email and send them across." });
         return;
       }
@@ -1623,6 +1625,11 @@ class Component extends DCLogic {
           key: 'submit', type: 'submit', disabled: busy,
           style: { ...primaryButtonStyle, fontFamily: "'Poppins',sans-serif", opacity: busy ? .65 : 1, cursor: busy ? 'wait' : 'pointer' }
         }, busy ? 'Sending…' : 'Send my request')
+      ]),
+      h('p', { key: 'policy', style: { margin: 0, fontSize: 12, textAlign: 'center', color: '#7A5C6B' } }, [
+        'By sending this request, you agree to the ',
+        h('a', { key: 'privacy', href: '/policies/#privacy', style: { color: '#9A1450', fontWeight: 700 } }, 'privacy and order policies'),
+        '.'
       ])
     ]);
   }
@@ -1824,7 +1831,11 @@ class Component extends DCLogic {
       // The commission wizard lays option cards out in a grid and needs the
       // room; the other two panels are single-column forms that get harder to
       // read as they get wider.
-      h('div', { key: 'form', style: { maxWidth: tab.id === 'custom' ? 680 : 520, margin: '0 auto' } }, body)
+      h('div', { key: 'form', style: { maxWidth: tab.id === 'custom' ? 680 : 520, margin: '0 auto' } }, body),
+      h('p', { key: 'policies', style: { margin: '18px auto 0', maxWidth: 520, textAlign: 'center', fontSize: 12, color: tab.body } }, [
+        'How Verre uses your details and handles requests: ',
+        h('a', { key: 'link', href: '/policies/', style: { color: 'inherit', fontWeight: 700 } }, 'customer policies')
+      ])
     ]);
   }
 
@@ -1882,8 +1893,10 @@ class Component extends DCLogic {
             style: { margin: 0, color: '#A81F32', background: '#fff', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 600 }
           }, this.state.newsletterError)
         : null,
-      h('p', { key: 'promise', style: { margin: 0, fontSize: 12, color: '#2B5568', opacity: .8 } },
-        'Just new drops and market dates. Unsubscribe from any email.')
+      h('p', { key: 'promise', style: { margin: 0, fontSize: 12, color: '#2B5568', opacity: .8 } }, [
+        'Just new drops and market dates. Unsubscribe from any email. ',
+        h('a', { key: 'privacy', href: '/policies/#privacy', style: { color: 'inherit', fontWeight: 700 } }, 'Privacy notice')
+      ])
     ]);
   }
 

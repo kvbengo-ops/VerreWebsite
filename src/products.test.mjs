@@ -127,12 +127,13 @@ assert.equal(catalogWithPhoto.data[0].images[0].alt,'Front view');
 assert.equal(catalogWithPhoto.data[0].images[0].url,
   '/media/products/22222222-2222-4222-8222-222222222222.webp');
 
-// A configured database failure must not resurrect the old seeded catalog.
-// Removed products are more important than a deceptively full fallback grid.
+// A configured database failure keeps the read-only launch snapshot available.
+// Order writes separately refuse stale data, so this cannot sell old stock.
 globalThis.fetch = async () => response({message:'database unavailable',code:'NETWORK'},503);
 const unavailableCatalog=await listPublicProducts(env);
 assert.equal(unavailableCatalog.stale,true);
-assert.deepEqual(unavailableCatalog.data,[]);
+assert.ok(unavailableCatalog.data.length>0);
+assert.ok(unavailableCatalog.data.every(product=>!product.id));
 
 const restoreCalls=[];
 globalThis.fetch=async (url,options={})=>{

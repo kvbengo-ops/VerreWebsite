@@ -61,9 +61,9 @@ assert.ok(mail.customerText.includes('VR-TEST'));
 
 // 5 through, 6th blocked
 hits.clear();
-for (let i = 0; i < 5; i++) assert.equal(rateLimited('1.2.3.4'), false, 'request ' + (i + 1));
-assert.equal(rateLimited('1.2.3.4'), true);
-assert.equal(rateLimited('5.6.7.8'), false, 'other IPs unaffected');
+for (let i = 0; i < 5; i++) assert.equal(await rateLimited({},'1.2.3.4'), false, 'request ' + (i + 1));
+assert.equal(await rateLimited({},'1.2.3.4'), true);
+assert.equal(await rateLimited({},'5.6.7.8'), false, 'other IPs unaffected');
 
 const env = {
   RESEND_API_KEY: 'test-key',

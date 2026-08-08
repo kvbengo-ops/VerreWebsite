@@ -131,7 +131,7 @@ export async function customRequestApi(request, env, { rateLimited, makeRef, sen
   if (parsed.error) return bad(parsed.error, parsed.field);
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  if (rateLimited(ip)) return json(429, { ok: false, error: 'Too many requests' }, { 'retry-after': '600' });
+  if (await rateLimited(env, ip)) return json(429, { ok: false, error: 'Too many requests' }, { 'retry-after': '600' });
 
   const ref = makeRef();
   const saved = await createCustomRequest(env, ref, parsed);
@@ -217,7 +217,15 @@ export async function customUploadApi(request, env) {
     const path = str(body.path);
     if (!path.startsWith('custom/' + orderId + '/')) return bad('That upload path is not yours', 'path');
     const attached = await attachReferenceImage(env, orderId, path, Number(body.position) || 0);
-    if (attached.error) return json(400, { ok: false, error: attached.error.message });
+    if (attached.error) {
+      const cleaned = await db(env).storage('object/custom-references/' + path, { method: 'DELETE' });
+      if (cleaned.error) console.error('custom upload: orphan cleanup failed - ' + cleaned.error.code);
+      return json(400, {
+        ok: false,
+        error: attached.error.message,
+        code: cleaned.error ? 'ATTACH_FAILED_CLEANUP_PENDING' : 'ATTACH_FAILED_CLEANED'
+      });
+    }
     return json(200, { ok: true });
   }
 

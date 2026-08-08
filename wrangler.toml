@@ -31,15 +31,19 @@ keep_vars = true
 [vars]
 LOCAL_AUTH_BYPASS = "false"
 
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimiter"]
+
 # Optional caches. Create them with:
 #   npx wrangler kv namespace create CATALOG_CACHE
-# then paste the printed id below and uncomment. The site works without them;
-# it just reads Supabase more often. AUTH_LIMITS is the one worth doing first —
-# without it, login rate limiting falls back to an in-memory map that resets
-# whenever Cloudflare recycles the isolate.
-# [[kv_namespaces]]
-# binding = "AUTH_LIMITS"
-# id = ""
+# then paste the printed id below and uncomment. The site works without these
+# caches; it just reads Supabase more often. Authentication and enquiry rate
+# limits use the required RATE_LIMITER Durable Object above.
 # [[kv_namespaces]]
 # binding = "CATALOG_CACHE"
 # id = ""
@@ -65,4 +69,4 @@ binding = "ASSETS"
 # The bare paths are listed separately — "/admin/*" does not match "/admin",
 # which otherwise gets a 307 directory redirect from the asset layer instead of
 # the 401 everything else under it returns.
-run_worker_first = ["/", "/index.html", "/products/*", "/media/products/*", "/robots.txt", "/sitemap.xml", "/admin", "/admin/*", "/pos", "/pos/*"]
+run_worker_first = ["/*"]

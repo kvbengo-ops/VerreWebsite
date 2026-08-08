@@ -167,6 +167,19 @@ await authApiTest.sendResetEmail(
 assert.ok(resetMail.html.startsWith('<!doctype html>'),'reset mail uses the complete branded email shell');
 assert.ok(resetMail.html.includes('Choose a new password'),'reset mail has a clear action');
 assert.ok(resetMail.text.includes('https://verre.test/login/reset?token=safe-token'),'reset mail retains its plaintext link');
+globalThis.fetch=async () => new Response('{}',{status:503});
+const realConsoleError=console.error;
+console.error=()=>{};
+assert.deepEqual(
+  await authApiTest.sendResetEmail(
+    {RESEND_API_KEY:'re_test',FROM_EMAIL:'Verre <hello@mail.verre.test>'},
+    stub.account,
+    'https://verre.test/login/reset?token=safe-token'
+  ),
+  {ok:false,status:503},
+  'reset mail provider failures must be observed'
+);
+console.error=realConsoleError;
 globalThis.fetch=realFetch;
 
 /* ------------------------------------------------------------------ */
@@ -236,67 +249,35 @@ const health = await worker.fetch(new Request('https://verre.test/api/health'), 
 assert.equal(health.status, 503, 'an unconfigured deployment is not ready');
 const healthBody = await health.json();
 assert.equal(healthBody.data.ready, false);
-assert.equal(healthBody.data.database, 'not-configured');
-assert.equal(healthBody.data.configured.database, false);
-assert.equal(healthBody.data.configured.email, false);
-assert.match(healthBody.data.hint, /SUPABASE_URL/, 'health must say what to do, not just what is wrong');
-// Per-name, so a misspelled secret NAME is distinguishable from an unset one.
-assert.deepEqual(healthBody.data.secrets.SUPABASE_URL, false);
-assert.ok(healthBody.data.missing.includes('SUPABASE_SERVICE_ROLE_KEY'));
-assert.match(healthBody.data.hint, /wrangler secret list/,
-  'setting a secret against the wrong Worker name is the likeliest cause, so name that check');
+assert.equal(healthBody.data.status, 'not-ready');
+assert.equal(healthBody.data.checks.database, false);
+assert.equal(healthBody.data.checks.email, false);
+assert.equal(healthBody.data.checks.catalog, false);
+assert.equal(healthBody.data.secrets, undefined, 'public health must not enumerate secret names');
 
-// Every distinguishable Supabase failure, because an earlier version collapsed
-// all of them into "unreachable" and told the operator to check their key — for
-// a database that had no tables. Wrong advice is worse than none.
-const dbEnvHealth = {
-  ...bare,
-  SUPABASE_URL: 'https://db.test',
-  SUPABASE_SERVICE_ROLE_KEY: 'k',
-  SUPER_ADMIN_EMAILS: 'kyle@example.com'
+const healthFetch=globalThis.fetch;
+globalThis.fetch=async (input) => {
+  const path=new URL(input).pathname;
+  const payload=path.endsWith('/products')
+    ? [{id:'p1',slug:'sample',price_cents:100,cost_cents:50,stock_on_hand:1}]
+    : path.endsWith('/rpc/custom_wizard')
+      ? ['base','size','design'].map((key)=>({key,options:[{key:'one'}]}))
+      : {ok:false};
+  return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}});
 };
-const realFetchHealth = globalThis.fetch;
-const probeWith = async (responder) => {
-  globalThis.fetch = responder;
-  const res = await worker.fetch(new Request('https://verre.test/api/health'), dbEnvHealth);
-  const parsed = await res.json();
-  globalThis.fetch = realFetchHealth;
-  return parsed.data;
-};
-const okJson = (payload) => new Response(JSON.stringify(payload), { headers: { 'content-type': 'application/json' } });
-const errJson = (status, payload) => new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } });
-
-// 1. Key rejected.
-const rejected = await probeWith(async () => errJson(401, { message: 'Invalid API key' }));
-assert.equal(rejected.probes.credentials, 'rejected-key');
-assert.match(rejected.hint, /sb_secret_/, 'a rejected key is the one case where the key advice is right');
-
-// 2. Key fine, database empty — no migrations at all.
-const empty = await probeWith(async () => errJson(404, { code: 'PGRST205', message: 'Could not find the table public.products' }));
-assert.equal(empty.probes.coreSchema, 'missing-table');
-assert.match(empty.hint, /db push/i, 'an empty database must not be blamed on the key');
-assert.doesNotMatch(empty.hint, /sb_secret_/, 'and must not send you hunting for a credential problem');
-
-// 3. The real shape of the failure here: tables exist, verify_password does not
-//    because the auth migration rolled back with a later one.
-const noAuthFn = await probeWith(async (url) => {
-  const path = new URL(url).pathname;
-  if (path.endsWith('/rpc/verify_password')) {
-    return errJson(404, { code: 'PGRST202', message: 'Could not find the function public.verify_password' });
-  }
-  return okJson([{ id: 1 }]);
+const readyHealth=await worker.fetch(new Request('https://verre.test/api/health'),{
+  SUPABASE_URL:'https://database.test',
+  SUPABASE_SERVICE_ROLE_KEY:'secret',
+  RESEND_API_KEY:'resend',
+  OWNER_EMAIL:'owner@example.com',
+  FROM_EMAIL:'Verre <hello@example.com>',
+  SUPER_ADMIN_EMAILS:'owner@example.com',
+  PUBLIC_SITE_URL:'https://verre.example',
+  RATE_LIMITER:{}
 });
-assert.equal(noAuthFn.probes.credentials, 'ok');
-assert.equal(noAuthFn.probes.coreSchema, 'ok');
-assert.equal(noAuthFn.probes.authSchema, 'missing-function');
-assert.equal(noAuthFn.ready, false);
-assert.match(noAuthFn.hint, /reload schema cache/i, 'the schema cache is half of this fix and easy to miss');
-
-// 4. Everything working.
-const healthy = await probeWith(async () => okJson([{ id: 1 }]));
-assert.equal(healthy.ready, true, 'credentials, schema and auth all ok means ready');
-assert.equal(healthy.probes.authSchema, 'ok');
-assert.match(healthy.hint, /email is unset/i, 'and it still flags that email will not send');
+globalThis.fetch=healthFetch;
+assert.equal(readyHealth.status,200,'readiness passes only when every critical dependency is ready');
+assert.equal((await readyHealth.json()).data.ready,true);
 
 // Booleans only. A public endpoint that echoes a URL or a key fragment would be
 // a far worse problem than the one it was added to solve.

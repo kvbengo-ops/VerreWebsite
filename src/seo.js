@@ -49,7 +49,7 @@ function structuredData(origin, product) {
           '@id': origin + '/#organization',
           name: 'Verre',
           url: origin + '/',
-          logo: origin + '/assets/verre-social-card.png',
+          logo: origin + '/assets/verre-social-card-v1.webp',
           description: HOME_DESCRIPTION,
           address: {
             '@type': 'PostalAddress',
@@ -105,7 +105,7 @@ export function injectSeo(html, request, env = {}, options = {}) {
   const productImage = product && product.images && product.images[0]
     ? absoluteUrl(origin, product.images[0].url)
     : null;
-  const shareImage = productImage || origin + '/assets/verre-social-card.png';
+  const shareImage = productImage || origin + '/assets/verre-social-card-v1.webp';
   const robots = options.noindex || (product && product.status !== 'active')
     ? 'noindex,follow'
     : 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';

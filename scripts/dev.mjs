@@ -25,7 +25,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Deliberately explicit. Watching the root would pick up dist/ and rebuild in
 // response to its own output, forever.
-const WATCHED = ['src', 'admin', 'pos', 'login', 'assets', 'index.html', 'support.js', 'scripts/build.mjs'];
+const WATCHED = ['src', 'admin', 'pos', 'login', 'policies', 'assets', 'index.html', 'support.js', 'scripts/build.mjs'];
 
 const stamp = () => new Date().toLocaleTimeString('en-PH', { hour12: false });
 const log = (message) => console.log(`\x1b[35m[dev ${stamp()}]\x1b[0m ${message}`);

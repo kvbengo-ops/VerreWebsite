@@ -40,8 +40,8 @@ owner inbox and sending domain are intentionally not hardcoded; confirm both
 with Kyle before launch.
 
 Prices sent by the browser are ignored. The Worker resolves permanent slugs and
-recomputes order subtotals from Supabase. The current inquiry rate limit is
-best-effort: five valid requests per IP per ten minutes, stored in Worker memory.
+recomputes order subtotals from Supabase. Inquiry and authentication limits use
+a Durable Object, so counters survive Worker isolate and region changes.
 
 ## Database (admin, inventory, POS)
 
@@ -270,9 +270,9 @@ email, wrong password, locked account — returns one identical message, and
 `/api/auth/request-reset` always returns `200`, so neither endpoint can be used
 to enumerate accounts.
 
-Bind a KV namespace as `AUTH_LIMITS` in production. Without it the limiter falls
-back to an in-memory map that resets whenever Cloudflare recycles the isolate —
-acceptable for the contact form, not for a password gate.
+The required `RATE_LIMITER` Durable Object binding is declared in
+`wrangler.toml`. The public readiness check stays red if that binding is absent;
+only local development and unit tests use an in-memory fallback.
 
 ### Other identity sources
 

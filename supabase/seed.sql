@@ -79,11 +79,13 @@ insert into products (
   'Reverse-painted glass, acrylic paint, sealed wood-composite frame',
   'Dust with a soft dry cloth. Keep away from moisture and direct sun.',
   'Ships in 2–3 days', '#FFDCD9', '#FFD166', 7
-);
+)
+on conflict (slug) do nothing;
 
 -- Opening balance for the ledger. Cloud Nine ships sold out, and delta <> 0 is a
 -- constraint, so this correctly skips it.
 insert into stock_movements (product_id, delta, reason, note, created_by)
 select id, stock_on_hand, 'initial', 'Seeded from the storefront PRODUCTS array', 'seed'
 from products
-where stock_on_hand > 0;
+where stock_on_hand > 0
+  and not exists (select 1 from stock_movements m where m.product_id = products.id);

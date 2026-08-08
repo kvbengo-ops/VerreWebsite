@@ -59,15 +59,15 @@ const workerFirst=wrangler.match(/run_worker_first\s*=\s*\[([^\]]*)\]/);
 assert.ok(workerFirst,'run_worker_first must be configured');
 const workerFirstPaths=[...workerFirst[1].matchAll(/"([^"]+)"/g)].map(m=>m[1]);
 for(const path of ['/products/*','/media/products/*','/robots.txt','/sitemap.xml','/admin','/admin/*','/pos','/pos/*']){
-  assert.ok(workerFirstPaths.includes(path),path+' must run through Worker authorization before the asset layer');
+  assert.ok(workerFirstPaths.includes('/*')||workerFirstPaths.includes(path),path+' must run through Worker authorization before the asset layer');
 }
 // Not authorization — the Worker injects the seasonal theme into this document.
 // Served straight off the asset layer that code never runs and the storefront
 // is undressed all year, with nothing anywhere reporting a problem.
 for(const path of ['/','/index.html']){
-  assert.ok(workerFirstPaths.includes(path),path+' must reach the Worker so the season can be injected');
+  assert.ok(workerFirstPaths.includes('/*')||workerFirstPaths.includes(path),path+' must reach the Worker so the season can be injected');
 }
-assert.ok(!workerFirstPaths.includes('/login'),'/login must not be gated');
+assert.match(await readFile(resolve(root,'src','worker.js'),'utf8'),/env\.ASSETS\.fetch\(request\)/,'public assets, including login, still pass through after headers');
 const buildScript=await readFile(resolve(root,'scripts','build.mjs'),'utf8');
 assert.match(buildScript,/copyTree\(resolve\(root, "assets"\)/,'all public SEO and storefront assets must reach the production build');
 // A section needs its nav link, its route permission and its PAGES entry to

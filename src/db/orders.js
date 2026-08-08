@@ -56,12 +56,47 @@ export async function syncSales(env, sales, actor) {
   return { data: results, error: null };
 }
 
-export const listSessions = (env) => db(env).rest('pos_sessions', 'select=*&order=opened_at.desc&limit=100');
-export const openSession = (env, body) => db(env).rest('pos_sessions', 'select=*', {
-  method: 'POST', headers: { prefer: 'return=representation' },
-  body: JSON.stringify({ label: body.label, device_label: body.device_label || null, opening_float_cents: body.opening_float_cents || 0 })
-});
+export async function listSessions(env) {
+  const client=db(env);
+  const sessions=await client.rest('pos_sessions','select=*&order=opened_at.desc&limit=100');
+  if(sessions.error)return sessions;
+  const sales=await client.rest('orders','select=session_id,total_cents,payment_method,status&session_id=not.is.null&channel=eq.pos');
+  if(sales.error)return sales;
+  const cash=new Map();
+  for(const sale of sales.data||[]){
+    if(sale.payment_method==='cash'&&sale.status!=='cancelled')cash.set(sale.session_id,(cash.get(sale.session_id)||0)+Number(sale.total_cents||0));
+  }
+  return {data:(sessions.data||[]).map(session=>{
+    const expected_cash_cents=Number(session.opening_float_cents||0)+(cash.get(session.id)||0);
+    return {...session,expected_cash_cents,variance_cents:session.closing_cash_cents==null?null:Number(session.closing_cash_cents)-expected_cash_cents};
+  }),error:null};
+}
+export const openSession = (env, body, actor) => body.client_uuid
+  ? db(env).rpc('open_pos_session', {
+      p_client_uuid: body.client_uuid,
+      p_label: body.label,
+      p_device_label: body.device_label || null,
+      p_opening_float_cents: body.opening_float_cents || 0,
+      p_opened_at: body.opened_at || null,
+      p_operator_email: actor
+    })
+  : db(env).rest('pos_sessions', 'select=*', {
+      method: 'POST', headers: { prefer: 'return=representation' },
+      body: JSON.stringify({
+        label: body.label,
+        device_label: body.device_label || null,
+        opening_float_cents: body.opening_float_cents || 0,
+        operator_email: actor || null
+      })
+    });
 export const closeSession = (env, id, body) => db(env).rest('pos_sessions', `id=eq.${encodeURIComponent(id)}&select=*`, {
   method: 'PATCH', headers: { prefer: 'return=representation' },
   body: JSON.stringify({ closing_cash_cents: body.closing_cash_cents, closed_at: new Date().toISOString() })
+});
+
+export const closeOfflineSession = (env, body, actor) => db(env).rpc('close_pos_session', {
+  p_client_uuid: body.client_uuid,
+  p_closing_cash_cents: body.closing_cash_cents,
+  p_closed_at: body.closed_at || null,
+  p_operator_email: actor
 });

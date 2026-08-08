@@ -1,8 +1,8 @@
 // Bump on every change to a SHELL file. The shell is cache-first, so a stale
 // version keeps serving the old markup and stylesheet forever — a redesign that
 // "did not apply" is almost always this line not having moved.
-const VERSION = 'verre-pos-v6';
-const SHELL = ['/pos/', '/pos/index.html', '/pos/style.css', '/pos/app.js', '/pos/manifest.json', '/pos/icon.svg', '/assets/verre-photo-atlas.png'];
+const VERSION = 'verre-pos-v7';
+const SHELL = ['/pos/', '/pos/index.html', '/pos/style.css', '/pos/app.js', '/pos/manifest.json', '/pos/icon.svg', '/assets/verre-photo-atlas-v1.webp'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -12,6 +12,9 @@ import { themedPage } from './api/theme.js';
 import { can, resolveUser } from './roles.js';
 import { emailButton, emailMessage, emailReference, emailShell, escapeEmailHtml as esc } from './email.js';
 import { productImage, productPage, robots, sitemap } from './api/seo.js';
+import { limited as requestLimited, RateLimiter, _test as rateLimitTest } from './rate-limit.js';
+
+export { RateLimiter };
 
 const MAX_BODY = 16 * 1024;
 const RESEND_TIMEOUT_MS = 8000;
@@ -37,6 +40,11 @@ const wantsHtml = (request) => {
 
 export default {
   async fetch(request, env) {
+    return secureResponse(await routeRequest(request, env), request);
+  }
+};
+
+async function routeRequest(request, env) {
     const url = new URL(request.url);
 
     // Before every gate below: /api/auth/* is how you get a session in the
@@ -149,8 +157,33 @@ export default {
       return env.ASSETS.fetch(request);
     }
     return env.ASSETS.fetch(request);
+}
+
+function secureResponse(response, request) {
+  const headers = new Headers(response.headers);
+  const url = new URL(request.url);
+  if (response.ok && /-v\d+\.(?:webp|png|jpg|jpeg|gif|svg|woff2?)$/i.test(url.pathname)) {
+    headers.set('cache-control', 'public, max-age=31536000, immutable');
+  } else if (response.ok && /\.(?:js|css|webp|png|jpg|jpeg|gif|svg|woff2?)$/i.test(url.pathname)) {
+    headers.set('cache-control', 'public, max-age=86400, stale-while-revalidate=604800');
   }
-};
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+  headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  headers.set('cross-origin-opener-policy', 'same-origin');
+  headers.set(
+    'content-security-policy-report-only',
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; " +
+    "script-src 'self' 'unsafe-inline' https://unpkg.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.qrserver.com; " +
+    "connect-src 'self' https://*.supabase.co; form-action 'self'; upgrade-insecure-requests"
+  );
+  if (url.protocol === 'https:') {
+    headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 async function requestUser(request, env) {
   const identity = await authenticate(request, env);
@@ -212,26 +245,10 @@ function signInRedirect(request) {
 // Cloudflare recycles the isolate and is not shared between colos, so a
 // determined flooder gets through. Move to a Durable Object (or KV with a
 // short TTL) the moment one is provisioned.
-const hits = new Map();
 const RATE_MAX = 5;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 
-function rateLimited(ip) {
-  const now = Date.now();
-  const recent = (hits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
-  if (recent.length >= RATE_MAX) {
-    hits.set(ip, recent);
-    return true;
-  }
-  recent.push(now);
-  hits.set(ip, recent);
-  if (hits.size > 5000) {
-    for (const [k, v] of hits) {
-      if (!v.some((t) => now - t < RATE_WINDOW_MS)) hits.delete(k);
-    }
-  }
-  return false;
-}
+const rateLimited = (env, ip) => requestLimited(env, 'public:' + ip, RATE_MAX, RATE_WINDOW_MS);
 
 /* ------------------------------------------------------------------ */
 /* endpoint                                                            */
@@ -284,7 +301,7 @@ async function handleInquiry(request, env) {
   }
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  if (rateLimited(ip)) {
+  if (await rateLimited(env, ip)) {
     return json(429, { ok: false, error: 'Too many requests' }, { 'retry-after': '600' });
   }
 
@@ -348,123 +365,57 @@ async function handleInquiry(request, env) {
 async function handleHealth(request, env) {
   if (request.method !== 'GET') return json(405, { ok: false, error: 'Method not allowed' }, { allow: 'GET' });
 
-  // Per-name, not per-group. "database: false" does not tell you whether the URL
-  // is missing, the key is missing, or one of them is spelled wrong — and a
-  // typo in a secret NAME looks exactly like never having set it.
-  const present = (name) => Boolean(env[name]);
-  const secrets = Object.fromEntries(
-    ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPER_ADMIN_EMAILS', 'RESEND_API_KEY', 'OWNER_EMAIL', 'FROM_EMAIL']
-      .map((name) => [name, present(name)])
-  );
-  const missing = Object.entries(secrets).filter(([, set]) => !set).map(([name]) => name);
+  const configured = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+  const email = Boolean(env.RESEND_API_KEY && env.OWNER_EMAIL && env.FROM_EMAIL);
+  const administrator = Boolean(env.SUPER_ADMIN_EMAILS || env.ADMIN_EMAILS);
+  const rateLimiting = Boolean(env.RATE_LIMITER);
+  const publicOrigin = publicOriginReady(env.PUBLIC_SITE_URL);
+  let database = false;
+  let auth = false;
+  let catalog = false;
+  let customization = false;
 
-  const configured = {
-    database: secrets.SUPABASE_URL && secrets.SUPABASE_SERVICE_ROLE_KEY,
-    email: secrets.RESEND_API_KEY && secrets.OWNER_EMAIL && secrets.FROM_EMAIL,
-    bootstrapAdmin: Boolean(env.SUPER_ADMIN_EMAILS || env.ADMIN_EMAILS),
-    kvAuthLimits: Boolean(env.AUTH_LIMITS),
-    kvCatalogCache: Boolean(env.CATALOG_CACHE),
-    kvDashboardCache: Boolean(env.DASHBOARD_CACHE)
-  };
-
-  // "Rejected the call" covered far too much. A wrong key, a table that was
-  // never created and a function that was never created all surfaced as
-  // "unreachable", which sent us hunting for a credential problem that did not
-  // exist. Probe three separate things and name which one failed.
-  let credentials = 'not-configured';
-  let coreSchema = 'unknown';
-  let authSchema = 'unknown';
-  let lastCode = null;
-
-  if (configured.database) {
-    // `products` exists from the very first migration, so a failure here is
-    // about credentials or an empty database — never about a later migration.
-    const core = await db(env).rest('products', 'select=id&limit=1');
-    credentials = classifyProbe(core.error);
-    coreSchema = core.error ? classifyProbe(core.error) : 'ok';
-    if (core.error) lastCode = core.error.code;
-
-    if (credentials === 'ok') {
-      // Everything below depends on migrations that may have rolled back
-      // together when one of them failed.
-      const settings = await db(env).rest('site_settings', 'select=id&limit=1');
-      const rpc = await db(env).rpc('verify_password', { p_email: 'health-probe@invalid.test', p_password: '' });
-      authSchema = rpc.error ? classifyProbe(rpc.error) : 'ok';
-      if (rpc.error) lastCode = rpc.error.code;
-      if (settings.error) console.error('health: site_settings probe — ' + settings.error.code);
-      if (rpc.error) console.error('health: verify_password probe — ' + rpc.error.code + ' ' + (rpc.error.message || ''));
-      var settingsSchema = settings.error ? classifyProbe(settings.error) : 'ok';
-    }
+  if (configured) {
+    const [products, wizard, password] = await Promise.all([
+      db(env).rest('products', 'select=id,slug,price_cents,cost_cents,stock_on_hand&status=eq.active&limit=100'),
+      db(env).rpc('custom_wizard', {}),
+      db(env).rpc('verify_password', { p_email: 'health-probe@invalid.test', p_password: '' })
+    ]);
+    database = !products.error;
+    auth = !password.error;
+    catalog = !products.error && (products.data || []).length > 0 && (products.data || []).every((product) =>
+      Boolean(product.id && product.slug) && Number.isInteger(product.price_cents) && product.price_cents >= 0 &&
+      Number.isInteger(product.cost_cents) && product.cost_cents >= 0
+    );
+    customization = !wizard.error && requiredWizardReady(wizard.data);
+    if (products.error) console.error('health: product probe - ' + products.error.code);
+    if (wizard.error) console.error('health: wizard probe - ' + wizard.error.code);
+    if (password.error) console.error('health: auth probe - ' + password.error.code);
   }
 
-  // Kept for the older shape callers already read.
-  const database = credentials === 'ok' ? 'ok' : credentials === 'not-configured' ? 'not-configured' : 'unreachable';
-  const auth = authSchema === 'unknown' ? 'not-configured' : authSchema;
-
-  // The storefront falls back to a hardcoded catalog when the database is
-  // unreachable, so products rendering is not evidence of anything. Readiness
-  // is decided here, not by whether the homepage looks populated.
-  const ready = credentials === 'ok' && authSchema === 'ok' && configured.bootstrapAdmin;
+  const ready = database && auth && catalog && customization && email && administrator && rateLimiting && publicOrigin;
   return json(ready ? 200 : 503, {
     ok: ready,
     data: {
       ready,
-      database,
-      auth,
-      probes: {
-        credentials,
-        coreSchema,
-        settingsSchema: typeof settingsSchema === 'undefined' ? 'unknown' : settingsSchema,
-        authSchema
-      },
-      lastCode,
-      configured,
-      // Names only, never values.
-      secrets,
-      missing,
-      // Whatever is wrong, say what to do about it. This endpoint exists
-      // because every failure so far looked the same from the browser.
-      hint: hintFor({ credentials, coreSchema, authSchema, configured, missing })
+      status: ready ? 'ready' : 'not-ready',
+      checks: { database, auth, catalog, customization, email, administrator, rateLimiting, publicOrigin }
     }
   }, { 'cache-control': 'no-store' });
 }
 
-/**
- * Turn a PostgREST failure into something actionable.
- *
- * PGRST205 = no such table, PGRST202 = no such function. Both arrive as a 404
- * and both mean "the migration did not run", which is a completely different
- * fix from a rejected key.
- */
-function classifyProbe(error) {
-  if (!error) return 'ok';
-  const code = String(error.code || '');
-  const message = String(error.message || '');
-  if (code === '401' || code === '403') return 'rejected-key';
-  if (code === 'PGRST205' || /find the table/i.test(message)) return 'missing-table';
-  if (code === 'PGRST202' || /find the function/i.test(message)) return 'missing-function';
-  if (code === 'NETWORK' || code === 'TimeoutError' || code === 'AbortError') return 'unreachable';
-  return 'error-' + (code || 'unknown');
+function requiredWizardReady(groups) {
+  const byKey = new Map((groups || []).map((group) => [group.key, group]));
+  return ['base', 'size', 'design'].every((key) => (byKey.get(key)?.options || []).length > 0);
 }
 
-function hintFor({ credentials, coreSchema, authSchema, configured, missing = [] }) {
-  if (!configured.database) {
-    // Name the Worker as well as the variables. Setting a secret while
-    // wrangler.toml points at a different name silently configures a second,
-    // empty Worker and leaves the live one exactly like this.
-    return 'This Worker has no ' + missing.filter((n) => n.startsWith('SUPABASE')).join(' or ') +
-      '. Set them on the Worker actually serving this hostname — check `wrangler secret list` and that wrangler.toml `name` matches it.';
+function publicOriginReady(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' && !url.hostname.endsWith('.workers.dev');
+  } catch {
+    return false;
   }
-  if (credentials === 'rejected-key') return 'Supabase rejected the key. Use the sb_secret_ service role key, not sb_publishable_.';
-  if (credentials === 'unreachable') return 'Could not reach Supabase at all. Check SUPABASE_URL is the project URL with no trailing path.';
-  if (coreSchema === 'missing-table') return 'The key works but this database has no tables. Run `supabase db push` — you may be pointed at a different Supabase project than the one you migrated.';
-  if (credentials !== 'ok') return 'Supabase returned an unexpected error. See lastCode and the Worker logs (`wrangler tail`).';
-  if (authSchema === 'missing-function') return 'verify_password does not exist. The auth migration never landed — run `supabase db push`, then Supabase → Settings → API → Reload schema cache.';
-  if (authSchema === 'missing-table') return 'The auth migration is partly applied. Run `supabase db push` and check it completes without error.';
-  if (authSchema !== 'ok') return 'verify_password exists but errored. Check pgcrypto is installed in the extensions schema.';
-  if (!configured.bootstrapAdmin) return 'Set SUPER_ADMIN_EMAILS so at least one account can be granted admin.';
-  if (!configured.email) return 'Ready to sign in. Email is unset, so enquiries and password resets will not send.';
-  return 'Ready.';
 }
 
 /* ------------------------------------------------------------------ */
@@ -495,7 +446,7 @@ async function handleSubscribe(request, env) {
   }
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  if (rateLimited(ip)) {
+  if (await rateLimited(env, ip)) {
     return json(429, { ok: false, error: 'Too many requests' }, { 'retry-after': '600' });
   }
 
@@ -597,6 +548,9 @@ function validate(body) {
 
 async function resolveOrder(env, items) {
   const catalog = await listPublicProducts(env);
+  if ((catalog.stale || catalog.error) && db(env).configured) {
+    return { error: 'The live catalog is temporarily unavailable. Your cart is safe; please try again shortly.' };
+  }
   const bySlug = new Map((catalog.data || []).map((product) => [product.slug, product]));
   const resolved = [];
   let subtotal = 0;
@@ -762,4 +716,4 @@ async function sendEmail(env, payload) {
   }
 }
 
-export const _test = { validate, resolveOrder, makeRef, compose, rateLimited, hits };
+export const _test = { validate, resolveOrder, makeRef, compose, rateLimited, hits: rateLimitTest.fallback };

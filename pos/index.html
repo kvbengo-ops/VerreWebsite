@@ -21,6 +21,8 @@
   <header>
     <a class="brand" href="/admin"><span>V</span><strong>Verre market</strong></a>
     <span id="operator" class="operator" title="Signed-in operator">Checking account…</span>
+    <button id="set-pin" type="button">Offline PIN</button>
+    <button id="lock-pos" type="button">Lock</button>
     <button id="session-button" class="session">No open session</button>
     <div class="signals">
       <span id="network" class="signal" role="status">Checking…</span>
@@ -30,8 +32,9 @@
   <main>
     <section class="catalog" aria-label="Products">
       <div class="catalog-tools">
+        <label class="visually-hidden" for="search">Search products</label>
         <input id="search" type="search" placeholder="Search pieces" autocomplete="off">
-        <div id="categories" class="categories" role="tablist"></div>
+        <div id="categories" class="categories" aria-label="Product categories"></div>
       </div>
       <div id="products" class="products" aria-live="polite"></div>
     </section>
@@ -94,17 +97,19 @@
     </aside>
   </main>
 
-  <dialog id="success">
+  <dialog id="success" aria-labelledby="success-title">
     <div class="success-card">
-      <p class="eyebrow">Sale saved</p><h2 id="success-ref">Pending sync</h2>
+      <p class="eyebrow" id="success-title">Sale saved</p><h2 id="success-ref">Pending sync</h2>
       <div id="qr" class="qr"></div>
       <a id="receipt-link" class="receipt" href="#">Open digital receipt</a>
       <p id="sync-note"></p>
       <div class="actions"><button id="undo">Undo sale</button><button id="next-sale" class="primary">Next sale</button></div>
     </div>
   </dialog>
-  <dialog id="queue-dialog"><div class="dialog-card"><button class="close" data-close>×</button><h2>Sync queue</h2><p id="queue-message"></p><div id="queue-list"></div><button id="sync-now" class="primary">Sync now</button></div></dialog>
-  <dialog id="session-dialog"><div class="dialog-card"><button class="close" data-close>×</button><h2>Market session</h2><div id="session-body"></div></div></dialog>
+  <dialog id="queue-dialog" aria-labelledby="queue-title"><div class="dialog-card"><button class="close" data-close aria-label="Close sync queue">×</button><h2 id="queue-title">Sync queue</h2><p id="queue-message"></p><div id="queue-list"></div><button id="sync-now" class="primary">Sync now</button></div></dialog>
+  <dialog id="session-dialog" aria-labelledby="session-title"><div class="dialog-card"><button class="close" data-close aria-label="Close market session">×</button><h2 id="session-title">Market session</h2><div id="session-body"></div></div></dialog>
+  <dialog id="pin-dialog" aria-labelledby="pin-title"><form method="dialog" class="dialog-card" id="pin-form"><button class="close" value="cancel" aria-label="Close offline PIN setup">×</button><h2 id="pin-title">Set offline device PIN</h2><p>Use six digits known only to this operator. It is required after an offline restart.</p><label>Six-digit PIN <input id="new-pin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required></label><button class="primary" value="default">Save PIN</button></form></dialog>
+  <dialog id="lock-dialog" aria-labelledby="lock-title"><div class="dialog-card"><h2 id="lock-title">POS locked</h2><p id="lock-message"></p><div id="offline-pin-wrap"><label>Offline device PIN <input id="offline-pin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password"></label><button id="unlock-offline" class="primary">Unlock offline</button></div><button id="reconnect-signin">Reconnect and sign in</button><button id="secure-reset" class="danger">Secure device reset</button></div></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="/pos/app.js"></script>
 </body>

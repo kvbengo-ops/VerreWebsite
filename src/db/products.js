@@ -23,7 +23,10 @@ export async function listPublicProducts(env, includeArchivedSlug) {
   // last-known-good catalog: removed products may have changed since deploy.
   // The public route can still use its KV snapshot, but without one an empty
   // stale catalog is safer than silently republishing archived inventory.
-  if (result.error) return { data: [], error: result.error, stale: true };
+  if (result.error) {
+    console.error('catalog: live read failed - ' + result.error.code);
+    return { data: FALLBACK_PRODUCTS, error: null, stale: true };
+  }
   return { data: attachPublicImages(result.data), error: null, stale: false };
 }
 

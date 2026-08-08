@@ -296,6 +296,8 @@ tr.out{color:var(--muted);box-shadow:inset 4px 0 0 var(--faint)}
 
 .tabs{display:flex;gap:var(--s2);flex-wrap:wrap}
 .tabs button[aria-selected=true]{background:linear-gradient(140deg,var(--pink-light),var(--pink));box-shadow:var(--lift-pink)}
+.order-link{appearance:none;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.order-link:hover,.order-link:focus-visible{color:var(--pink-deep);text-decoration:underline}
 
 /* ============================================================
    Empty, loading, error

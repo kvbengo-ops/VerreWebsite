@@ -32,21 +32,39 @@ async function copyTree(from, to, skip = () => false) {
   }
 }
 
+async function assertNoNulBytes(directory) {
+  const textExtensions = new Set(['.html', '.js', '.mjs', '.css', '.json', '.xml', '.txt', '.svg']);
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) await assertNoNulBytes(path);
+    else if (textExtensions.has(entry.name.slice(entry.name.lastIndexOf('.')).toLowerCase())) {
+      const bytes = await readFile(path);
+      if (bytes.includes(0)) throw new Error('build: NUL byte found in text asset ' + path);
+    }
+  }
+}
+
 // Best-effort: a stale module left behind by an older build. If it cannot be
 // removed the build is still correct, so never fail on it.
 await rm(resolve(server, "catalog.js"), { force: true }).catch(() => {});
 
 await mkdir(resolve(client, "assets"), { recursive: true });
 await mkdir(server, { recursive: true });
+for (const stale of ['verre-photo-atlas.png', 'verre-social-card.png']) {
+  await rm(resolve(client, 'assets', stale), { force: true }).catch(() => {});
+}
 
 await copyFile(resolve(root, "index.html"), resolve(client, "index.html"));
 await copyFile(resolve(root, "support.js"), resolve(client, "support.js"));
-await copyTree(resolve(root, "assets"), resolve(client, "assets"));
+await copyTree(resolve(root, "assets"), resolve(client, "assets"), (path) =>
+  path.endsWith('verre-photo-atlas.png') || path.endsWith('verre-social-card.png')
+);
 await copyTree(resolve(root, "admin"), resolve(client, "admin"));
 await copyTree(resolve(root, "pos"), resolve(client, "pos"));
 // Public by design — it is the page you reach *because* you are not signed in.
 // Deliberately absent from run_worker_first in wrangler.toml.
 await copyTree(resolve(root, "login"), resolve(client, "login"));
+await copyTree(resolve(root, "policies"), resolve(client, "policies"));
 
 // The Worker lives in src/. Copy the whole tree rather than naming each module —
 // a per-file list silently drops every new import until the deploy fails.
@@ -58,6 +76,8 @@ await copyTree(
   (path) => path.endsWith(".test.mjs") || path.endsWith("worker.js")
 );
 await copyFile(resolve(root, "src", "worker.js"), resolve(server, "index.js"));
+await assertNoNulBytes(client);
+await assertNoNulBytes(server);
 
 // Cheap tripwire for the failure this file exists to prevent: if the entrypoint
 // on disk does not mention the login route, the copy silently did not happen
