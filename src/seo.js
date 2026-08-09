@@ -49,7 +49,12 @@ function structuredData(origin, product) {
           '@id': origin + '/#organization',
           name: 'Verre',
           url: origin + '/',
-          logo: origin + '/assets/verre-social-card-v1.webp',
+          logo: {
+            '@type': 'ImageObject',
+            url: origin + '/icon-512.png',
+            width: 512,
+            height: 512
+          },
           description: HOME_DESCRIPTION,
           address: {
             '@type': 'PostalAddress',
@@ -141,6 +146,26 @@ export function injectSeo(html, request, env = {}, options = {}) {
   ].join('');
 
   return document.includes('</head>') ? document.replace('</head>', tags + '</head>') : tags + document;
+}
+
+// Keep every public hostname on one HTTPS origin. Canonical tags tell search
+// engines which URL we prefer; a permanent redirect makes browsers, links and
+// crawlers use it consistently in the first place.
+export function canonicalRedirect(request, env = {}) {
+  const current = new URL(request.url);
+  if (['localhost', '127.0.0.1'].includes(current.hostname)) return null;
+  const configured = String(env.PUBLIC_SITE_URL || '').trim();
+  if (!configured) return null;
+  try {
+    const canonical = new URL(configured);
+    if (canonical.protocol !== 'https:' || canonical.origin === current.origin) return null;
+    canonical.pathname = current.pathname;
+    canonical.search = current.search;
+    canonical.hash = '';
+    return Response.redirect(canonical, 308);
+  } catch {
+    return null;
+  }
 }
 
 export function robotsText(request, env = {}) {

@@ -71,6 +71,7 @@ npx supabase db push      # apply pending migrations to the linked project
 | `CF_ACCESS_TEAM_DOMAIN` | Access issuer, such as `https://team.cloudflareaccess.com`. |
 | `CF_ACCESS_AUD` | Access application audience tag checked on every admin/POS API request. |
 | `SUPER_ADMIN_EMAILS` | Comma-separated bootstrap Super Admin emails. `ADMIN_EMAILS` remains a legacy alias. |
+| `PUBLIC_SITE_URL` | Canonical HTTPS origin used for redirects, metadata, robots.txt and the sitemap. This non-secret value is committed in `wrangler.toml`. |
 
 Set both the same way as the Resend values: `.dev.vars` locally,
 `npx wrangler secret put NAME` in production. The **anon key is deliberately not

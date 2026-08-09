@@ -265,7 +265,7 @@ globalThis.fetch=async (input) => {
       : {ok:false};
   return new Response(JSON.stringify(payload),{headers:{'content-type':'application/json'}});
 };
-const readyHealth=await worker.fetch(new Request('https://verre.test/api/health'),{
+const readyHealth=await worker.fetch(new Request('https://verre.example/api/health'),{
   SUPABASE_URL:'https://database.test',
   SUPABASE_SERVICE_ROLE_KEY:'secret',
   RESEND_API_KEY:'resend',

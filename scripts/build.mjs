@@ -56,6 +56,16 @@ for (const stale of ['verre-photo-atlas.png', 'verre-social-card.png']) {
 
 await copyFile(resolve(root, "index.html"), resolve(client, "index.html"));
 await copyFile(resolve(root, "support.js"), resolve(client, "support.js"));
+for (const asset of [
+  'favicon.ico',
+  'favicon-48x48.png',
+  'apple-touch-icon.png',
+  'icon-192.png',
+  'icon-512.png',
+  'site.webmanifest'
+]) {
+  await copyFile(resolve(root, asset), resolve(client, asset));
+}
 await copyTree(resolve(root, "assets"), resolve(client, "assets"), (path) =>
   path.endsWith('verre-photo-atlas.png') || path.endsWith('verre-social-card.png')
 );

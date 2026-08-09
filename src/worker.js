@@ -12,6 +12,7 @@ import { themedPage } from './api/theme.js';
 import { can, resolveUser } from './roles.js';
 import { emailButton, emailMessage, emailReference, emailShell, escapeEmailHtml as esc } from './email.js';
 import { productImage, productPage, robots, sitemap } from './api/seo.js';
+import { canonicalRedirect } from './seo.js';
 import { limited as requestLimited, RateLimiter, _test as rateLimitTest } from './rate-limit.js';
 
 export { RateLimiter };
@@ -46,6 +47,9 @@ export default {
 
 async function routeRequest(request, env) {
     const url = new URL(request.url);
+
+    const redirect = canonicalRedirect(request, env);
+    if (redirect) return redirect;
 
     // Before every gate below: /api/auth/* is how you get a session in the
     // first place, so it cannot require one. Each route inside does its own

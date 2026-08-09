@@ -70,6 +70,12 @@ for(const path of ['/','/index.html']){
 assert.match(await readFile(resolve(root,'src','worker.js'),'utf8'),/env\.ASSETS\.fetch\(request\)/,'public assets, including login, still pass through after headers');
 const buildScript=await readFile(resolve(root,'scripts','build.mjs'),'utf8');
 assert.match(buildScript,/copyTree\(resolve\(root, "assets"\)/,'all public SEO and storefront assets must reach the production build');
+for(const asset of ['favicon.ico','favicon-48x48.png','apple-touch-icon.png','icon-192.png','icon-512.png','site.webmanifest']){
+  assert.ok(buildScript.includes("'"+asset+"'"),asset+' must reach the production build');
+}
+for(const tag of ['rel="icon" href="/favicon.ico"','href="/favicon-48x48.png"','href="/apple-touch-icon.png"','rel="manifest" href="/site.webmanifest"']){
+  assert.ok(html.includes(tag),'storefront head is missing '+tag);
+}
 // A section needs its nav link, its route permission and its PAGES entry to
 // agree. Miss one and the link either 404s to the dashboard or renders a header
 // with no body — both silent.

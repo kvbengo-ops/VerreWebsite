@@ -311,6 +311,32 @@ const themeAssets = {
 };
 const themeEnv = { ASSETS: themeAssets };
 
+// Production has one HTTPS origin. Alternate hosts and plain HTTP keep their
+// path/query but permanently move to the configured public URL.
+for (const source of [
+  'http://verrecrafts.shop/products/pink?ref=market',
+  'https://www.verrecrafts.shop/products/pink?ref=market',
+  'https://verrewebsite.kvb-engo.workers.dev/products/pink?ref=market'
+]) {
+  const redirected = await worker.fetch(new Request(source), {
+    ...themeEnv,
+    PUBLIC_SITE_URL: 'https://verrecrafts.shop'
+  });
+  assert.equal(redirected.status, 308, source + ' must use the canonical host');
+  assert.equal(
+    redirected.headers.get('location'),
+    'https://verrecrafts.shop/products/pink?ref=market'
+  );
+}
+assert.equal(
+  (await worker.fetch(new Request('https://verrecrafts.shop/'), {
+    ...themeEnv,
+    PUBLIC_SITE_URL: 'https://verrecrafts.shop'
+  })).status,
+  200,
+  'the canonical origin must not redirect to itself'
+);
+
 // The storefront path must reach ASSETS exactly as it arrived.
 const storefrontSeen = [];
 await worker.fetch(new Request('https://verre.test/'), {
@@ -328,6 +354,8 @@ assert.match(homeHtml, /window\.__VERRE_THEME__=\{[\s\S]*<\/head>/, 'the theme i
 assert.match(homeHtml, /window\.__VERRE_MARKETS__=\[/, 'published upcoming markets are injected with the theme');
 assert.match(homeHtml, /rel="canonical" href="https:\/\/verre\.test\/"/, 'the homepage has one canonical URL');
 assert.match(homeHtml, /application\/ld\+json/, 'the homepage publishes structured data');
+assert.match(homeHtml, /"logo":\{"@type":"ImageObject","url":"https:\/\/verre\.test\/icon-512\.png","width":512,"height":512\}/,
+  'Organization structured data uses the square brand mark, not the social card');
 assert.ok(home.headers.get('x-verre-theme'), 'the resolved theme is reported in a header');
 assert.equal(home.headers.get('content-length'), null, 'stale content-length must not survive the rewrite');
 
@@ -382,7 +410,8 @@ assert.equal(await workerRobots.text(), 'User-agent: *\nDisallow: /\n', 'the dup
 const hostedAliasRobots = await worker.fetch(new Request('https://verre-host.chatgpt.site/robots.txt'), {
   ...themeEnv, PUBLIC_SITE_URL: 'https://verrecrafts.shop'
 });
-assert.equal(await hostedAliasRobots.text(), 'User-agent: *\nDisallow: /\n', 'the hosting alias cannot compete with the custom domain');
+assert.equal(hostedAliasRobots.status, 308, 'the hosting alias cannot compete with the custom domain');
+assert.equal(hostedAliasRobots.headers.get('location'), 'https://verrecrafts.shop/robots.txt');
 
 const sitemapResponse = await worker.fetch(new Request('https://verre.test/sitemap.xml'), themeEnv);
 const sitemapBody = await sitemapResponse.text();

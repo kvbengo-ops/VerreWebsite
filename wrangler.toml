@@ -6,30 +6,29 @@ name = "verrewebsite"
 main = "dist/server/index.js"
 compatibility_date = "2025-05-01"
 
-# The *.workers.dev origin is on, which is how this deploys before a domain
-# exists.
-#
-# It was off while admin auth depended on a trusted header from a dispatcher:
-# that hostname has no dispatcher in front of it, so it was an unprotected door
-# into /admin and /pos. It is not any more. Authentication is a session cookie
-# checked by the Worker itself, on every hostname, so workers.dev is exactly as
-# protected as the real domain will be.
-#
-# Turn this back off once a custom domain and a route are in place — a second
-# public origin is still a second thing to think about, and search engines will
-# index it.
-workers_dev = true
+# The custom domain is now the only production origin. Disabling workers.dev
+# prevents a second public copy from collecting links or competing in search.
+workers_dev = false
 
 # Runtime values managed in the Cloudflare dashboard must survive CI deploys.
 # Without this, `wrangler deploy` replaces dashboard plaintext variables with
 # only the values declared below, leaving production without Supabase access.
 keep_vars = true
 
+[[routes]]
+pattern = "verrecrafts.shop/*"
+zone_name = "verrecrafts.shop"
+
+[[routes]]
+pattern = "www.verrecrafts.shop/*"
+zone_name = "verrecrafts.shop"
+
 # Non-secret configuration. Anything here is committed to git, so nothing that
 # grants access belongs in this block — SUPABASE_SERVICE_ROLE_KEY and
 # RESEND_API_KEY go through `wrangler secret put`, never here.
 [vars]
 LOCAL_AUTH_BYPASS = "false"
+PUBLIC_SITE_URL = "https://verrecrafts.shop"
 
 [[durable_objects.bindings]]
 name = "RATE_LIMITER"
